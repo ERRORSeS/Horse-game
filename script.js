@@ -176,8 +176,11 @@ function changeTab(tab) {
 }
 
 function ensurePanels() {
-  const main = document.querySelector('main');
-  if (!main) return;
+  let main = document.querySelector('main');
+  if (!main) {
+    main = document.createElement('main');
+    document.body.append(main);
+  }
   tabs.forEach((tab) => {
     if (document.getElementById(tab)) return;
     const section = document.createElement('section');
@@ -188,8 +191,15 @@ function ensurePanels() {
 }
 
 function buildTabs() {
-  const wrap = document.getElementById('tabs');
-  if (!wrap) return;
+  let wrap = document.getElementById('tabs');
+  if (!wrap) {
+    wrap = document.createElement('nav');
+    wrap.id = 'tabs';
+    wrap.className = 'tabs';
+    const topbar = document.querySelector('.topbar');
+    if (topbar && topbar.nextSibling) topbar.parentNode.insertBefore(wrap, topbar.nextSibling);
+    else document.body.prepend(wrap);
+  }
   wrap.innerHTML = '';
   tabs.forEach((tab) => {
     const btn = document.createElement('button');
@@ -223,7 +233,14 @@ function renderDashboard() {
 
 function createHorseCard(horse) {
   const tpl = document.getElementById('horseCardTemplate');
-  const node = tpl.content.firstElementChild.cloneNode(true);
+  const node = tpl?.content?.firstElementChild
+    ? tpl.content.firstElementChild.cloneNode(true)
+    : (() => {
+      const article = document.createElement('article');
+      article.className = 'horse-card';
+      article.innerHTML = `<h3 class='horse-name'></h3><p class='subline'></p><p class='meta'></p><div class='grid two'><div><h4>Jump Training</h4><ul class='stats jump-stats'></ul></div><div><h4>Dressage Training</h4><ul class='stats dressage-stats'></ul></div></div><div class='grid two'><div class='results'></div><div class='manage'></div></div>`;
+      return article;
+    })();
   const activeIssue = horse.illnesses.find((i) => i.active);
 
   node.querySelector('.horse-name').textContent = horse.name;
@@ -938,8 +955,10 @@ function render() {
   safeRun('renderFreezer', renderFreezer);
 }
 
-document.getElementById('skipMonthBtn').onclick = () => { monthlyProgress(); render(); };
-document.getElementById('addMoneyBtn').onclick = () => { app.money += 100000; render(); };
+const skipBtn = document.getElementById('skipMonthBtn');
+const addMoneyBtn = document.getElementById('addMoneyBtn');
+if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); };
+if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); };
 
 window.addEventListener('error', (event) => {
   showFatal(event.message || 'Unknown runtime error');
