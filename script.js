@@ -53,6 +53,25 @@ const money = (v) => `$${Math.round(v).toLocaleString()}`;
 const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 
+
+function showFatal(message) {
+  const main = document.querySelector('main');
+  if (!main) return;
+  const box = document.createElement('section');
+  box.className = 'panel';
+  box.innerHTML = `<div class='box'><h2>Startup Error</h2><p>${message}</p><p class='small'>Try a hard refresh (Ctrl/Cmd + Shift + R). If this persists, your local branch may still contain unresolved conflicts.</p></div>`;
+  main.prepend(box);
+}
+
+function safeRun(label, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`${label} failed`, error);
+    throw new Error(`${label} failed: ${error.message}`);
+  }
+}
+
 function pushReport(text) {
   app.reports.push({ date: dateLabel(), text });
 }
@@ -134,8 +153,10 @@ function seed() {
 }
 
 function updateHeader() {
-  document.getElementById('monthLabel').textContent = `Month ${app.month}, Year ${app.year}`;
-  document.getElementById('moneyLabel').innerHTML = `<span class="money">${money(app.money)}</span>`;
+  const monthEl = document.getElementById('monthLabel');
+  const moneyEl = document.getElementById('moneyLabel');
+  if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
+  if (moneyEl) moneyEl.innerHTML = `<span class="money">${money(app.money)}</span>`;
 }
 
 function changeTab(tab) {
@@ -160,6 +181,8 @@ function ensurePanels() {
 
 function buildTabs() {
   const wrap = document.getElementById('tabs');
+  if (!wrap) return;
+  wrap.innerHTML = '';
   tabs.forEach((tab) => {
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
@@ -890,26 +913,35 @@ function monthlyProgress() {
 }
 
 function render() {
-  updateHeader();
-  renderDashboard();
-  renderHorses();
-  renderMarket();
-  renderSales();
-  renderStud();
-  renderShows();
-  renderVet();
-  renderFarrier();
-  renderTraining();
-  renderBreeding();
-  renderRegistries();
-  renderBreeders();
-  renderFreezer();
+  safeRun('updateHeader', updateHeader);
+  safeRun('renderDashboard', renderDashboard);
+  safeRun('renderHorses', renderHorses);
+  safeRun('renderMarket', renderMarket);
+  safeRun('renderSales', renderSales);
+  safeRun('renderStud', renderStud);
+  safeRun('renderShows', renderShows);
+  safeRun('renderVet', renderVet);
+  safeRun('renderFarrier', renderFarrier);
+  safeRun('renderTraining', renderTraining);
+  safeRun('renderBreeding', renderBreeding);
+  safeRun('renderRegistries', renderRegistries);
+  safeRun('renderBreeders', renderBreeders);
+  safeRun('renderFreezer', renderFreezer);
 }
 
 document.getElementById('skipMonthBtn').onclick = () => { monthlyProgress(); render(); };
 document.getElementById('addMoneyBtn').onclick = () => { app.money += 100000; render(); };
 
-seed();
-ensurePanels();
-buildTabs();
-render();
+window.addEventListener('error', (event) => {
+  showFatal(event.message || 'Unknown runtime error');
+});
+
+try {
+  seed();
+  ensurePanels();
+  buildTabs();
+  render();
+} catch (error) {
+  console.error('Startup failed', error);
+  showFatal(error.message);
+}
