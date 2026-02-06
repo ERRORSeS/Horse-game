@@ -84,3 +84,23 @@ input, select {
   margin-bottom: .5rem;
 }
 .section-cards { margin-top: .75rem; }
+.table-wrap { overflow-x: auto; }
+.horse-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid #35475a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.horse-table th,
+.horse-table td {
+  text-align: left;
+  padding: .6rem .75rem;
+  border-bottom: 1px solid #2a3a4c;
+  font-size: .95rem;
+}
+.horse-table th { color: #cfe0f2; font-weight: 600; }
+.horse-table tr:hover { background: #273748; cursor: pointer; }
+.horse-table tr.selected { background: #2f4458; }
+.horse-profile { margin-top: 1.5rem; }
