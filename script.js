@@ -84,6 +84,16 @@ function pushReport(text) {
   app.reports.push({ date: dateLabel(), text });
 }
 
+function canCompeteUnderSaddle(horse) {
+  return horse.age >= 3;
+}
+
+function horseLifeStage(horse) {
+  if (horse.age < 1) return 'Foal';
+  if (horse.age < 3) return 'Young Horse';
+  return 'Mature Horse';
+}
+
 function horseDisciplineAverage(horse, discipline) {
   if (discipline === 'jumping') {
     return Object.values(horse.stats.jumping).reduce((a, b) => a + b, 0) / 6;
@@ -244,8 +254,8 @@ function createHorseCard(horse) {
   const activeIssue = horse.illnesses.find((i) => i.active);
 
   node.querySelector('.horse-name').textContent = horse.name;
-  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} ${horse.marking} | ${horse.age} | ${horse.gender}`;
-  node.querySelector('.meta').textContent = `${horse.breed} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears} years est. • Worth: ${money(horseWorth(horse))}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''}`;
+  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} ${horse.marking} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears} years est. • Worth: ${money(horseWorth(horse))}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${v}</li>`; });
@@ -401,6 +411,10 @@ function renderStud() {
 }
 
 function runShow(horse, discipline, level) {
+  if (!canCompeteUnderSaddle(horse)) {
+    pushReport(`${horse.name} cannot enter under-saddle shows until age 3.`);
+    return;
+  }
   const idx = levelIndex(discipline, level);
   const avg = horseDisciplineAverage(horse, discipline);
   const target = 45 + idx * 4.8;
@@ -438,8 +452,9 @@ function renderShows() {
         ${s.names.map((n) => `<p>${n} (0/250) — Oxer To Oxer Showgrounds</p>`).join('')}
         <label>Horse</label>
         <select id='show-horse-${s.key}'>
-          ${app.horses.filter((h) => !h.retiredForever).map((h) => `<option value='${h.id}'>${h.name}</option>`).join('')}
+          ${app.horses.filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${h.name}</option>`).join('')}
         </select>
+        <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
         <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
         <button id='enter-${s.key}'>Run Show Now</button>
@@ -454,7 +469,8 @@ function renderShows() {
       const id = document.getElementById(`show-horse-${d}`).value;
       const level = document.getElementById(`show-level-${d}`).value;
       const horse = app.horses.find((h) => h.id === id);
-      if (!horse) return;
+      if (!horse) return alert('No eligible horse selected.');
+      if (!canCompeteUnderSaddle(horse)) return alert('This horse is in-hand only until age 3.');
       runShow(horse, d, level);
       render();
     };
@@ -808,9 +824,15 @@ function renderRegistries() {
       const action = btn.dataset.action;
       if (action === 'inspect') {
         const score = Math.round((horseDisciplineAverage(winner, 'dressage') + horseDisciplineAverage(winner, 'jumping')) / 2 * 0.7 + rnd(5, 20));
-        pushReport(`${winner.name} attended ${breed} inspection and scored ${score}.`);
+        pushReport(`${winner.name} attended ${breed} inspection (in-hand) and scored ${score}.`);
       }
-      if (action === 'riding') pushReport(`${winner.name} completed ${breed} riding test and gained registry points.`);
+      if (action === 'riding') {
+        if (!canCompeteUnderSaddle(winner)) {
+          pushReport(`${winner.name} is under age 3 and can only do in-hand registry events right now.`);
+        } else {
+          pushReport(`${winner.name} completed ${breed} riding test and gained registry points.`);
+        }
+      }
       if (action === 'expo') pushReport(`${winner.name} represented your stable at the ${breed} breed expo.`);
       render();
     };
@@ -824,7 +846,7 @@ function renderBreeders() {
       <label>Horse</label>
       <select id='breed-horse'>${app.horses.filter((h) => !h.retiredForever).map((h) => `<option value='${h.id}'>${h.name}</option>`).join('')}</select>
       <button id='enter-breeder'>Enter Horse ($100)</button>
-      <p class='small'>Each horse may enter 4 times per month. Conformation and training influence score.</p>
+      <p class='small'>Foals/youngsters under 3 enter in-hand classes only. At 3+, they may continue here and also compete under saddle. Each horse may enter 4 times per month.</p>
     </div>
   `;
 
@@ -845,7 +867,8 @@ function renderBreeders() {
     horse.earnings += payout;
     if (placing <= 3) horse.topWins.breed += 1;
     if (placing === 1) horse.topWins.overall += 1;
-    pushReport(`Breeders' Show: ${horse.name} scored ${score}, placed #${placing}, won ${money(payout)}.`);
+    const showType = canCompeteUnderSaddle(horse) ? 'under-saddle or in-hand' : 'in-hand';
+    pushReport(`Breeders' Show (${showType}): ${horse.name} scored ${score}, placed #${placing}, won ${money(payout)}.`);
     render();
   };
 }
