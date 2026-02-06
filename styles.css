@@ -76,3 +76,10 @@ input, select {
 .money { color: var(--good); font-weight: 700; }
 .small { font-size: .85rem; color: var(--muted); }
 .inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.horse-section { margin-bottom: 1rem; }
+.horse-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: .5rem;
+}
+.section-cards { margin-top: .75rem; }
