@@ -69,6 +69,8 @@ const app = {
   semenStraws: [],
   embryos: [],
   saleBarn: [],
+  npcSales: [],
+  npcStuds: [],
   reports: [],
   showOffspringWindow: true,
   trainingSelection: { horseId: '', discipline: 'jumping', exercise: '' }
@@ -84,11 +86,19 @@ const money = (v) => `$${Math.round(v).toLocaleString()}`;
 const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 
+const RARE_MARKINGS = MARKINGS.filter((m) => m !== 'None');
+
 function normalizeMarkingForBreed(marking, breed) {
   if (!marking.includes('Rabicano')) return marking;
   const lower = String(breed || '').toLowerCase();
   if (lower.includes('arab')) return marking;
   return pick(MARKINGS.filter((m) => m !== 'Rabicano'));
+}
+
+function randomMarking(breed) {
+  const roll = rnd(1, 100);
+  const marking = roll <= 7 ? pick(RARE_MARKINGS) : 'None';
+  return normalizeMarkingForBreed(marking, breed);
 }
 
 function personalityProfile(personality) {
@@ -161,6 +171,8 @@ function hydrateFromSave(data) {
   app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
   app.embryos = Array.isArray(data.embryos) ? data.embryos : [];
   app.saleBarn = Array.isArray(data.saleBarn) ? data.saleBarn : [];
+  app.npcSales = Array.isArray(data.npcSales) ? data.npcSales : [];
+  app.npcStuds = Array.isArray(data.npcStuds) ? data.npcStuds : [];
   app.reports = Array.isArray(data.reports) ? data.reports : [];
   app.showOffspringWindow = data.showOffspringWindow !== false;
   app.trainingSelection = typeof data.trainingSelection === 'object' && data.trainingSelection
@@ -176,6 +188,8 @@ function hydrateFromSave(data) {
     h.faceMarking = h.faceMarking || pick(FACE_MARKINGS);
     h.marking = normalizeMarkingForBreed(h.marking || 'None', h.breed);
     h.personality = h.personality || pick(PERSONALITIES);
+    h.behavior = Number.isFinite(h.behavior) ? h.behavior : 0;
+    h.extraPotential = h.extraPotential === true;
     h.stats = h.stats || { dressage: {}, jumping: {} };
     const d = h.stats.dressage || {};
     const j = h.stats.jumping || {};
@@ -209,6 +223,8 @@ function resetGame() {
   app.semenStraws = [];
   app.embryos = [];
   app.saleBarn = [];
+  app.npcSales = [];
+  app.npcStuds = [];
   app.reports = [];
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
@@ -289,7 +305,8 @@ function requiredSkillBand(discipline, level) {
 
 function effectiveDisciplineSkill(horse, discipline) {
   const raw = horseDisciplineAverage(horse, discipline);
-  return Math.min(raw, horse.potential[discipline] || 100);
+  const talentBoost = horse.extraPotential ? 3 : 0;
+  return Math.min(raw + talentBoost, horse.potential[discipline] || 100);
 }
 
 function highestAllowedLevelIndex(horse, discipline) {
@@ -312,9 +329,10 @@ function horseWorth(horse) {
   const training = Object.values(horse.stats.dressage).reduce((a, b) => a + b, 0) + Object.values(horse.stats.jumping).reduce((a, b) => a + b, 0);
   const resultsBonus = horse.totalPoints * 25 + horse.championships * 450 + horse.reserves * 250;
   const conformBonus = CONFORMATION_MULT[horse.conformation] || 1;
+  const talentBonus = horse.extraPotential ? 2500 : 0;
   const potentialBonus = (horse.potential.dressage + horse.potential.jumping + horse.potential.eventing + horse.potential.hunter) * 9;
   const agePenalty = horse.age > 16 ? (horse.age - 16) * 300 : 0;
-  return Math.max(350, Math.round((1500 + training * 6 + potentialBonus + resultsBonus - agePenalty) * conformBonus));
+  return Math.max(350, Math.round((1500 + training * 6 + potentialBonus + resultsBonus + talentBonus - agePenalty) * conformBonus));
 }
 
 function baseHorse(type = 'trained') {
@@ -339,6 +357,8 @@ function baseHorse(type = 'trained') {
     marking: 'None',
     faceMarking: pick(FACE_MARKINGS),
     personality: pick(PERSONALITIES),
+    behavior: 0,
+    extraPotential: false,
     conformation: pick(CONFORMATION),
     height: `${rnd(14, 18)}.${rnd(0, 3)} hh`,
     soundnessYears: rnd(1, 15),
@@ -367,8 +387,19 @@ function baseHorse(type = 'trained') {
     topWins: { mareFilly: 0, breed: 0, overall: 0, highestScore: 0 },
     offspring: []
   };
-  horse.marking = normalizeMarkingForBreed(pick(MARKINGS), horse.breed);
+  if (rnd(1, 100) <= 18) {
+    horse.extraPotential = true;
+    Object.keys(horse.potential).forEach((k) => {
+      horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
+    });
+  }
+  horse.marking = randomMarking(horse.breed);
   return horse;
+}
+
+function inheritExtraPotential(dam, sire) {
+  const inheritedChance = dam?.extraPotential || sire?.extraPotential ? 35 : 18;
+  return rnd(1, 100) <= inheritedChance;
 }
 
 function foalPotential(dam, sire) {
@@ -388,6 +419,26 @@ function foalPotential(dam, sire) {
 function seed() {
   app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
   app.saleBarn = [baseHorse('fully'), baseHorse('trained')].map((h, i) => ({ ...h, owner: 'NPC Stable', price: 8000 + i * 4000 }));
+  refreshNpcAds();
+}
+
+function refreshNpcAds() {
+  const saleCount = rnd(2, 4);
+  const studCount = rnd(2, 3);
+  app.npcSales = Array.from({ length: saleCount }, () => {
+    const horse = baseHorse(pick(['untrained', 'trained', 'fully']));
+    horse.owner = pick(['Evergreen Stables', 'Valley Creek Farm', 'Blue Ridge Sporthorses', 'Silverleaf Stables']);
+    const price = Math.round(horseWorth(horse) * rnd(85, 120) / 100);
+    return { ...horse, price, saleId: uid() };
+  });
+  app.npcStuds = Array.from({ length: studCount }, () => {
+    const stallion = baseHorse('trained');
+    stallion.gender = 'Stallion';
+    stallion.owner = pick(['Redwood Stud', 'Oak Hollow', 'Northbridge Sporthorses']);
+    const fee = Math.round(horseWorth(stallion) * 0.2 + 850);
+    return { ...stallion, fee, studId: uid() };
+  });
+  pushReport('NPC sale and stud ads have been refreshed.');
 }
 
 function updateHeader() {
@@ -477,7 +528,7 @@ function createHorseCard(horse) {
   const socks = horse.socks || 'None';
   const face = horse.faceMarking || 'Faint';
   node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${socks} | ${horse.marking} | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears} years est. • Worth: ${money(horseWorth(horse))}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${v}</li>`; });
@@ -545,11 +596,52 @@ function createHorseCard(horse) {
   return node;
 }
 
+function horseProfileMarkup(horse) {
+  const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
+  const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
+  return `
+    <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}</p>
+    <div class='grid two'>
+      <div><h4>Jump Training</h4><ul class='stats'>${jumping}</ul></div>
+      <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
+    </div>
+    <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Top Breed ${horse.topWins?.breed || 0}.</p>
+  `;
+}
+
 function renderHorses() {
   const el = document.getElementById('horses');
-  el.innerHTML = `<h2>Your Horses</h2><div class='cards'></div>`;
-  const cards = el.querySelector('.cards');
-  app.horses.forEach((h) => cards.append(createHorseCard(h)));
+  const foals = app.horses.filter((h) => h.age < 3);
+  const retiredBreeding = app.horses.filter((h) => h.retiredToBreeding && !h.retiredForever);
+  const retired = app.horses.filter((h) => h.retiredForever);
+  const active = app.horses.filter((h) => h.age >= 3 && !h.retiredToBreeding && !h.retiredForever);
+
+  const section = (title, horses, open = false) => `
+    <details class='horse-section' ${open ? 'open' : ''}>
+      <summary>${title} (${horses.length})</summary>
+      <div class='cards section-cards' data-section='${title}'></div>
+    </details>
+  `;
+
+  el.innerHTML = `
+    <h2>Your Horses</h2>
+    ${section('Active Horses', active, true)}
+    ${section('Retired for Breeding', retiredBreeding)}
+    ${section('Retired', retired)}
+    ${section('Foals & Young Horses', foals)}
+  `;
+
+  const sectionMap = {
+    'Active Horses': active,
+    'Retired for Breeding': retiredBreeding,
+    Retired: retired,
+    'Foals & Young Horses': foals
+  };
+
+  el.querySelectorAll('.section-cards').forEach((wrap) => {
+    const horses = sectionMap[wrap.dataset.section] || [];
+    horses.forEach((h) => wrap.append(createHorseCard(h)));
+  });
 }
 
 function renderMarket() {
@@ -590,13 +682,22 @@ function renderMarket() {
 
 function renderSales() {
   const el = document.getElementById('sales');
-  el.innerHTML = `<h2>Sales Barn</h2><div class='cards'></div>`;
-  const cards = el.querySelector('.cards');
+  el.innerHTML = `
+    <h2>Sales Barn</h2>
+    <div class='cards' id='player-sales'></div>
+    <h2>NPC Sales Ads</h2>
+    <div class='cards' id='npc-sales'></div>
+    <h2>NPC Stud Ads</h2>
+    <div class='cards' id='npc-studs'></div>
+  `;
+  const cards = el.querySelector('#player-sales');
+  const npcCards = el.querySelector('#npc-sales');
+  const studCards = el.querySelector('#npc-studs');
 
   app.saleBarn.forEach((h, idx) => {
     const b = document.createElement('div');
     b.className = 'box';
-    b.innerHTML = `<h3>${h.name}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>${money(h.price)}</p><p class='small'>Seller: ${h.owner}</p><button>Buy Horse</button>`;
+    b.innerHTML = `<h3>${h.name}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>${money(h.price)}</p><p class='small'>Seller: ${h.owner}</p><details><summary>View Profile</summary>${horseProfileMarkup(h)}</details><button>Buy Horse</button>`;
     b.querySelector('button').onclick = () => {
       if (app.money < h.price) return alert('Not enough money');
       app.money -= h.price;
@@ -606,6 +707,34 @@ function renderSales() {
       render();
     };
     cards.append(b);
+  });
+
+  app.npcSales.forEach((h) => {
+    const b = document.createElement('div');
+    b.className = 'box';
+    b.innerHTML = `<h3>${h.name}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>${money(h.price)}</p><p class='small'>Seller: ${h.owner}</p><details><summary>View Profile</summary>${horseProfileMarkup(h)}</details><button data-sale='${h.saleId}'>Buy Horse</button>`;
+    b.querySelector('button').onclick = () => {
+      if (app.money < h.price) return alert('Not enough money');
+      app.money -= h.price;
+      app.horses.push({ ...h, owner: 'Your Stable' });
+      app.npcSales = app.npcSales.filter((s) => s.saleId !== h.saleId);
+      pushReport(`Bought ${h.name} from NPC sales for ${money(h.price)}.`);
+      render();
+    };
+    npcCards.append(b);
+  });
+
+  app.npcStuds.forEach((h) => {
+    const b = document.createElement('div');
+    b.className = 'box';
+    b.innerHTML = `<h3>${h.name}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>Stud Fee: ${money(h.fee)}</p><p class='small'>Stud: ${h.owner}</p><details><summary>View Profile</summary>${horseProfileMarkup(h)}</details><button data-stud='${h.studId}'>Purchase Straw</button>`;
+    b.querySelector('button').onclick = () => {
+      if (!tryCharge(h.fee)) return;
+      app.semenStraws.push({ id: uid(), stallionId: h.id, stallionName: h.name });
+      pushReport(`Purchased a straw from ${h.name} for ${money(h.fee)}.`);
+      render();
+    };
+    studCards.append(b);
   });
 }
 
@@ -654,8 +783,10 @@ function runShow(horse, discipline, level) {
   const skill = effectiveDisciplineSkill(horse, discipline);
   const temperament = personalityProfile(horse.personality);
   const conformationBoost = (CONFORMATION_MULT[horse.conformation] - 1) * 14;
+  const behaviorBoost = Math.min(8, (horse.behavior || 0) * 0.35);
+  const talentBoost = horse.extraPotential ? 4 : 0;
   const illnessPenalty = horse.illnesses.filter((i) => i.active).reduce((a, i) => a + i.impact, 0);
-  const score = Math.max(0, Math.min(100, Math.round(skill + conformationBoost + temperament.showDelta - illnessPenalty + rnd(-2, 4) - Math.max(0, minReq - skill) * 1.0)));
+  const score = Math.max(0, Math.min(100, Math.round(skill + conformationBoost + behaviorBoost + talentBoost + temperament.showDelta - illnessPenalty + rnd(-2, 4) - Math.max(0, minReq - skill) * 1.0)));
   const placing = score >= 92 ? 1 : score >= 88 ? 2 : score >= 84 ? 3 : score >= 78 ? rnd(4, 6) : score >= 70 ? rnd(7, 10) : rnd(11, 15);
   const prize = Math.max(120, Math.round((3000 - placing * 130 + idx * 260) * (placing <= 3 ? 1.4 : 1)));
 
@@ -829,6 +960,9 @@ function renderVet() {
     if (!h || !tryCharge(500)) return;
     h.gender = 'Gelding';
     Object.keys(h.potential).forEach((k) => { h.potential[k] += rnd(0, 5); });
+    if (['Stubborn', 'Spooky', 'Unfocused'].includes(h.personality)) {
+      h.personality = pick(['Easy-Going', 'Bomb-proof']);
+    }
     vetNote(h, `${h.name} was gelded; performance trainability may improve.`);
     render();
   };
@@ -895,7 +1029,15 @@ function renderVet() {
     if (!mare || !straw || !tryCharge(1000)) return;
     if (!mare.retiredToBreeding) { app.money += 1000; return alert('Mare must be retired to breeding for embryo flush.'); }
     const n = rnd(0, 2);
-    for (let i = 0; i < n; i++) app.embryos.push({ id: uid(), donor: mare.name, sire: straw.stallionName });
+    for (let i = 0; i < n; i++) {
+      app.embryos.push({
+        id: uid(),
+        donor: mare.name,
+        donorId: mare.id,
+        sire: straw.stallionName,
+        sireId: straw.stallionId
+      });
+    }
     vetNote(mare, `Embryo flush complete for ${mare.name}: ${n} embryo(s) produced.`);
     render();
   };
@@ -981,6 +1123,7 @@ function renderFarrier() {
 
 function renderTraining() {
   const opts = app.horses.map((h) => `<option value='${h.id}'>${h.name}</option>`).join('');
+  const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${h.name}</option>`).join('');
   document.getElementById('training').innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
     <div class='grid two'>
@@ -996,6 +1139,19 @@ function renderTraining() {
         <button id='clinic'>Run Gold Clinic Evaluation</button>
       </div>
     </div>
+    <div class='box'>
+      <h3>Foal Handling (under age 3)</h3>
+      ${foalOpts ? `<label>Foal</label><select id='foal-horse'>${foalOpts}</select>` : '<p class="small">No foals or young horses available.</p>'}
+      <label>Exercise</label>
+      <select id='foal-ex' ${foalOpts ? '' : 'disabled'}>
+        <option>Weaning</option>
+        <option>Lunging</option>
+        <option>Petting</option>
+        <option>Standing Still</option>
+      </select>
+      <button id='do-foal-train' ${foalOpts ? '' : 'disabled'}>Handle Foal</button>
+      <p class='small'>Foal handling boosts behavior and gives tiny skill gains.</p>
+    </div>
   `;
 
   const EXERCISES = {
@@ -1003,6 +1159,12 @@ function renderTraining() {
     dressage: ['Collection', 'Balance', 'Connection', 'Gaits', 'Rhythm', 'Flowiness'],
     hunter: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
     eventing: ['Collection', 'Connection', 'Rhythm', 'Striding', 'Confidence', 'Speed']
+  };
+  const FOAL_TRAINING = {
+    Weaning: { behavior: [1, 2], dressage: ['Balance', 'Rhythm'] },
+    Lunging: { behavior: [1, 2], jumping: ['Striding', 'Balance'] },
+    Petting: { behavior: [2, 3], dressage: ['Connection'], jumping: ['Confidence'] },
+    'Standing Still': { behavior: [1, 2], dressage: ['Collection'], jumping: ['Structure'] }
   };
 
   const disciplineSelect = document.getElementById('train-disc');
@@ -1046,6 +1208,10 @@ function renderTraining() {
     const d = disciplineSelect.value;
     const ex = exerciseSelect.value;
     if (!h) return;
+    if (h.age < 3) {
+      alert('Foals and young horses should use Foal Handling until age 3.');
+      return;
+    }
     if (h.illnesses.some((i) => i.active)) {
       alert('This horse is recovering and cannot train until fully healed.');
       return;
@@ -1054,7 +1220,7 @@ function renderTraining() {
     const good = rnd(1, 100) > Math.max(5, 18 - profile.trainDelta);
 
     const applyBoost = (group, key, capDiscipline) => {
-      if (!key || !group[key]) return;
+      if (!key || group[key] == null) return;
       if (good) group[key] = clampSkill(h, capDiscipline, group[key] + rnd(1, 4));
     };
 
@@ -1079,6 +1245,31 @@ function renderTraining() {
     pushReport(`Clinic: ${h.name} ${cap(disc)} potential ${h.potential[disc]}%. Suggested current max level: ${maxByPotential}.`);
     render();
   };
+
+  const foalButton = document.getElementById('do-foal-train');
+  if (foalButton) {
+    foalButton.onclick = () => {
+      const foalId = document.getElementById('foal-horse')?.value;
+      const foal = app.horses.find((x) => x.id === foalId);
+      const ex = document.getElementById('foal-ex')?.value;
+      if (!foal || foal.age >= 3 || !FOAL_TRAINING[ex]) return;
+      if (foal.illnesses.some((i) => i.active)) {
+        alert('This foal is recovering and cannot be handled yet.');
+        return;
+      }
+      const plan = FOAL_TRAINING[ex];
+      foal.behavior = Math.max(0, (foal.behavior || 0) + rnd(plan.behavior[0], plan.behavior[1]));
+      (plan.dressage || []).forEach((skill) => {
+        foal.stats.dressage[skill] = clampSkill(foal, 'dressage', foal.stats.dressage[skill] + rnd(1, 2));
+      });
+      (plan.jumping || []).forEach((skill) => {
+        foal.stats.jumping[skill] = clampSkill(foal, 'jumping', foal.stats.jumping[skill] + rnd(1, 2));
+      });
+      foal.managed.trained = true;
+      pushReport(`${foal.name} completed foal handling: ${ex}.`);
+      render();
+    };
+  }
 }
 
 
@@ -1147,7 +1338,8 @@ function renderRegistries() {
       const winner = horses.sort((a, b) => horseWorth(b) - horseWorth(a))[0];
       const action = btn.dataset.action;
       if (action === 'inspect') {
-        const score = Math.round((horseDisciplineAverage(winner, 'dressage') + horseDisciplineAverage(winner, 'jumping')) / 2 * 0.7 + rnd(5, 20));
+        const confScore = CONFORMATION_MULT[winner.conformation] * 35;
+        const score = Math.round(confScore + rnd(10, 25) + horseDisciplineAverage(winner, 'dressage') * 0.2);
         pushReport(`${winner.name} attended ${breed} inspection (in-hand) and scored ${score}.`);
       }
       if (action === 'riding') {
@@ -1183,8 +1375,10 @@ function renderBreeders() {
       return;
     }
     horse.breedersEntries = (horse.breedersEntries || 0) + 1;
-    const conf = CONFORMATION_MULT[horse.conformation] * 12;
-    const score = Math.round(horseWorth(horse) / 900 + conf + rnd(45, 65));
+    const conf = CONFORMATION_MULT[horse.conformation] * 32;
+    const worthInfluence = horseWorth(horse) / 1400;
+    const talentBoost = horse.extraPotential ? 4 : 0;
+    const score = Math.round(conf + worthInfluence + talentBoost + rnd(20, 40));
     const placing = score > 93 ? 1 : score > 88 ? 2 : score > 82 ? 3 : rnd(4, 20);
     const payout = placing === 1 ? 1500 : placing === 2 ? 900 : placing === 3 ? 500 : 120;
     app.money += payout;
@@ -1239,24 +1433,37 @@ function processPregnancy(horse, newborns) {
   if (horse.gestation >= due) {
     const foal = baseHorse('untrained');
     foal.age = 0;
-    const sireName = horse.pregnantBy || horse.pregnantEmbryo?.sire || 'Unknown Sire';
-    const sireHorse = app.horses.find((x) => x.name === sireName && x.gender === 'Stallion');
-    foal.breed = sireHorse && sireHorse.breed !== horse.breed ? `${horse.breed} 50% x ${sireHorse.breed} 50%` : horse.breed;
-    foal.name = `Foal of ${horse.name}`;
+    const embryo = horse.pregnantEmbryo;
+    const damHorse = embryo?.donorId ? app.horses.find((x) => x.id === embryo.donorId) : horse;
+    const damName = damHorse?.name || horse.name;
+    const sireName = horse.pregnantBy || embryo?.sire || 'Unknown Sire';
+    const sireHorse = embryo?.sireId
+      ? app.horses.find((x) => x.id === embryo.sireId)
+      : app.horses.find((x) => x.name === sireName && x.gender === 'Stallion');
+    foal.breed = sireHorse && damHorse && sireHorse.breed !== damHorse.breed
+      ? `${damHorse.breed} 50% x ${sireHorse.breed} 50%`
+      : (damHorse?.breed || horse.breed);
+    foal.name = `Foal of ${damName}`;
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
     foal.gender = pick(['Mare', 'Stallion']);
-    foal.potential = foalPotential(horse, sireHorse);
-    const damTrait = horse.personality || pick(PERSONALITIES);
+    foal.potential = foalPotential(damHorse, sireHorse);
+    foal.extraPotential = inheritExtraPotential(damHorse, sireHorse);
+    if (foal.extraPotential) {
+      Object.keys(foal.potential).forEach((k) => {
+        foal.potential[k] = Math.min(100, foal.potential[k] + rnd(3, 8));
+      });
+    }
+    const damTrait = damHorse?.personality || pick(PERSONALITIES);
     const sireTrait = sireHorse?.personality || pick(PERSONALITIES);
     foal.personality = rnd(1, 100) <= 45 ? damTrait : rnd(1, 100) <= 60 ? sireTrait : pick(PERSONALITIES);
     foal.socks = pick(SOCKS);
     foal.faceMarking = pick(FACE_MARKINGS);
-    foal.marking = normalizeMarkingForBreed(pick(MARKINGS), foal.breed);
+    foal.marking = randomMarking(foal.breed);
     foal.stats.dressage = { Collection: 0, Balance: 0, Connection: 0, Gaits: 0, Rhythm: 0, Flowiness: 0 };
     foal.stats.jumping = { Striding: 0, Confidence: 0, Balance: 0, Power: 0, Speed: 0, Structure: 0 };
-    horse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
-    if (sireHorse) sireHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Dam', otherParentName: horse.name, age: foal.age });
+    if (damHorse) damHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
+    if (sireHorse) sireHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Dam', otherParentName: damName, age: foal.age });
     newborns.push(foal);
     delete horse.pregnantBy;
     delete horse.pregnantEmbryo;
@@ -1313,6 +1520,7 @@ function monthlyProgress() {
     if (!processAgingAndMortality(h)) survivors.push(h);
   });
   app.horses = survivors.concat(newborns);
+  refreshNpcAds();
 }
 
 
