@@ -142,6 +142,9 @@ function hydrateFromSave(data) {
       Speed: j.Speed ?? rnd(0, 20),
       Structure: j.Structure ?? j.Bascule ?? rnd(0, 20)
     };
+    h.lastFarrierMonth = Number.isFinite(h.lastFarrierMonth)
+      ? h.lastFarrierMonth
+      : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
   });
 }
 
@@ -208,7 +211,7 @@ function horseDisciplineAverage(horse, discipline) {
   const jumpAvg = Object.values(jump).reduce((a, b) => a + b, 0) / 6;
   const dressAvg = Object.values(dress).reduce((a, b) => a + b, 0) / 6;
   if (discipline === 'dressage') return dressAvg;
-  if (discipline === 'jumping') return (jumpAvg * 0.85) + (dress.Connection * 0.15);
+  if (discipline === 'jumping') return (jumpAvg * 0.9) + (dress.Connection * 0.1);
   if (discipline === 'hunter') {
     return (dress.Flowiness + dress.Balance + dress.Collection + jump.Striding + jump.Confidence + jump.Balance + jump.Structure) / 7;
   }
@@ -284,7 +287,8 @@ function baseHorse(type = 'trained') {
     retiredToBreeding: false,
     retiredForever: false,
     managed: { fed: false, vet: false, farrier: false, showEntry: false, breedersEntry: false, trained: false },
-    due: { checkup: true, farrier: true },
+    due: { checkup: true, farrier: false },
+    lastFarrierMonth: app.year * 12 + app.month,
     illnesses: [],
     healthRisks: [pick(['Metabolic', 'Colic', 'Laminitis', 'Tendon Strain']), pick(['Arthritis', 'Respiratory', 'Ulcers', 'None'])],
     vetNotes: [],
@@ -571,10 +575,10 @@ function runShow(horse, discipline, level) {
 
   const [minReq] = requiredSkillBand(discipline, level);
   const skill = effectiveDisciplineSkill(horse, discipline);
-  const conformationBoost = (CONFORMATION_MULT[horse.conformation] - 1) * 8;
+  const conformationBoost = (CONFORMATION_MULT[horse.conformation] - 1) * 12;
   const illnessPenalty = horse.illnesses.filter((i) => i.active).reduce((a, i) => a + i.impact, 0);
-  const score = Math.max(0, Math.min(100, Math.round(skill + conformationBoost - illnessPenalty + rnd(-4, 6) - Math.max(0, minReq - skill) * 1.4)));
-  const placing = score >= 95 ? 1 : score >= 90 ? 2 : score >= 85 ? 3 : score >= 78 ? rnd(4, 8) : score >= 68 ? rnd(9, 16) : rnd(17, 25);
+  const score = Math.max(0, Math.min(100, Math.round(skill + conformationBoost - illnessPenalty + rnd(-3, 7) - Math.max(0, minReq - skill) * 1.1)));
+  const placing = score >= 93 ? 1 : score >= 88 ? 2 : score >= 82 ? 3 : score >= 75 ? rnd(4, 7) : score >= 65 ? rnd(8, 14) : rnd(15, 25);
   const prize = Math.max(120, Math.round((3000 - placing * 130 + idx * 260) * (placing <= 3 ? 1.4 : 1)));
 
   const jump = horse.stats.jumping;
@@ -866,6 +870,7 @@ function renderFarrier() {
     const cost = Number(document.getElementById('farrier-type').value);
     if (!h || !tryCharge(cost)) return;
     h.managed.farrier = true;
+    h.lastFarrierMonth = app.year * 12 + app.month;
     h.due.farrier = false;
     if (cost === 120) {
       h.stats.dressage.Collection = Math.min(100, h.stats.dressage.Collection + 2);
@@ -1102,7 +1107,7 @@ function processPregnancy(horse, newborns) {
     foal.name = `Foal of ${horse.name}`;
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
-    foal.gender = pick(['Mare', 'Gelding']);
+    foal.gender = pick(['Mare', 'Stallion']);
     foal.socks = pick(SOCKS);
     foal.faceMarking = pick(FACE_MARKINGS);
     foal.marking = normalizeMarkingForBreed(pick(MARKINGS), foal.breed);
@@ -1149,8 +1154,9 @@ function monthlyProgress() {
       if (i.active && i.remaining > 0) i.remaining -= 1;
       if (i.active && i.remaining <= 0) i.active = false;
     });
-    h.managed = { fed: false, vet: false, farrier: false, showEntry: false, breedersEntry: false, trained: false };
-    h.due.farrier = true;
+    const monthsSinceFarrier = app.year * 12 + app.month - (h.lastFarrierMonth || 0);
+    h.due.farrier = monthsSinceFarrier >= 6;
+    h.managed = { fed: false, vet: false, farrier: !h.due.farrier, showEntry: false, breedersEntry: false, trained: false };
     h.breedersEntries = 0;
     h.offspring.forEach((o) => { if (app.month === 1) o.age += 1; });
     if (!processAgingAndMortality(h)) survivors.push(h);
