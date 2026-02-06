@@ -44,6 +44,7 @@ const app = {
   showOffspringWindow: true
 };
 
+const SAVE_KEY = 'horse_game_save_v1';
 const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -76,6 +77,53 @@ function safeRun(label, fn) {
   } catch (error) {
     console.error(`${label} failed`, error);
     showFatal(`${label} failed: ${error.message}`);
+    return false;
+  }
+}
+
+
+function serializeAppState() {
+  return JSON.stringify(app);
+}
+
+function hydrateFromSave(data) {
+  if (!data || typeof data !== 'object') throw new Error('Invalid save data.');
+  app.money = Number(data.money) || 50000;
+  app.month = Number(data.month) || 1;
+  app.year = Number(data.year) || 1;
+  app.horses = Array.isArray(data.horses) ? data.horses : [];
+  app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
+  app.embryos = Array.isArray(data.embryos) ? data.embryos : [];
+  app.saleBarn = Array.isArray(data.saleBarn) ? data.saleBarn : [];
+  app.reports = Array.isArray(data.reports) ? data.reports : [];
+  app.showOffspringWindow = data.showOffspringWindow !== false;
+}
+
+function saveGame(manual = true) {
+  try {
+    localStorage.setItem(SAVE_KEY, serializeAppState());
+    if (manual) pushReport('Game saved successfully.');
+    return true;
+  } catch (error) {
+    if (manual) alert('Unable to save game in this browser/environment.');
+    console.error('Save failed', error);
+    return false;
+  }
+}
+
+function loadGame(manual = true) {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      if (manual) alert('No saved game found yet.');
+      return false;
+    }
+    hydrateFromSave(JSON.parse(raw));
+    if (manual) pushReport('Game loaded successfully.');
+    return true;
+  } catch (error) {
+    if (manual) alert('Failed to load saved game data.');
+    console.error('Load failed', error);
     return false;
   }
 }
@@ -919,6 +967,7 @@ function processPregnancy(horse, newborns) {
     foal.name = `Foal of ${horse.name}`;
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
+    foal.gender = pick(['Mare', 'Gelding']);
     const sireName = horse.pregnantBy || horse.pregnantEmbryo?.sire || 'Unknown Sire';
     horse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
     const sireHorse = app.horses.find((x) => x.name === sireName && x.gender === 'Stallion');
@@ -992,8 +1041,12 @@ function render() {
 
 const skipBtn = document.getElementById('skipMonthBtn');
 const addMoneyBtn = document.getElementById('addMoneyBtn');
-if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); };
-if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); };
+const saveGameBtn = document.getElementById('saveGameBtn');
+const loadGameBtn = document.getElementById('loadGameBtn');
+if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
+if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
+if (saveGameBtn) saveGameBtn.onclick = () => { if (saveGame(true)) render(); };
+if (loadGameBtn) loadGameBtn.onclick = () => { if (loadGame(true)) render(); };
 
 window.addEventListener('error', (event) => {
   showFatal(event.message || 'Unknown runtime error');
@@ -1006,6 +1059,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 try {
   seed();
+  loadGame(false);
   ensurePanels();
   buildTabs();
   render();
