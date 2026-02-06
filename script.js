@@ -783,7 +783,17 @@ function renderBreeding() {
       <div class='box'>
         <h3>Offspring Records</h3>
         <button id='toggle-offspring'>${app.showOffspringWindow ? 'Close Window' : 'Open Window'}</button>
-        ${app.showOffspringWindow ? (app.horses.map((h) => h.offspring.map((o) => `<p>${o.name} — ${o.otherParentRole}: ${o.otherParentName} • Age ${o.age}</p>`).join('')).join('') || '<p class="small">No offspring records yet.</p>') : '<p class="small">Offspring window closed.</p>'}
+        ${app.showOffspringWindow ? (() => {
+          const unique = new Map();
+          app.horses.forEach((h) => {
+            h.offspring.forEach((o) => {
+              const key = o.foalId || `${o.name}-${o.otherParentName}`;
+              if (!unique.has(key)) unique.set(key, o);
+            });
+          });
+          const rows = Array.from(unique.values()).map((o) => `<p>${o.name} — ${o.otherParentRole}: ${o.otherParentName} • Age ${o.age}</p>`).join('');
+          return rows || '<p class="small">No offspring records yet.</p>';
+        })() : '<p class="small">Offspring window closed.</p>'}
       </div>
     </div>
   `;
@@ -898,7 +908,7 @@ function maybeAddRandomIllness(horse) {
   }
 }
 
-function processPregnancy(horse) {
+function processPregnancy(horse, newborns) {
   if (!(horse.pregnantBy || horse.pregnantEmbryo)) return;
   horse.gestation = (horse.gestation || 0) + 1;
   const due = horse.foalDue || 11;
@@ -910,10 +920,10 @@ function processPregnancy(horse) {
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
     const sireName = horse.pregnantBy || horse.pregnantEmbryo?.sire || 'Unknown Sire';
-    horse.offspring.push({ name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
+    horse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
     const sireHorse = app.horses.find((x) => x.name === sireName && x.gender === 'Stallion');
-    if (sireHorse) sireHorse.offspring.push({ name: foal.name, otherParentRole: 'Dam', otherParentName: horse.name, age: foal.age });
-    app.horses.push(foal);
+    if (sireHorse) sireHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Dam', otherParentName: horse.name, age: foal.age });
+    newborns.push(foal);
     delete horse.pregnantBy;
     delete horse.pregnantEmbryo;
     horse.gestation = 0;
@@ -944,8 +954,9 @@ function monthlyProgress() {
   }
 
   const survivors = [];
+  const newborns = [];
   app.horses.forEach((h) => {
-    processPregnancy(h);
+    processPregnancy(h, newborns);
     maybeAddRandomIllness(h);
     h.illnesses.forEach((i) => {
       if (i.active && i.remaining > 0) i.remaining -= 1;
@@ -957,8 +968,9 @@ function monthlyProgress() {
     h.offspring.forEach((o) => { if (app.month === 1) o.age += 1; });
     if (!processAgingAndMortality(h)) survivors.push(h);
   });
-  app.horses = survivors;
+  app.horses = survivors.concat(newborns);
 }
+
 
 function render() {
   ensurePanels();
