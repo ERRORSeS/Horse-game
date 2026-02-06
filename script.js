@@ -112,7 +112,7 @@ function hydrateFromSave(data) {
   app.money = Number(data.money) || 50000;
   app.month = Number(data.month) || 1;
   app.year = Number(data.year) || 1;
-  app.horses = Array.isArray(data.horses) ? data.horses : [];
+  app.horses = Array.isArray(data.horses) ? data.horses.filter(Boolean) : [];
   app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
   app.embryos = Array.isArray(data.embryos) ? data.embryos : [];
   app.saleBarn = Array.isArray(data.saleBarn) ? data.saleBarn : [];
@@ -145,6 +145,19 @@ function hydrateFromSave(data) {
   });
 }
 
+function resetGame() {
+  app.money = 50000;
+  app.month = 1;
+  app.year = 1;
+  app.horses = [];
+  app.semenStraws = [];
+  app.embryos = [];
+  app.saleBarn = [];
+  app.reports = [];
+  app.showOffspringWindow = true;
+  seed();
+  saveGame(false);
+}
 
 function saveGame(manual = true) {
   try {
@@ -974,8 +987,8 @@ function renderBreeding() {
 
 function renderRegistries() {
   const groups = BREEDS.map((breed) => {
-    const horses = app.horses.filter((h) => h.breed === breed);
-    const horse = { breed, prefix: breed.split(' ').map((w) => w[0]).join(''), horses };
+    const horses = app.horses.filter((h) => h && h.breed === breed);
+    return { breed, prefix: breed.split(' ').map((w) => w[0]).join(''), horses };
   });
 
   document.getElementById('registries').innerHTML = `
@@ -996,7 +1009,7 @@ function renderRegistries() {
   document.querySelectorAll('#registries button[data-reg]').forEach((btn) => {
     btn.onclick = () => {
       const breed = btn.dataset.reg;
-      const horses = app.horses.filter((h) => h.breed === breed && !h.retiredForever);
+      const horses = app.horses.filter((h) => h && h.breed === breed && !h.retiredForever);
       if (!horses.length) return alert(`No eligible ${breed} horses.`);
       const winner = horses.sort((a, b) => horseWorth(b) - horseWorth(a))[0];
       const action = btn.dataset.action;
@@ -1168,10 +1181,17 @@ const skipBtn = document.getElementById('skipMonthBtn');
 const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
+const resetGameBtn = document.getElementById('resetGameBtn');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
 if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
 if (saveGameBtn) saveGameBtn.onclick = () => { if (saveGame(true)) render(); };
 if (loadGameBtn) loadGameBtn.onclick = () => { if (loadGame(true)) render(); };
+if (resetGameBtn) resetGameBtn.onclick = () => {
+  if (!confirm('Reset game? This clears saved progress and starts fresh.')) return;
+  try { localStorage.removeItem(SAVE_KEY); } catch (error) { console.error('Reset save failed', error); }
+  resetGame();
+  render();
+};
 
 window.addEventListener('error', (event) => {
   showFatal(event.message || 'Unknown runtime error');
