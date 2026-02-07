@@ -46,6 +46,13 @@ button {
   cursor: pointer;
 }
 button:hover { background: #2f4458; }
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .tab-btn.active { border-color: var(--accent); }
 main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
 .panel { display: block; }
