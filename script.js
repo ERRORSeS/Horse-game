@@ -130,6 +130,12 @@ const FEEDS = [
 ];
 const MOODS = ['Motivated', 'Happy', 'Try-Hard', 'Neutral', 'Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy'];
 const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overweight'];
+const EXERCISE_MENU = {
+  jumping: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
+  dressage: ['Collection', 'Balance', 'Connection', 'Gaits', 'Rhythm', 'Flowiness'],
+  hunter: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
+  eventing: ['Collection', 'Connection', 'Rhythm', 'Striding', 'Confidence', 'Speed']
+};
 
 function normalizeMarkingForBreed(marking, breed) {
   if (!marking.includes('Rabicano')) return marking;
@@ -220,6 +226,17 @@ function turnoutRange(level) {
   return '3-8';
 }
 
+function turnoutRangeBounds(level) {
+  if (level === 'Low') return [2, 3];
+  if (level === 'High') return [8, 14];
+  return [3, 8];
+}
+
+function feedRangeBounds(horse) {
+  const pref = horse.preferredFeedGrams || 150;
+  return [Math.max(50, pref - 25), Math.min(250, pref + 25)];
+}
+
 function updateWeight(horse, delta) {
   const idx = Math.max(0, Math.min(WEIGHTS.length - 1, WEIGHTS.indexOf(horse.weightStatus)));
   const next = Math.max(0, Math.min(WEIGHTS.length - 1, idx + delta));
@@ -254,12 +271,53 @@ function applyMonthlyMoodShift(horse) {
   horse.mood = rnd(1, 100) <= 50 ? 'Bad moods' : 'Grumpy';
 }
 
+function genderPronouns(horse) {
+  const female = horse.gender === 'Mare';
+  return {
+    subject: female ? 'She' : 'He',
+    object: female ? 'her' : 'him',
+    possessive: female ? 'her' : 'his'
+  };
+}
+
+function trainerNotesForHorse(horse) {
+  const notes = [];
+  const { subject, object, possessive } = genderPronouns(horse);
+  const [feedMin, feedMax] = feedRangeBounds(horse);
+  const totalGrams = (horse.feedPlan || []).reduce((sum, f) => sum + f.grams, 0);
+  if (totalGrams > feedMax + 10) {
+    notes.push(`${subject} is getting fleshy, you should feed ${object} less.`);
+  } else if (totalGrams && totalGrams < feedMin - 10) {
+    notes.push(`${subject} is too lightweight, consider making ${possessive} feeding plan more balanced.`);
+  }
+  if (horse.lastFeedIssue) {
+    notes.push(`Ohhh ${subject} is uncomfortable! You should change up ${possessive} feeding plan.`);
+  }
+  if (horse.lastTurnoutIssue === 'low') {
+    notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
+  }
+  if (horse.lastTrainingIssue === 'high') {
+    notes.push(`${subject} is very tired, consider easing up ${possessive} schedule.`);
+  }
+  if (horse.lastTrainingIssue === 'low') {
+    notes.push(`${subject} has too much energy, you should train ${object} bit more!`);
+  }
+  if (!horse.retiredForever && !horse.retiredToBreeding && horse.soundnessYears <= 0) {
+    notes.push(`${subject} looks tired and burnt-out maybe it’s time for retirement.`);
+  }
+  if (horse.gender === 'Stallion' && horse.lastTrainingIssue === 'low') {
+    notes.push('He looks overly energetic, consider gelding.');
+  }
+  horse.trainerNotes = notes;
+}
+
 function evaluateFeedEffects(horse) {
   let moodOverride = '';
   let weightDelta = 0;
   let trainingBoost = 0;
   let competitionBoost = 0;
   let healingBoost = 0;
+  let feedIssue = '';
   const activeTraining = (horse.trainingSessionsThisMonth || 0) > 0 || horse.managed?.showEntry;
   const hasInjury = horse.illnesses.some((i) => i.active);
   const totalGrams = (horse.feedPlan || []).reduce((sum, f) => sum + f.grams, 0);
@@ -276,6 +334,7 @@ function evaluateFeedEffects(horse) {
         if (!activeTraining) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          feedIssue = 'wrong';
         } else {
           competitionBoost += 2;
         }
@@ -284,6 +343,7 @@ function evaluateFeedEffects(horse) {
         if (['Energetic', 'Stubborn'].includes(horse.personality)) {
           weightDelta += 1;
           moodOverride = 'Overly-Active';
+          feedIssue = 'wrong';
         } else {
           moodOverride = 'Happy';
         }
@@ -292,11 +352,13 @@ function evaluateFeedEffects(horse) {
         if (!(horse.retiredToBreeding || horse.pregnantBy || horse.pregnantEmbryo)) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          feedIssue = 'wrong';
         }
         break;
       case 'Calm nd Ez':
         if (['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality)) {
           moodOverride = 'No energy';
+          feedIssue = 'wrong';
         } else {
           moodOverride = 'Neutral';
         }
@@ -306,6 +368,7 @@ function evaluateFeedEffects(horse) {
         if (horse.age > 5 || horse.retiredForever || horse.retiredToBreeding) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          feedIssue = 'wrong';
         } else {
           trainingBoost += 2;
         }
@@ -314,12 +377,14 @@ function evaluateFeedEffects(horse) {
         if (horse.age < 15 && !horse.retiredForever) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          feedIssue = 'wrong';
           if (['Energetic', 'Stubborn'].includes(horse.personality)) moodOverride = 'Overly-Active';
         }
         break;
       case 'Recovery':
         if (!hasInjury) {
           moodOverride = 'Uncomfortable';
+          feedIssue = 'wrong';
         } else if (rnd(1, 100) <= 70) {
           healingBoost += 1;
         }
@@ -328,6 +393,7 @@ function evaluateFeedEffects(horse) {
         if (['Moderate', 'Fleshy', 'Overweight'].includes(horse.weightStatus)) {
           moodOverride = 'Distress';
           weightDelta += 1;
+          feedIssue = 'wrong';
         } else {
           weightDelta += 1;
         }
@@ -339,9 +405,40 @@ function evaluateFeedEffects(horse) {
 
   if (weightDelta !== 0) updateWeight(horse, weightDelta);
   if (moodOverride) horse.mood = moodOverride;
+  horse.lastFeedIssue = feedIssue;
   horse.trainingBoost = trainingBoost;
   horse.competitionBoost = competitionBoost;
   horse.healingBoost = healingBoost;
+}
+
+function applyAutoTraining(horse) {
+  horse.autoExerciseHours = 0;
+  if (!horse.autoTrainingPlan?.length) return;
+  const totalEntries = horse.autoTrainingPlan.slice(0, 8);
+  totalEntries.forEach((entry) => {
+    const times = Math.max(1, Math.min(10, entry.times || 1));
+    for (let i = 0; i < times; i += 1) {
+      if (horse.illnesses.some((n) => n.active)) {
+        horse.autoExerciseHours = rnd(1, 3);
+        continue;
+      }
+      const discipline = entry.discipline;
+      const skill = entry.exercise;
+      const targetStats = discipline === 'dressage' ? horse.stats.dressage : horse.stats.jumping;
+      const current = targetStats?.[skill];
+      const capValue = horse?.potential?.[discipline] ?? 100;
+      const atCap = Number.isFinite(current) && current >= capValue;
+      if (horse.retiredForever || horse.retiredToBreeding || atCap) {
+        horse.autoExerciseHours = rnd(1, 3);
+        continue;
+      }
+      const bonus = horse.trainingBoost ? Math.max(0, Math.round(horse.trainingBoost / 2)) : 0;
+      if (targetStats?.[skill] != null) {
+        targetStats[skill] = clampSkill(horse, discipline, targetStats[skill] + rnd(1, 3) + bonus);
+      }
+      horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+    }
+  });
 }
 
 function updateMonthlyCare(horse) {
@@ -349,9 +446,29 @@ function updateMonthlyCare(horse) {
   applyMonthlyMoodShift(horse);
   evaluateFeedEffects(horse);
   const stamina = horse.trainingPreference || 'Medium';
-  horse.turnoutHours = horse.illnesses.some((i) => i.active) ? 0 : (stamina === 'Low' ? rnd(2, 3) : stamina === 'High' ? rnd(8, 14) : rnd(3, 8));
-  if (horse.turnoutHours < 2) horse.mood = 'Distress';
-  if ((horse.trainingSessionsThisMonth || 0) > (horse.preferredTrainingSessions || 25)) horse.mood = 'No energy';
+  const [minTurnout, maxTurnout] = turnoutRangeBounds(stamina);
+  const assignedTurnout = Number.isFinite(horse.turnoutAssignmentHours) ? horse.turnoutAssignmentHours : rnd(minTurnout, maxTurnout);
+  const effectiveTurnout = horse.turnoutAssignmentHours > 0 ? horse.turnoutAssignmentHours : rnd(minTurnout, maxTurnout);
+  horse.turnoutHours = horse.illnesses.some((i) => i.active) ? 0 : Math.max(0.5, Math.min(14, effectiveTurnout));
+  horse.lastTurnoutIssue = '';
+  horse.lastTrainingIssue = '';
+  if (horse.illnesses.some((i) => i.active)) {
+    if (!(horse.feedPlan || []).some((f) => f.type === 'Calm nd Ez')) horse.mood = 'Distress';
+  } else if (horse.turnoutHours < minTurnout) {
+    horse.mood = 'Distress';
+    horse.lastTurnoutIssue = 'low';
+    updateWeight(horse, 1);
+  } else if (horse.turnoutHours > maxTurnout) {
+    horse.mood = 'No energy';
+  }
+  const preferred = horse.preferredTrainingSessions || 25;
+  if ((horse.trainingSessionsThisMonth || 0) > preferred) {
+    horse.mood = 'No energy';
+    horse.lastTrainingIssue = 'high';
+  } else if ((horse.trainingSessionsThisMonth || 0) < Math.max(1, Math.floor(preferred * 0.4))) {
+    horse.lastTrainingIssue = 'low';
+  }
+  trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
 }
 
@@ -424,7 +541,10 @@ function hydrateFromSave(data) {
     h.showPedigree = h.showPedigree || false;
     h.notes = h.notes || '';
     h.showNotes = h.showNotes || false;
+    h.showTrainerNotes = h.showTrainerNotes || false;
     h.feedPlan = Array.isArray(h.feedPlan) ? h.feedPlan : [];
+    h.autoTrainingPlan = Array.isArray(h.autoTrainingPlan) ? h.autoTrainingPlan : [];
+    h.autoExerciseHours = Number.isFinite(h.autoExerciseHours) ? h.autoExerciseHours : 0;
     h.preferredFeedGrams = Number.isFinite(h.preferredFeedGrams) ? h.preferredFeedGrams : rnd(80, 220);
     h.preferredMood = h.preferredMood || pick(['Motivated', 'Happy', 'Try-Hard', 'Neutral']);
     h.mood = h.mood || 'Neutral';
@@ -436,6 +556,11 @@ function hydrateFromSave(data) {
     h.trainingBoost = Number.isFinite(h.trainingBoost) ? h.trainingBoost : 0;
     h.competitionBoost = Number.isFinite(h.competitionBoost) ? h.competitionBoost : 0;
     h.healingBoost = Number.isFinite(h.healingBoost) ? h.healingBoost : 0;
+    h.trainerNotes = Array.isArray(h.trainerNotes) ? h.trainerNotes : [];
+    h.lastFeedIssue = h.lastFeedIssue || '';
+    h.lastTurnoutIssue = h.lastTurnoutIssue || '';
+    h.lastTrainingIssue = h.lastTrainingIssue || '';
+    h.turnoutAssignmentHours = Number.isFinite(h.turnoutAssignmentHours) ? h.turnoutAssignmentHours : 0;
     h.soundnessYears = Number.isFinite(h.soundnessYears) ? h.soundnessYears : rnd(1, 15);
     h.soundnessExpiredMonths = Number.isFinite(h.soundnessExpiredMonths) ? h.soundnessExpiredMonths : 0;
     h.lastSoundnessIssueMonth = Number.isFinite(h.lastSoundnessIssueMonth) ? h.lastSoundnessIssueMonth : 0;
@@ -526,7 +651,7 @@ function pushReport(text) {
 }
 
 function canCompeteUnderSaddle(horse) {
-  return horse.age >= 3 && !horse.unridable;
+  return horse.age >= 3 && !horse.unridable && !horse.retiredToBreeding && !horse.retiredForever;
 }
 
 function horseLifeStage(horse) {
@@ -802,7 +927,10 @@ function baseHorse(type = 'trained', origin = 'player') {
     showPedigree: false,
     notes: '',
     showNotes: false,
+    showTrainerNotes: false,
     feedPlan: [],
+    autoTrainingPlan: [],
+    autoExerciseHours: 0,
     preferredFeedGrams: rnd(80, 220),
     preferredMood: pick(['Motivated', 'Happy', 'Try-Hard', 'Neutral']),
     mood: 'Neutral',
@@ -811,9 +939,14 @@ function baseHorse(type = 'trained', origin = 'player') {
     preferredTrainingSessions: rnd(10, 50),
     trainingSessionsThisMonth: 0,
     turnoutHours: 0,
+    turnoutAssignmentHours: 0,
     trainingBoost: 0,
     competitionBoost: 0,
     healingBoost: 0,
+    trainerNotes: [],
+    lastFeedIssue: '',
+    lastTurnoutIssue: '',
+    lastTrainingIssue: '',
     conformation: pick(CONFORMATION),
     height: `${rnd(14, 18)}.${rnd(0, 3)} hh`,
     soundnessYears: rnd(1, 15),
@@ -1076,7 +1209,30 @@ function createHorseCard(horse) {
     <button data-action='add-feed'>Add Feed</button>
     <button data-action='clear-feed'>Clear Feed Plan</button>
     ${horse.feedPlan.length ? `<div class='box'><p class='small'>${horse.feedPlan.map((f) => `${f.type} (${f.grams}g)`).join(', ')}</p></div>` : '<p class="small">No feed assigned.</p>'}
-    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    <p class='small'>Preferred feed range: ${feedRangeBounds(horse)[0]}-${feedRangeBounds(horse)[1]}g (you don’t need to be exact, just within range).</p>
+    <label>Turn-out assignment (hours)</label>
+    <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
+    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    <button data-action='save-turnout'>Save Turn-out</button>
+    <button data-action='toggle-trainer-notes'>${horse.showTrainerNotes ? 'Hide Trainer Notes' : 'Show Trainer Notes'}</button>
+    ${horse.showTrainerNotes ? `<div class='box'>${horse.trainerNotes.length ? horse.trainerNotes.map((n) => `<p class='small'>${n}</p>`).join('') : '<p class="small">No trainer notes this month.</p>'}</div>` : ''}
+    <label>Auto Training Plan (monthly)</label>
+    <div class='grid two'>
+      <div>
+        <label>Discipline</label>
+        <select class='auto-disc'>${Object.keys(EXERCISE_MENU).map((d) => `<option>${d}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Exercise</label>
+        <select class='auto-ex'>${EXERCISE_MENU.jumping.map((e) => `<option>${e}</option>`).join('')}</select>
+      </div>
+    </div>
+    <label>Times per month</label>
+    <input type='number' class='auto-times' min='1' max='10' value='1' />
+    <button data-action='add-auto-train'>Add Training</button>
+    <button data-action='clear-auto-train'>Clear Training Plan</button>
+    ${horse.autoTrainingPlan.length ? `<div class='box'><p class='small'>${horse.autoTrainingPlan.map((p) => `${p.discipline} ${p.exercise} x${p.times}`).join(', ')}</p></div>` : '<p class="small">No auto training assigned.</p>'}
+    ${horse.autoExerciseHours ? `<p class='small'>Exercise (retired/maxed): ${horse.autoExerciseHours} hour(s) on lunging/hot-walker.</p>` : ''}
     <button data-action='vet-notes'>${horse.showVetNotes ? 'Hide Vet Notes' : 'Show Vet Notes'}</button>
     ${horse.showVetNotes ? `<div class='box'>${horse.vetNotes.length ? horse.vetNotes.map((n) => `<p class='small'>${n.date}: ${n.text}</p>`).join('') : '<p class="small">No vet notes yet.</p>'}</div>` : ''}
     ${horse.registryInspection ? `<button data-action='inspection-details'>${horse.showInspectionDetails ? 'Hide Inspection Details' : 'Show Inspection Details'}</button>` : ''}
@@ -1163,6 +1319,11 @@ function createHorseCard(horse) {
         horse.notes = text;
       }
       if (action === 'toggle-notes') horse.showNotes = !horse.showNotes;
+      if (action === 'save-turnout') {
+        const value = Number(node.querySelector('.turnout-hours')?.value);
+        if (Number.isFinite(value)) horse.turnoutAssignmentHours = Math.max(0.5, Math.min(14, value));
+      }
+      if (action === 'toggle-trainer-notes') horse.showTrainerNotes = !horse.showTrainerNotes;
       if (action === 'add-feed') {
         const type = node.querySelector('.feed-type')?.value;
         const grams = Number(node.querySelector('.feed-grams')?.value) || 150;
@@ -1171,6 +1332,14 @@ function createHorseCard(horse) {
         }
       }
       if (action === 'clear-feed') horse.feedPlan = [];
+      if (action === 'add-auto-train') {
+        if (horse.autoTrainingPlan.length >= 8) return;
+        const disc = node.querySelector('.auto-disc')?.value;
+        const ex = node.querySelector('.auto-ex')?.value;
+        const times = Math.max(1, Math.min(10, Number(node.querySelector('.auto-times')?.value) || 1));
+        if (disc && ex) horse.autoTrainingPlan.push({ discipline: disc, exercise: ex, times });
+      }
+      if (action === 'clear-auto-train') horse.autoTrainingPlan = [];
       if (action === 'vet-notes') horse.showVetNotes = !horse.showVetNotes;
       if (action === 'inspection-details') horse.showInspectionDetails = !horse.showInspectionDetails;
       if (action === 'offspring-summary') horse.showOffspringSummary = !horse.showOffspringSummary;
@@ -1182,6 +1351,13 @@ function createHorseCard(horse) {
       render();
     };
   });
+  const autoDisc = node.querySelector('.auto-disc');
+  const autoEx = node.querySelector('.auto-ex');
+  if (autoDisc && autoEx) {
+    autoDisc.onchange = () => {
+      autoEx.innerHTML = EXERCISE_MENU[autoDisc.value].map((e) => `<option>${e}</option>`).join('');
+    };
+  }
   return node;
 }
 
@@ -2293,6 +2469,7 @@ function monthlyProgress() {
       }
     });
     applySoundnessWear(h);
+    applyAutoTraining(h);
     const monthsSinceFarrier = app.year * 12 + app.month - (h.lastFarrierMonth || 0);
     h.due.farrier = monthsSinceFarrier >= 6;
     h.managed = { fed: false, vet: false, farrier: !h.due.farrier, showEntry: false, breedersEntry: false, trained: false };

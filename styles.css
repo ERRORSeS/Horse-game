@@ -74,6 +74,15 @@ input, select {
   padding: .45rem;
   margin: .35rem 0 .7rem;
 }
+textarea {
+  background: var(--surface-alt);
+  border: 1px solid #49617a;
+  border-radius: 8px;
+  color: var(--text);
+  padding: .45rem;
+  margin: .35rem 0 .7rem;
+  width: 100%;
+}
 .money { color: var(--good); font-weight: 700; }
 .small { font-size: .85rem; color: var(--muted); }
 .inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
