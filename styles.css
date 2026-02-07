@@ -104,3 +104,20 @@ input, select {
 .horse-table tr:hover { background: #273748; cursor: pointer; }
 .horse-table tr.selected { background: #2f4458; }
 .horse-profile { margin-top: 1.5rem; }
+.pedigree-grid {
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.pedigree-entry details {
+  background: var(--surface-alt);
+  border: 1px solid #35475a;
+  border-radius: 10px;
+  padding: .5rem .6rem;
+}
+.pedigree-entry summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #dfe9f5;
+}
+.pedigree-relation { margin-bottom: .35rem; font-weight: 600; color: var(--accent); }

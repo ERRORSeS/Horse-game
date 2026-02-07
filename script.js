@@ -115,6 +115,7 @@ const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 
 const RARE_MARKINGS = MARKINGS.filter((m) => m !== 'None');
+const PEDIGREE_RELATIONS = ['Sire', 'Dam', 'Sire\'s Sire', 'Sire\'s Dam', 'Dam\'s Sire', 'Dam\'s Dam'];
 
 function normalizeMarkingForBreed(marking, breed) {
   if (!marking.includes('Rabicano')) return marking;
@@ -160,6 +161,28 @@ function injuryRecoveryMonths(severity) {
   if (severity === 'More Than Medium') return rnd(4, 7);
   if (severity === 'Severe') return rnd(8, 12);
   return rnd(12, 16);
+}
+
+function soundnessLossRange(severity) {
+  if (severity === 'Easy') return [0.5, 0.9];
+  if (severity === 'Medium') return [0.8, 1.2];
+  if (severity === 'More Than Medium') return [1, 1.5];
+  if (severity === 'Severe') return [2, 2.9];
+  if (severity === 'Very Severe') return [2.9, 3.5];
+  return [0, 0];
+}
+
+function soundnessLossMultiplier(horse) {
+  if (horse.healthGenetics === 'Low') return 0.8;
+  if (horse.healthGenetics === 'High') return 1.2;
+  return 1;
+}
+
+function applySoundnessLoss(horse, severity) {
+  const [minLoss, maxLoss] = soundnessLossRange(severity);
+  if (!maxLoss) return;
+  const loss = (minLoss + Math.random() * (maxLoss - minLoss)) * soundnessLossMultiplier(horse);
+  horse.soundnessYears = Math.max(0, Number((horse.soundnessYears - loss).toFixed(1)));
 }
 
 function soundnessForecastLine(years) {
@@ -237,10 +260,19 @@ function hydrateFromSave(data) {
     h.registryInspection = h.registryInspection || null;
     h.showInspectionDetails = h.showInspectionDetails || false;
     h.showOffspringSummary = h.showOffspringSummary || false;
+    h.showPedigree = h.showPedigree || false;
     h.soundnessYears = Number.isFinite(h.soundnessYears) ? h.soundnessYears : rnd(1, 15);
     h.soundnessExpiredMonths = Number.isFinite(h.soundnessExpiredMonths) ? h.soundnessExpiredMonths : 0;
     h.lastSoundnessIssueMonth = Number.isFinite(h.lastSoundnessIssueMonth) ? h.lastSoundnessIssueMonth : 0;
     h.unridable = h.unridable || false;
+    h.pedigree = h.pedigree || {
+      sire: null,
+      dam: null,
+      sireSire: null,
+      sireDam: null,
+      damSire: null,
+      damDam: null
+    };
     h.stats = h.stats || { dressage: {}, jumping: {} };
     const d = h.stats.dressage || {};
     const j = h.stats.jumping || {};
@@ -330,6 +362,56 @@ function horseLifeStage(horse) {
 function horseDisplayName(horse) {
   const branding = horse.registryInspection?.branding;
   return branding ? `${horse.name} "${branding}"` : horse.name;
+}
+
+function showRecordSummary(horse) {
+  const records = horse.showResults || [];
+  const first = records.filter((r) => r.placing === 1).length;
+  const second = records.filter((r) => r.placing === 2).length;
+  const third = records.filter((r) => r.placing === 3).length;
+  return { total: records.length, first, second, third };
+}
+
+function breedPercentages(breed) {
+  if (!breed) return {};
+  const parts = [];
+  const regex = /([^x]+?)\s*(\d+)%/gi;
+  let match;
+  while ((match = regex.exec(breed)) !== null) {
+    parts.push({ name: match[1].trim(), percent: Number(match[2]) });
+  }
+  if (!parts.length) {
+    return { [breed]: 100 };
+  }
+  return parts.reduce((acc, part) => {
+    acc[part.name] = part.percent;
+    return acc;
+  }, {});
+}
+
+function pedigreeEntry(label, info, subjectBreed) {
+  const fallback = { name: 'Unknown', breed: 'Unknown', coat: 'Unknown' };
+  const entry = info || fallback;
+  const percents = breedPercentages(subjectBreed);
+  const percent = entry.breed && percents[entry.breed] ? `${percents[entry.breed]}%` : 'Unknown';
+  return { relation: label, ...fallback, ...entry, percent };
+}
+
+function pedigreeForHorse(horse) {
+  const ped = horse.pedigree || {};
+  return [
+    pedigreeEntry('Sire', ped.sire, horse.breed),
+    pedigreeEntry('Dam', ped.dam, horse.breed),
+    pedigreeEntry("Sire's Sire", ped.sireSire, horse.breed),
+    pedigreeEntry("Sire's Dam", ped.sireDam, horse.breed),
+    pedigreeEntry("Dam's Sire", ped.damSire, horse.breed),
+    pedigreeEntry("Dam's Dam", ped.damDam, horse.breed)
+  ];
+}
+
+function pedigreeStats(entry) {
+  if (!entry || !entry.id) return null;
+  return app.horses.find((h) => h.id === entry.id) || null;
 }
 
 function offspringSummary(horse) {
@@ -473,7 +555,7 @@ function horseWorth(horse) {
   return Math.max(350, Math.round(base - agePenalty));
 }
 
-function baseHorse(type = 'trained') {
+function baseHorse(type = 'trained', origin = 'player') {
   const minAge = type === 'untrained' ? 4 : type === 'trained' ? 8 : 10;
   const maxAge = type === 'untrained' ? 6 : type === 'trained' ? 11 : 12;
   const name = `${pick(['Silver', 'Midnight', 'Winter', 'Storm', 'Emerald', 'Hope', 'Royal', 'Velvet', 'Sol', 'Luna', 'Aster', 'Río', 'Nieve', 'Cielo', 'Frost', 'Sable', 'Aquila', 'Noir', 'Azul', 'Viento', 'Sakura', 'Kumo', 'Brisa', 'Ravn', 'Fuego', 'Aurum', 'Étoile', 'Vega'])} ${pick(['Dream', 'River', 'Valor', 'Cross', 'Echo', 'Flight', 'Blessing', 'Danza', 'Cielo', 'Mistral', 'Reina', 'Fleur', 'Nimbus', 'Solstice', 'Gloria', 'Mariposa', 'Orion', 'Zenith', 'Eclipse', 'Horizon', 'Belle', 'Shadow', 'Storm', 'Mirage'])}`;
@@ -502,6 +584,7 @@ function baseHorse(type = 'trained') {
     registryInspection: null,
     showInspectionDetails: false,
     showOffspringSummary: false,
+    showPedigree: false,
     conformation: pick(CONFORMATION),
     height: `${rnd(14, 18)}.${rnd(0, 3)} hh`,
     soundnessYears: rnd(1, 15),
@@ -531,8 +614,20 @@ function baseHorse(type = 'trained') {
     reserves: 0,
     earnings: 0,
     topWins: { mareFilly: 0, breed: 0, overall: 0, highestScore: 0 },
-    offspring: []
+    offspring: [],
+    pedigree: {
+      sire: null,
+      dam: null,
+      sireSire: null,
+      sireDam: null,
+      damSire: null,
+      damDam: null
+    }
   };
+  if (origin === 'npc') {
+    horse.pedigree.sire = { name: `${pick(['Sir', 'King', 'Rider', 'Atlas'])} ${pick(['Valor', 'Legacy', 'Storm', 'Echo'])}`, breed: horse.breed, coat: pick(COATS) };
+    horse.pedigree.dam = { name: `${pick(['Lady', 'Queen', 'Bella', 'Nova'])} ${pick(['Grace', 'Dream', 'Breeze', 'Muse'])}`, breed: horse.breed, coat: pick(COATS) };
+  }
   if (rnd(1, 100) <= 18) {
     horse.extraPotential = true;
     Object.keys(horse.potential).forEach((k) => {
@@ -564,7 +659,7 @@ function foalPotential(dam, sire) {
 
 function seed() {
   app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
-  app.saleBarn = [baseHorse('fully'), baseHorse('trained')].map((h) => {
+  app.saleBarn = [baseHorse('fully', 'npc'), baseHorse('trained', 'npc')].map((h) => {
     seedShowHistory(h, rnd(1, 3), 10);
     return { ...h, owner: 'NPC Stable', price: Math.round(calculateHorsePrice(h, true) * rnd(95, 110) / 100) };
   });
@@ -594,14 +689,14 @@ function refreshNpcAds() {
   const saleCount = rnd(2, 4);
   const studCount = rnd(2, 3);
   app.npcSales = Array.from({ length: saleCount }, () => {
-    const horse = baseHorse(pick(['untrained', 'trained', 'fully']));
+    const horse = baseHorse(pick(['untrained', 'trained', 'fully']), 'npc');
     horse.owner = pick(['Evergreen Stables', 'Valley Creek Farm', 'Blue Ridge Sporthorses', 'Silverleaf Stables']);
     seedShowHistory(horse, rnd(1, 4), 12);
     const price = Math.round(calculateHorsePrice(horse, true) * rnd(95, 110) / 100);
     return { ...horse, price, saleId: uid() };
   });
   app.npcStuds = Array.from({ length: studCount }, () => {
-    const stallion = baseHorse('trained');
+    const stallion = baseHorse('trained', 'npc');
     stallion.gender = 'Stallion';
     stallion.owner = pick(['Redwood Stud', 'Oak Hollow', 'Northbridge Sporthorses']);
     seedShowHistory(stallion, rnd(2, 4), 20);
@@ -706,17 +801,19 @@ function createHorseCard(horse) {
   const socks = horse.socks || 'None';
   const face = horse.faceMarking || 'Faint';
   node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${socks} | ${horse.marking} | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${activeIssue ? ` • Active issue: ${activeIssue.name}` : ''} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${v}</li>`; });
   const jList = node.querySelector('.jump-stats');
   Object.entries(horse.stats.jumping).forEach(([k, v]) => { jList.innerHTML += `<li>${k}: ${v}</li>`; });
 
+  const record = showRecordSummary(horse);
   node.querySelector('.results').innerHTML = `
     <h4>Competition Results</h4>
     <p>Total Points: ${horse.totalPoints} | Championships: ${horse.championships} | Reserves: ${horse.reserves}</p>
     <p>Lifetime Earnings: ${money(horse.earnings)}</p>
+    <p>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>
     <p>Top Mare/Filly: ${horse.topWins.mareFilly} | Best Breed: ${horse.topWins.breed} | Best Overall: ${horse.topWins.overall}</p>
     ${horse.showResults.length ? `<p class='small'>Latest: ${horse.showResults[horse.showResults.length - 1].discipline} ${horse.showResults[horse.showResults.length - 1].level} — #${horse.showResults[horse.showResults.length - 1].placing} (${horse.showResults[horse.showResults.length - 1].resultText || horse.showResults[horse.showResults.length - 1].score})</p>` : '<p class="small">No show entries yet.</p>'}
     <p class='small'>${disciplineLevelSummary(horse, 'jumping')} | ${disciplineLevelSummary(horse, 'dressage')} | ${disciplineLevelSummary(horse, 'eventing')} | ${disciplineLevelSummary(horse, 'hunter')}</p>
@@ -746,6 +843,38 @@ function createHorseCard(horse) {
         <p class='small'>Conformation: ${horse.registryInspection.conformation.toFixed(1)} | Pedigree: ${horse.registryInspection.pedigree.toFixed(1)} | Potential: ${horse.registryInspection.potential.toFixed(1)}</p>
       </div>
     ` : ''}
+    <button data-action='toggle-pedigree'>${horse.showPedigree ? 'Hide Pedigree' : 'Show Pedigree'}</button>
+    ${horse.showPedigree ? (() => {
+      const entries = pedigreeForHorse(horse);
+      return `<div class='box pedigree-grid'>
+        ${entries.map((entry) => {
+          const stats = pedigreeStats(entry);
+          const disciplineMax = stats
+            ? `${disciplineLevelSummary(stats, 'jumping')} | ${disciplineLevelSummary(stats, 'dressage')} | ${disciplineLevelSummary(stats, 'eventing')} | ${disciplineLevelSummary(stats, 'hunter')}`
+            : 'Unknown';
+          const record = stats ? showRecordSummary(stats) : null;
+          return `<div class='pedigree-entry'>
+            <p class='small pedigree-relation'>${entry.relation}</p>
+            <details>
+              <summary>${entry.name}</summary>
+              <p class='small'>Breed: ${entry.breed} (${entry.percent})</p>
+              <p class='small'>Coat: ${entry.coat}</p>
+              <p class='small'>Jumping Stats: ${stats ? Object.entries(stats.stats.jumping).map(([k, v]) => `${k} ${v}`).join(', ') : 'Unknown'}</p>
+              <p class='small'>Dressage Stats: ${stats ? Object.entries(stats.stats.dressage).map(([k, v]) => `${k} ${v}`).join(', ') : 'Unknown'}</p>
+              <p class='small'>Personality: ${stats ? stats.personality : 'Unknown'}</p>
+              <p class='small'>Behavior: ${stats ? stats.behavior : 'Unknown'}</p>
+              <p class='small'>Conformation: ${stats ? stats.conformation : 'Unknown'}</p>
+              <p class='small'>Worth: ${stats ? money(horseWorth(stats)) : 'Unknown'}</p>
+              <p class='small'>Total Points: ${stats ? stats.totalPoints : 'Unknown'}</p>
+              <p class='small'>Winnings: ${stats ? money(stats.earnings) : 'Unknown'}</p>
+              <p class='small'>Lifetime Earnings: ${stats ? money(stats.earnings) : 'Unknown'}</p>
+              <p class='small'>Show record: ${stats ? `${record.total} (${record.first}-${record.second}-${record.third})` : 'Unknown'}</p>
+              <p class='small'>Discipline Max: ${disciplineMax}</p>
+            </details>
+          </div>`;
+        }).join('')}
+      </div>`;
+    })() : ''}
     <button data-action='offspring-summary'>${horse.showOffspringSummary ? 'Hide Offspring Summary' : 'Show Offspring Summary'}</button>
     ${horse.showOffspringSummary ? (() => {
       const summary = offspringSummary(horse);
@@ -783,6 +912,7 @@ function createHorseCard(horse) {
       if (action === 'vet-notes') horse.showVetNotes = !horse.showVetNotes;
       if (action === 'inspection-details') horse.showInspectionDetails = !horse.showInspectionDetails;
       if (action === 'offspring-summary') horse.showOffspringSummary = !horse.showOffspringSummary;
+      if (action === 'toggle-pedigree') horse.showPedigree = !horse.showPedigree;
       if (['feed', 'vet', 'farrier', 'train'].includes(action)) {
         const key = action === 'train' ? 'trained' : action;
         horse.managed[key] = !horse.managed[key];
@@ -800,6 +930,8 @@ function horseProfileMarkup(horse) {
   const inspection = horse.registryInspection
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'}</p>`
     : '';
+  const record = showRecordSummary(horse);
+  const showRecordLine = `<p class='small'>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>`;
   return `
     <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}</p>
     <div class='grid two'>
@@ -807,6 +939,7 @@ function horseProfileMarkup(horse) {
       <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
     </div>
     <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Top Breed ${horse.topWins?.breed || 0}.</p>
+    ${showRecordLine}
     ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — #${latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
     ${inspection}
   `;
@@ -905,7 +1038,7 @@ function renderMarket() {
     document.getElementById(`buy-${k.key}`).onclick = () => {
       if (app.money < k.cost) return alert('Not enough money');
       app.money -= k.cost;
-      const horse = baseHorse(k.key);
+      const horse = baseHorse(k.key, 'npc');
       horse.breed = document.getElementById(`breed-${k.key}`).value;
       horse.gender = document.getElementById(`gender-${k.key}`).value;
       horse.marking = normalizeMarkingForBreed(horse.marking, horse.breed);
@@ -1576,9 +1709,7 @@ function runRegistryInspection(horse) {
   const scores = registryInspectionScore(horse);
   let result = 'Fail';
   let title = '';
-  if (['Very Bad', 'Bad'].includes(horse.conformation)) {
-    result = 'Fail (conformation)';
-  } else if (scores.totalScore >= 9.5) {
+  if (scores.totalScore >= 9.5) {
     result = 'Elite';
     title = 'Elite';
   } else if (scores.totalScore >= 8) {
@@ -1746,6 +1877,7 @@ function maybeAddRandomIllness(horse) {
       }
     }
     horse.illnesses.push({ name: picked.name, impact: picked.impact, remaining, active: true, severity: picked.severity, retirementRisk: picked.retirementRisk || 0 });
+    applySoundnessLoss(horse, picked.severity);
     if (isSevere) {
       horse.injuryProtection[picked.name] = currentMonthIndex();
     }
@@ -1826,6 +1958,14 @@ function processPregnancy(horse, newborns) {
     foal.socks = pick(SOCKS);
     foal.faceMarking = pick(FACE_MARKINGS);
     foal.marking = randomMarking(foal.breed);
+    foal.pedigree = {
+      sire: sireHorse ? { id: sireHorse.id, name: sireHorse.name, breed: sireHorse.breed, coat: sireHorse.coat } : { name: sireName, breed: sireHorse?.breed || 'Unknown', coat: sireHorse?.coat || 'Unknown' },
+      dam: damHorse ? { id: damHorse.id, name: damHorse.name, breed: damHorse.breed, coat: damHorse.coat } : { name: damName, breed: damHorse?.breed || 'Unknown', coat: damHorse?.coat || 'Unknown' },
+      sireSire: sireHorse?.pedigree?.sire || null,
+      sireDam: sireHorse?.pedigree?.dam || null,
+      damSire: damHorse?.pedigree?.sire || null,
+      damDam: damHorse?.pedigree?.dam || null
+    };
     foal.stats.dressage = { Collection: 0, Balance: 0, Connection: 0, Gaits: 0, Rhythm: 0, Flowiness: 0 };
     foal.stats.jumping = { Striding: 0, Confidence: 0, Balance: 0, Power: 0, Speed: 0, Structure: 0 };
     if (damHorse) damHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
