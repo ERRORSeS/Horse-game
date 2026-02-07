@@ -116,6 +116,7 @@ const cap = (t) => t[0].toUpperCase() + t.slice(1);
 
 const RARE_MARKINGS = MARKINGS.filter((m) => m !== 'None');
 const PEDIGREE_RELATIONS = ['Sire', 'Dam', 'Sire\'s Sire', 'Sire\'s Dam', 'Dam\'s Sire', 'Dam\'s Dam'];
+const PEDIGREE_PREFIXES = ['OLD', 'HAN', 'RHF', 'BRW', 'STS', 'NTH', 'ELD', 'CRW'];
 
 function normalizeMarkingForBreed(marking, breed) {
   if (!marking.includes('Rabicano')) return marking;
@@ -273,6 +274,7 @@ function hydrateFromSave(data) {
       damSire: null,
       damDam: null
     };
+    ensurePedigreeBase(h);
     h.stats = h.stats || { dressage: {}, jumping: {} };
     const d = h.stats.dressage || {};
     const j = h.stats.jumping || {};
@@ -389,11 +391,50 @@ function breedPercentages(breed) {
   }, {});
 }
 
+function pedigreeBaseFromBreed(breed) {
+  const percents = breedPercentages(breed);
+  const entries = Object.entries(percents);
+  if (entries.length >= 2) {
+    const [sireBreed, sirePercent] = entries[0];
+    const [damBreed] = entries[1];
+    const normalizedSire = Math.min(100, Math.max(0, sirePercent));
+    const normalizedDam = Math.max(0, 100 - normalizedSire);
+    return { sireBreed, damBreed, sirePercent: normalizedSire, damPercent: normalizedDam };
+  }
+  const onlyBreed = entries.length ? entries[0][0] : breed || pick(BREEDS);
+  return { sireBreed: onlyBreed, damBreed: onlyBreed, sirePercent: 50, damPercent: 50 };
+}
+
+function randomPedigreeName(label, breed) {
+  const tag = pick(PEDIGREE_PREFIXES);
+  const code = `${tag}-${rnd(1000, 9999)}`;
+  const base = label === 'Dam'
+    ? `${pick(['Lady', 'Queen', 'Bella', 'Nova', 'Ivy', 'Aurora'])} ${pick(['Grace', 'Dream', 'Breeze', 'Muse'])}`
+    : `${pick(['Sir', 'King', 'Rider', 'Atlas', 'Titan', 'Noble'])} ${pick(['Valor', 'Legacy', 'Storm', 'Echo'])}`;
+  return `${base} (#${code})`;
+}
+
+function ensurePedigreeBase(horse) {
+  const ped = horse.pedigree || {
+    sire: null,
+    dam: null,
+    sireSire: null,
+    sireDam: null,
+    damSire: null,
+    damDam: null
+  };
+  const { sireBreed, damBreed, sirePercent, damPercent } = pedigreeBaseFromBreed(horse.breed);
+  if (!ped.sire) ped.sire = { name: randomPedigreeName('Sire', sireBreed), breed: sireBreed, coat: pick(COATS), percent: sirePercent };
+  if (!ped.dam) ped.dam = { name: randomPedigreeName('Dam', damBreed), breed: damBreed, coat: pick(COATS), percent: damPercent };
+  horse.pedigree = ped;
+}
+
 function pedigreeEntry(label, info, subjectBreed) {
   const fallback = { name: 'Unknown', breed: 'Unknown', coat: 'Unknown' };
   const entry = info || fallback;
   const percents = breedPercentages(subjectBreed);
-  const percent = entry.breed && percents[entry.breed] ? `${percents[entry.breed]}%` : 'Unknown';
+  const percentValue = Number.isFinite(entry.percent) ? entry.percent : entry.breed && percents[entry.breed] ? percents[entry.breed] : null;
+  const percent = percentValue != null ? `${percentValue}%` : 'Unknown';
   return { relation: label, ...fallback, ...entry, percent };
 }
 
@@ -625,9 +666,11 @@ function baseHorse(type = 'trained', origin = 'player') {
     }
   };
   if (origin === 'npc') {
-    horse.pedigree.sire = { name: `${pick(['Sir', 'King', 'Rider', 'Atlas'])} ${pick(['Valor', 'Legacy', 'Storm', 'Echo'])}`, breed: horse.breed, coat: pick(COATS) };
-    horse.pedigree.dam = { name: `${pick(['Lady', 'Queen', 'Bella', 'Nova'])} ${pick(['Grace', 'Dream', 'Breeze', 'Muse'])}`, breed: horse.breed, coat: pick(COATS) };
+    const { sireBreed, damBreed, sirePercent, damPercent } = pedigreeBaseFromBreed(horse.breed);
+    horse.pedigree.sire = { name: randomPedigreeName('Sire', sireBreed), breed: sireBreed, coat: pick(COATS), percent: sirePercent };
+    horse.pedigree.dam = { name: randomPedigreeName('Dam', damBreed), breed: damBreed, coat: pick(COATS), percent: damPercent };
   }
+  ensurePedigreeBase(horse);
   if (rnd(1, 100) <= 18) {
     horse.extraPotential = true;
     Object.keys(horse.potential).forEach((k) => {
@@ -855,7 +898,7 @@ function createHorseCard(horse) {
           const record = stats ? showRecordSummary(stats) : null;
           return `<div class='pedigree-entry'>
             <p class='small pedigree-relation'>${entry.relation}</p>
-            <details>
+            <details ${entry.name !== 'Unknown' ? '' : ''}>
               <summary>${entry.name}</summary>
               <p class='small'>Breed: ${entry.breed} (${entry.percent})</p>
               <p class='small'>Coat: ${entry.coat}</p>
@@ -1966,6 +2009,7 @@ function processPregnancy(horse, newborns) {
       damSire: damHorse?.pedigree?.sire || null,
       damDam: damHorse?.pedigree?.dam || null
     };
+    ensurePedigreeBase(foal);
     foal.stats.dressage = { Collection: 0, Balance: 0, Connection: 0, Gaits: 0, Rhythm: 0, Flowiness: 0 };
     foal.stats.jumping = { Striding: 0, Confidence: 0, Balance: 0, Power: 0, Speed: 0, Structure: 0 };
     if (damHorse) damHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
