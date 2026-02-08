@@ -169,56 +169,90 @@ const EXERCISE_MENU = {
   eventing: ['Collection', 'Connection', 'Rhythm', 'Striding', 'Confidence', 'Speed']
 };
 const COMPETITION_HIGHLIGHTS = {
-  jumping: [
-    'The horse struggled on jump #.',
-    'The horse had a dramatic knockdown on jump #.',
-    'The horse cleared jump # with perfect striding.',
-    'The striding was off, resulting in a refusal at jump #.',
-    'The turn was too sharp for jump #, resulting in a knockdown.',
-    'The pace was off, so the horse struggled but cleared jump #.',
-    'The pace was off, so the horse struggled, knocking jump #.',
-    'The horse approached jump # confidently but misjudged the distance, brushing the rail.',
-    'Jump # required extra effort, and the horse landed awkwardly.',
-    'The horse showed a clean line until jump #, where a slight stumble caused hesitation.',
-    'The horse went off-course at jump #, losing momentum before rejoining the track.'
-  ],
-  dressage: [
-    'The horse executed the movement with fluidity and balance.',
-    'The transition into the movement was slightly rushed, reducing the score.',
-    'The horse hesitated during the movement.',
-    'The horse overbent in the movement, resulting in a score drop.',
-    'The movement was accurate but lacked impulsion.',
-    'The horse was tense during the movement, affecting rhythm.',
-    'The horse performed the movement correctly, but the stride length was inconsistent.',
-    'The horse lost straightness during the movement.',
-    'The movement was executed with expression and engagement.',
-    'The horse broke gait momentarily during the movement.'
-  ],
-  eventing: [
-    'The horse handled the jump well, landing smoothly.',
-    'The horse knocked down a rail at jump #.',
-    'The horse refused at jump # and required a re-approach.',
-    'The horse galloped confidently over the cross-country obstacle.',
-    'The pace was too fast into the obstacle, resulting in a stumble.',
-    'The horse misjudged the distance and had a knockdown at jump #.',
-    'The horse hesitated at water/ditch combinations.',
-    'The horse showed excellent rhythm throughout the course, only faltering at jump #.',
-    'The horse executed a clean line in dressage, but stamina issues affected cross-country.',
-    'The horse’s turning radius caused an awkward approach to jump #.'
-  ],
-  hunter: [
-    'The horse showed a flowing, consistent pace over the fence.',
-    'The horse hit a rail lightly on fence #.',
-    'The horse refused at fence #, causing a break in rhythm.',
-    'The horse’s striding between fences was uneven.',
-    'The horse performed with expression and elegance over fence #.',
-    'The horse was slow to the jump but cleared it.',
-    'Fence # disrupted the horse’s rhythm, causing a knockdown.',
-    'The horse executed a smooth line until fence #, where the pace dropped slightly.',
-    'The horse maintained balance and posture throughout the course.',
-    'Fence # caused a slight stumble on landing, but the horse recovered well.',
-    'The horse drifted off-course near fence # before correcting.'
-  ]
+  jumping: {
+    positive: [
+      'The horse cleared jump # with perfect striding.',
+      'The horse approached jump # confidently and met the distance well.',
+      'The horse maintained a clean line through jump #.',
+      'Jump # required extra effort, and the horse landed smoothly.',
+      'The horse showed a clean line until jump #, where a slight stumble caused hesitation.'
+    ],
+    faults: [
+      'The horse had a dramatic knockdown on jump #.',
+      'The turn was too sharp for jump #, resulting in a knockdown.',
+      'The horse approached jump # confidently but misjudged the distance, brushing the rail.',
+      'The pace was off, so the horse struggled, knocking jump #.'
+    ],
+    refusals: [
+      'The striding was off, resulting in a refusal at jump #.'
+    ],
+    time: [
+      'The pace was off, so the horse struggled but cleared jump #.',
+      'The horse went off-course at jump #, losing momentum before rejoining the track.'
+    ],
+    eliminated: [
+      'The horse was eliminated after a costly mistake on jump #.'
+    ]
+  },
+  dressage: {
+    positive: [
+      'The horse executed the movement with fluidity and balance.',
+      'The movement was executed with expression and engagement.',
+      'The movement was accurate and showed good impulsion.'
+    ],
+    neutral: [
+      'The movement was accurate but lacked impulsion.',
+      'The horse performed the movement correctly, but the stride length was inconsistent.',
+      'The transition into the movement was slightly rushed, reducing the score.'
+    ],
+    negative: [
+      'The horse hesitated during the movement.',
+      'The horse overbent in the movement, resulting in a score drop.',
+      'The horse was tense during the movement, affecting rhythm.',
+      'The horse lost straightness during the movement.',
+      'The horse broke gait momentarily during the movement.'
+    ]
+  },
+  eventing: {
+    positive: [
+      'The horse handled the jump well, landing smoothly.',
+      'The horse galloped confidently over the cross-country obstacle.',
+      'The horse showed excellent rhythm throughout the course.'
+    ],
+    rails: [
+      'The horse knocked down a rail at jump #.',
+      'The horse misjudged the distance and had a knockdown at jump #.'
+    ],
+    refusals: [
+      'The horse refused at jump # and required a re-approach.',
+      'The horse hesitated at water/ditch combinations.'
+    ],
+    time: [
+      'The pace was too fast into the obstacle, resulting in a stumble.',
+      'The horse executed a clean line in dressage, but stamina issues affected cross-country.'
+    ],
+    eliminated: [
+      'The horse was eliminated after a fall on the cross-country course.'
+    ]
+  },
+  hunter: {
+    positive: [
+      'The horse showed a flowing, consistent pace over the fence.',
+      'The horse performed with expression and elegance over fence #.',
+      'The horse maintained balance and posture throughout the course.'
+    ],
+    faults: [
+      'The horse hit a rail lightly on fence #.',
+      'Fence # disrupted the horse’s rhythm, causing a knockdown.',
+      'The horse refused at fence #, causing a break in rhythm.'
+    ],
+    rhythm: [
+      'The horse’s striding between fences was uneven.',
+      'The horse was slow to the jump but cleared it.',
+      'Fence # caused a slight stumble on landing, but the horse recovered well.',
+      'The horse drifted off-course near fence # before correcting.'
+    ]
+  }
 };
 const COMPETITION_COMMENTS = {
   strong: [
@@ -1516,9 +1550,18 @@ function renderDashboard() {
     </div>
     <div class="box">
       <h2>Competition Reports</h2>
+      <button id="clear-competition-reports">Clear Reports</button>
       ${competitionReports}
     </div>
   `;
+  const clearBtn = document.getElementById('clear-competition-reports');
+  if (clearBtn) {
+    clearBtn.onclick = () => {
+      app.competitionReports = [];
+      renderDashboard();
+      saveGame(false);
+    };
+  }
 }
 
 function createHorseCard(horse) {
@@ -1966,14 +2009,51 @@ function competitionJumpCount(discipline, level) {
   return rnd(6, 12);
 }
 
-function generateHighlights(discipline, count, maxCount) {
-  const templates = COMPETITION_HIGHLIGHTS[discipline] || [];
-  if (!templates.length) return [];
-  return Array.from({ length: count }, () => {
-    const template = pick(templates);
-    const marker = maxCount ? rnd(1, maxCount) : rnd(1, 10);
-    return template.replace('#', marker);
-  });
+function formatHighlight(template, maxCount) {
+  if (!template) return '';
+  const marker = maxCount ? rnd(1, maxCount) : rnd(1, 10);
+  return template.replace('#', marker);
+}
+
+function pickHighlight(list, maxCount) {
+  if (!list?.length) return '';
+  return formatHighlight(pick(list), maxCount);
+}
+
+function buildHighlights(discipline, details) {
+  const maxCount = details.jumpCount || 10;
+  const lines = [];
+  if (discipline === 'jumping') {
+    if (details.eliminated) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.jumping.eliminated, maxCount));
+    if (details.refusals > 0) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.jumping.refusals, maxCount));
+    for (let i = 0; i < details.rails; i += 1) {
+      lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.jumping.faults, maxCount));
+      if (lines.length >= 3) break;
+    }
+    if (details.overSeconds > 0) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.jumping.time, maxCount));
+    while (lines.length < 4) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.jumping.positive, maxCount));
+  } else if (discipline === 'dressage') {
+    const pct = details.pct || 0;
+    const bucket = pct >= 80 ? 'positive' : pct >= 70 ? 'neutral' : 'negative';
+    while (lines.length < 4) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.dressage[bucket], maxCount));
+  } else if (discipline === 'eventing') {
+    if (details.eliminated) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.eventing.eliminated, maxCount));
+    for (let i = 0; i < details.rails; i += 1) {
+      lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.eventing.rails, maxCount));
+      if (lines.length >= 2) break;
+    }
+    if (details.refusals > 0) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.eventing.refusals, maxCount));
+    if (details.overSeconds > 0) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.eventing.time, maxCount));
+    while (lines.length < 4) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.eventing.positive, maxCount));
+  } else if (discipline === 'hunter') {
+    for (let i = 0; i < details.faults; i += 1) {
+      lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.hunter.faults, maxCount));
+      if (lines.length >= 2) break;
+    }
+    if (details.faults > 0) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.hunter.rhythm, maxCount));
+    while (lines.length < 4) lines.push(pickHighlight(COMPETITION_HIGHLIGHTS.hunter.positive, maxCount));
+  }
+  return lines.filter(Boolean).slice(0, 5);
 }
 
 function selectCompetitionComment(score) {
@@ -2008,18 +2088,23 @@ function calculateCompetitionResult(horse, discipline, level) {
   let penaltiesText = '';
   let timeScoreText = '';
   let eliminated = false;
+  let rails = 0;
+  let refusals = 0;
+  let overSeconds = 0;
+  let faults = 0;
+  let pct = 0;
   const jump = horse.stats.jumping;
   const dress = horse.stats.dressage;
   const jumpCount = competitionJumpCount(discipline, level);
 
   if (discipline === 'jumping') {
     const railBias = Math.max(0, 4 - Math.floor((jump.Striding + jump.Structure + jump.Power) / 95));
-    const rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias), 0, 8);
+    rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias), 0, 8);
     const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias, 5, 60);
-    const refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
+    refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + Math.floor((minReq - skill) / 8));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
-    const overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
+    overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
     if (fall || refusals >= 2) {
       eliminated = true;
       score = 0;
@@ -2027,25 +2112,25 @@ function calculateCompetitionResult(horse, discipline, level) {
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     } else {
-      const faults = rails * 4 + refusals * 4 + overSeconds;
+      faults = rails * 4 + refusals * 4 + overSeconds;
       score = clamp(baseScore - faults * 1.5, 0, 100);
       penaltiesText = `${faults} faults`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = `${penaltiesText} | ${timeScoreText}`;
     }
   } else if (discipline === 'dressage') {
-    const pct = clamp((baseScore * 0.6 + 34) + rnd(-2, 2), 45, 100);
+    pct = clamp((baseScore * 0.6 + 34) + rnd(-2, 2), 45, 100);
     score = pct;
     penaltiesText = `${pct.toFixed(2)}%`;
     timeScoreText = `${pct.toFixed(2)}%`;
     resultText = penaltiesText;
   } else if (discipline === 'eventing') {
-    const rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias)), 0, 6);
+    rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias)), 0, 6);
     const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias, 5, 55);
-    const refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
+    refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
-    const overSeconds = Math.max(0, rnd(0, 20) - Math.floor(jump.Speed / 4));
+    overSeconds = Math.max(0, rnd(0, 20) - Math.floor(jump.Speed / 4));
     if (fall || refusals >= 3) {
       eliminated = true;
       score = 0;
@@ -2060,7 +2145,7 @@ function calculateCompetitionResult(horse, discipline, level) {
       resultText = penaltiesText;
     }
   } else if (discipline === 'hunter') {
-    const faults = clamp(rnd(0, 5 + Math.max(0, temperament.penaltyBias)) - Math.floor((dress.Flowiness + dress.Balance + jump.Striding + jump.Structure) / 90), 0, 12);
+    faults = clamp(rnd(0, 5 + Math.max(0, temperament.penaltyBias)) - Math.floor((dress.Flowiness + dress.Balance + jump.Striding + jump.Structure) / 90), 0, 12);
     score = clamp(baseScore - faults * 1.4, 0, 100);
     penaltiesText = `${faults} faults`;
     timeScoreText = `Score ${score.toFixed(1)}`;
@@ -2071,7 +2156,15 @@ function calculateCompetitionResult(horse, discipline, level) {
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
   const idx = levelIndex(discipline, level);
   const prize = Math.max(120, Math.round((3000 - placing * 130 + idx * 260) * (placing <= 3 ? 1.4 : 1)));
-  const highlights = generateHighlights(discipline, rnd(3, 5), jumpCount);
+  const highlights = buildHighlights(discipline, {
+    jumpCount,
+    eliminated,
+    rails,
+    refusals,
+    overSeconds,
+    faults,
+    pct
+  });
   const comment = selectCompetitionComment(score);
   const suggestion = selectCompetitionSuggestion(horse);
 
@@ -2550,10 +2643,9 @@ function renderTraining() {
 
     const applyBoost = (group, key, capDiscipline) => {
       if (!key || group[key] == null) return;
-      if (good) {
-        const extra = h.trainingBoost ? Math.max(0, Math.round(h.trainingBoost / 2)) : 0;
-        group[key] = clampSkill(h, capDiscipline, group[key] + rnd(1, 4) + extra);
-      }
+      const extra = h.trainingBoost ? Math.max(0, Math.round(h.trainingBoost / 2)) : 0;
+      const gain = good ? rnd(1, 4) + extra : rnd(0, 1);
+      if (gain > 0) group[key] = clampSkill(h, capDiscipline, group[key] + gain);
     };
 
     if (d === 'dressage') applyBoost(h.stats.dressage, ex, 'dressage');
