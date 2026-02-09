@@ -164,6 +164,7 @@ const FEEDS = [
   'Diet Feed',
   'Joint Support'
 ];
+let wrongFeedUsed = null;
 const MOODS = ['Motivated', 'Happy', 'Try-Hard', 'Neutral', 'Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy'];
 const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overweight'];
 const EXERCISE_MENU = {
@@ -1550,71 +1551,6 @@ function refreshNpcAds() {
   pushReport('NPC sale, rescue, and stud ads have been refreshed.');
 }
 
-function randomRescueBreed() {
-  const roll = rnd(1, 100);
-  const one = pick(BREEDS);
-  if (roll <= 15) return `${one} 100%`;
-  if (roll <= 50) {
-    const two = pick(BREEDS.filter((b) => b !== one));
-    return `${one} 50% x ${two} 50%`;
-  }
-  if (roll <= 85) {
-    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
-    return picks.map((b) => `${b} 25%`).join(' x ');
-  }
-  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
-  return picks.map((b) => `${b} 15%`).join(' x ');
-}
-
-function rescueHealthIssues() {
-  const pool = [
-    { name: 'Internal Parasites', severity: 'Medium' },
-    { name: 'Chronic Infection', severity: 'More Than Medium' },
-    { name: 'Laminitis', severity: 'Severe' },
-    { name: 'Anhidrosis', severity: 'Medium' },
-    { name: 'Melanoma', severity: 'Severe' },
-    { name: 'Kissing Spines', severity: 'Very Severe' }
-  ];
-  if (rnd(1, 100) > 75) return [];
-  const count = rnd(1, 4);
-  return Array.from({ length: count }, () => pick(pool));
-}
-
-function generateRescueHorse() {
-  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
-  const age = rnd(3, 18);
-  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
-  const breed = randomRescueBreed();
-  const gender = pick(['Mare', 'Stallion', 'Gelding']);
-  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
-  const issues = rescueHealthIssues();
-  const deadlineMonths = rnd(1, 8);
-  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
-  return {
-    id: uid(),
-    name,
-    age,
-    ageLabel,
-    breed,
-    gender,
-    weightStatus,
-    issues,
-    deadlineMonthIndex,
-    price: rnd(500, 1500),
-    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
-    rescueWeightDelay: rnd(4, 12)
-  };
-}
-
-function refreshRescueHorses() {
-  const now = currentMonthIndex();
-  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
-  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
-  while (app.rescueHorses.length < 15) {
-    app.rescueHorses.push(generateRescueHorse());
-  }
-}
-
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
@@ -2582,7 +2518,9 @@ function renderVet() {
 
   document.getElementById('vet-gelding').onclick = () => {
     const h = selectedHorse();
-    if (!h || !tryCharge(500)) return;
+    if (!h) return;
+    if (!confirm('You sure you want to geld this horse?')) return;
+    if (!tryCharge(500)) return;
     h.gender = 'Gelding';
     Object.keys(h.potential).forEach((k) => { h.potential[k] += rnd(0, 5); });
     if (['Stubborn', 'Spooky', 'Unfocused'].includes(h.personality)) {
@@ -3190,9 +3128,9 @@ function renderRescue() {
 }
 
 function injuryChanceByGenetics(horse) {
-  if (horse.healthGenetics === 'Low') return 5;
-  if (horse.healthGenetics === 'High') return 12;
-  return 8;
+  if (horse.healthGenetics === 'Low') return 8;
+  if (horse.healthGenetics === 'High') return 3;
+  return 5;
 }
 
 function pickIllnessWithModifiers(horse) {
