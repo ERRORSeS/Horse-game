@@ -118,6 +118,19 @@ textarea {
 }
 .horse-table th { color: #cfe0f2; font-weight: 600; }
 .horse-table tr:hover { background: #273748; cursor: pointer; }
+.bond-meter {
+  height: 8px;
+  background: #1b2633;
+  border-radius: 999px;
+  border: 1px solid #314456;
+  overflow: hidden;
+  margin-top: .35rem;
+}
+.bond-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #3f8cd6, #2ecc71);
+}
 .horse-table tr.selected { background: #2f4458; }
 .horse-profile { margin-top: 1.5rem; }
 .pedigree-grid {
