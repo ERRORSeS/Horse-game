@@ -1551,6 +1551,10 @@ function refreshNpcAds() {
   pushReport('NPC sale, rescue, and stud ads have been refreshed.');
 }
 
+function refreshRescueHorses() {
+  refreshNpcAds();
+}
+
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
@@ -3131,70 +3135,6 @@ function injuryChanceByGenetics(horse) {
   if (horse.healthGenetics === 'Low') return 8;
   if (horse.healthGenetics === 'High') return 3;
   return 5;
-}
-
-function pickIllnessWithModifiers(horse) {
-  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
-  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
-  if (wrongFeedMonths > 5) {
-    baseWeights.forEach((item) => {
-      if (item.entry.name === 'Colic') item.weight *= 1.5;
-      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
-    });
-  }
-  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
-  let roll = Math.random() * total;
-  for (const item of baseWeights) {
-    roll -= item.weight;
-    if (roll <= 0) return item.entry;
-  }
-  return SICKNESS_TYPES[0];
-}
-
-function addIllness(horse, illness) {
-  if (!illness) return;
-  const remaining = injuryRecoveryMonths(illness.severity);
-  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
-  const lastSevere = horse.injuryProtection?.[illness.name];
-  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
-    if (rnd(1, 100) <= 90) return;
-  }
-  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
-  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
-    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
-    if (died) {
-      horse.deceased = true;
-      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
-      return;
-    }
-  }
-  horse.illnesses.push({
-    name: illness.name,
-    impact: illness.impact,
-    remaining,
-    active: true,
-    severity: illness.severity,
-    retirementRisk: illness.retirementRisk || 0
-  });
-  applySoundnessLoss(horse, illness.severity);
-  if (isSevere) {
-    horse.injuryProtection[illness.name] = currentMonthIndex();
-  }
-  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
-  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
-}
-
-function maybeAddOvertrainingInjury(horse) {
-  if (horse.illnesses.some((i) => i.active)) return;
-  const count = horse.overTrainingCountYear || 0;
-  if (!horse.pendingOvertrainingInjury || count < 4) return;
-  if (count >= 8) {
-    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
-    horse.pendingOvertrainingInjury = false;
-    return;
-  }
-  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
-  horse.pendingOvertrainingInjury = false;
 }
 
 function maybeAddRandomIllness(horse) {
