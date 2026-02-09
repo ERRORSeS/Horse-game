@@ -173,11 +173,139 @@ const EXERCISE_MENU = {
   hunter: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
   eventing: ['Collection', 'Connection', 'Rhythm', 'Striding', 'Confidence', 'Speed']
 };
-const FOAL_TRAINING = {
-  Weaning: { behavior: [1, 2], dressage: ['Balance', 'Rhythm'] },
-  Lunging: { behavior: [1, 2], jumping: ['Striding', 'Balance'] },
-  Petting: { behavior: [2, 3], dressage: ['Connection'], jumping: ['Confidence'] },
-  'Standing Still': { behavior: [1, 2], dressage: ['Collection'], jumping: ['Structure'] }
+const COMPETITION_HIGHLIGHTS = {
+  jumping: {
+    positive: [
+      'The horse cleared jump # with perfect striding.',
+      'The horse approached jump # confidently and met the distance well.',
+      'The horse maintained a clean line through jump #.',
+      'Jump # required extra effort, and the horse landed smoothly.',
+      'The horse showed a clean line until jump #, where a slight stumble caused hesitation.'
+    ],
+    faults: [
+      'The horse had a dramatic knockdown on jump #.',
+      'The turn was too sharp for jump #, resulting in a knockdown.',
+      'The horse approached jump # confidently but misjudged the distance, brushing the rail.',
+      'The pace was off, so the horse struggled, knocking jump #.'
+    ],
+    refusals: [
+      'The striding was off, resulting in a refusal at jump #.'
+    ],
+    time: [
+      'The pace was off, so the horse struggled but cleared jump #.',
+      'The horse went off-course at jump #, losing momentum before rejoining the track.'
+    ],
+    eliminated: [
+      'The horse was eliminated after a costly mistake on jump #.'
+    ]
+  },
+  dressage: {
+    positive: [
+      'The horse executed the movement with fluidity and balance.',
+      'The movement was executed with expression and engagement.',
+      'The movement was accurate and showed good impulsion.'
+    ],
+    neutral: [
+      'The movement was accurate but lacked impulsion.',
+      'The horse performed the movement correctly, but the stride length was inconsistent.',
+      'The transition into the movement was slightly rushed, reducing the score.'
+    ],
+    negative: [
+      'The horse hesitated during the movement.',
+      'The horse overbent in the movement, resulting in a score drop.',
+      'The horse was tense during the movement, affecting rhythm.',
+      'The horse lost straightness during the movement.',
+      'The horse broke gait momentarily during the movement.'
+    ]
+  },
+  eventing: {
+    positive: [
+      'The horse handled the jump well, landing smoothly.',
+      'The horse galloped confidently over the cross-country obstacle.',
+      'The horse showed excellent rhythm throughout the course.'
+    ],
+    rails: [
+      'The horse knocked down a rail at jump #.',
+      'The horse misjudged the distance and had a knockdown at jump #.'
+    ],
+    refusals: [
+      'The horse refused at jump # and required a re-approach.',
+      'The horse hesitated at water/ditch combinations.'
+    ],
+    time: [
+      'The pace was too fast into the obstacle, resulting in a stumble.',
+      'The horse executed a clean line in dressage, but stamina issues affected cross-country.'
+    ],
+    eliminated: [
+      'The horse was eliminated after a fall on the cross-country course.'
+    ]
+  },
+  hunter: {
+    positive: [
+      'The horse showed a flowing, consistent pace over the fence.',
+      'The horse performed with expression and elegance over fence #.',
+      'The horse maintained balance and posture throughout the course.'
+    ],
+    faults: [
+      'The horse hit a rail lightly on fence #.',
+      'Fence # disrupted the horse’s rhythm, causing a knockdown.',
+      'The horse refused at fence #, causing a break in rhythm.'
+    ],
+    rhythm: [
+      'The horse’s striding between fences was uneven.',
+      'The horse was slow to the jump but cleared it.',
+      'Fence # caused a slight stumble on landing, but the horse recovered well.',
+      'The horse drifted off-course near fence # before correcting.'
+    ]
+  }
+};
+const COMPETITION_COMMENTS = {
+  strong: [
+    'Strong performance today; horse is adapting well to current skill level.',
+    'The horse is excelling beyond expectations; consider entering a slightly higher-level competition.',
+    'Exceptional effort from the horse; small improvements could have a big impact.'
+  ],
+  mixed: [
+    'The horse shows potential but made minor mistakes; focus on precision and rhythm.',
+    'Performance varied across rounds; consider adjusting skill-specific training.',
+    'The horse’s performance suggests more strength and endurance work is needed.'
+  ],
+  management: [
+    'The horse is responding well to management; keep routines consistent.',
+    'The horse’s temperament is affecting performance; observe and adjust management if needed.',
+    'The horse is showing its personality today; consider matching feed and turnout to mood.'
+  ]
+};
+const COMPETITION_SUGGESTIONS = {
+  feed: [
+    'The horse seems to be performing well, but might benefit from slightly richer feed.',
+    'The horse appears a little heavy; reducing feed could improve performance.',
+    'Consider switching to recovery feed; the horse seems stiff or tense.',
+    'The horse is underweight and could benefit from weight-gain feed.',
+    'The horse’s energy seems balanced; current feeding regimen is working well.',
+    'Too much feed may be affecting its energy and mood; monitor for weight gain.'
+  ],
+  turnout: [
+    'The horse appears energetic and eager, more training may help channel this energy.',
+    'The horse seems sluggish today, consider giving more turnout or adjusting feed.',
+    'The horse’s energy is off; too much or too little turnout might be affecting its performance.',
+    'Consider calm feed or extra rest for the horse; it’s overly active or distracted.',
+    'The horse thrives under current workload; maintain schedule.'
+  ],
+  training: [
+    'The horse shows promise in its current discipline but could benefit from extra skill work.',
+    'The horse struggles with certain movements/jumps; focus on targeted exercises.',
+    'Consistency is key; consider more repetition of current exercises to solidify skill.',
+    'The horse may need time off or light training to prevent fatigue or injury.',
+    'The horse demonstrates natural talent; ensure training is balanced to maximize potential.'
+  ],
+  health: [
+    'The horse seems healthy, but keep an eye on weight and energy.',
+    'Consider retiring this horse soon; age or current performance suggests limits.',
+    'The horse may benefit from being gelded if temperament or energy is difficult to manage.',
+    'The horse’s stamina is declining; review workload or discipline level.',
+    'Injuries or stiffness suggest extra recovery feed or reduced workload.'
+  ]
 };
 
 function normalizeMarkingForBreed(marking, breed) {
@@ -336,9 +464,11 @@ function genderPronouns(horse) {
 
 function recommendedFeedForHorse(horse) {
   if (horse.illnesses.some((i) => i.active)) return 'Recovery';
+  if ((horse.injuryCountYear || 0) > 3) return 'Joint Support';
   if (horse.pregnantBy || horse.pregnantEmbryo || horse.retiredToBreeding) return 'Brood-mare Feed';
   if (horse.age <= 5) return 'Youngster Feed';
   if (horse.age >= 15) return 'Old Horse Feed';
+  if (['Overweight', 'Fleshy'].includes(horse.weightStatus)) return 'Diet Feed';
   if (['Very Underweight', 'Underweight'].includes(horse.weightStatus)) return 'Weight Gain';
   return 'Basic Feed';
 }
@@ -371,6 +501,9 @@ function trainerNotesForHorse(horse) {
   if (horse.gender === 'Stallion' && horse.lastTrainingIssue === 'low' && !horse.retiredForever && !horse.retiredToBreeding) {
     notes.push('He looks overly energetic, consider gelding.');
   }
+  if ((horse.injuryCountYear || 0) > 3) {
+    notes.push(`${subject} is prone to injuries, better give ${object} some joint support feed!`);
+  }
   const bestFeed = recommendedFeedForHorse(horse);
   notes.push(`This is the best feedplan for this horse, ${bestFeed} ${feedMin}-${feedMax}g.`);
   horse.trainerNotes = notes;
@@ -383,6 +516,7 @@ function evaluateFeedEffects(horse) {
   let competitionBoost = 0;
   let healingBoost = 0;
   let feedIssue = null;
+  let wrongFeedUsed = false;
   const activeTraining = (horse.trainingSessionsThisMonth || 0) > 0 || horse.managed?.showEntry;
   const competitionCount = horse.showEntriesThisMonth || 0;
   const hasInjury = horse.illnesses.some((i) => i.active);
@@ -403,6 +537,7 @@ function evaluateFeedEffects(horse) {
         if (!activeTraining && competitionCount === 0) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Sports Feed', betterFeed: 'Basic Feed' };
         } else {
           trainingBoost += 2;
@@ -413,7 +548,12 @@ function evaluateFeedEffects(horse) {
         if (['Energetic', 'Stubborn'].includes(horse.personality)) {
           weightDelta += 1;
           moodOverride = 'Overly-Active';
+          competitionBoost -= 1;
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Sweet Feed', betterFeed: 'Calm nd Ez' };
+        } else if (horse.personality === 'Lazy') {
+          moodOverride = 'Motivated';
+          competitionBoost += 1;
         } else {
           moodOverride = 'Happy';
         }
@@ -422,12 +562,17 @@ function evaluateFeedEffects(horse) {
         if (!(horse.retiredToBreeding || horse.pregnantBy || horse.pregnantEmbryo || horse.age <= 2)) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Brood-mare Feed', betterFeed: 'Basic Feed' };
+        } else {
+          moodOverride = 'Happy';
         }
         break;
       case 'Calm nd Ez':
         if (['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality)) {
           moodOverride = 'No energy';
+          competitionBoost -= 1;
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Calm nd Ez', betterFeed: 'Basic Feed' };
         } else {
           moodOverride = 'Neutral';
@@ -439,6 +584,7 @@ function evaluateFeedEffects(horse) {
         if (horse.age > 5 || horse.retiredForever || horse.retiredToBreeding) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Youngster Feed', betterFeed: 'Basic Feed' };
         } else {
           trainingBoost += 2;
@@ -448,6 +594,7 @@ function evaluateFeedEffects(horse) {
         if (horse.age < 15 && !horse.retiredForever) {
           weightDelta += 1;
           moodOverride = 'Distress';
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Old Horse Feed', betterFeed: 'Basic Feed' };
           if (['Energetic', 'Stubborn'].includes(horse.personality)) moodOverride = 'Overly-Active';
         } else if (horse.age >= 20 || horse.retiredToBreeding || horse.retiredForever) {
@@ -460,13 +607,12 @@ function evaluateFeedEffects(horse) {
       case 'Recovery':
         if (!hasInjury) {
           moodOverride = 'Uncomfortable';
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Recovery', betterFeed: 'Basic Feed' };
         } else {
-          if (rnd(1, 100) <= 70) {
+          const roll = rnd(1, 100);
+          if (roll > 10 && roll <= 80) {
             healingBoost += 1;
-          }
-          if (rnd(1, 100) > 10) {
-            horse.soundnessYears = Number((horse.soundnessYears + 0.2).toFixed(1));
           }
         }
         break;
@@ -474,6 +620,7 @@ function evaluateFeedEffects(horse) {
         if (['Moderate', 'Fleshy', 'Overweight'].includes(horse.weightStatus)) {
           moodOverride = 'Distress';
           weightDelta += 1;
+          wrongFeedUsed = true;
           feedIssue = { badFeed: 'Weight Gain', betterFeed: 'Basic Feed' };
         } else {
           weightDelta += 1;
@@ -532,6 +679,9 @@ function applyAutoTraining(horse) {
   const allowedFocuses = autoTrainingOptionsForHorse(horse).map((option) => option.value);
   if (!allowedFocuses.includes(horse.autoTrainingFocus)) return;
   const preferred = Math.max(1, Math.min(50, horse.preferredTrainingSessions || 25));
+  const stamina = horse.trainingPreference || 'Medium';
+  const skillCap = stamina === 'Low' ? rnd(2, 5) : stamina === 'High' ? rnd(7, 10) : rnd(5, 7);
+  let skillGains = 0;
   let trainedSessions = 0;
   if (horse.autoTrainingFocus === 'Light Exercise') {
     for (let i = 0; i < preferred; i += 1) {
@@ -572,19 +722,23 @@ function applyAutoTraining(horse) {
     }
     const skill = pick(EXERCISE_MENU[discipline]);
     const bonus = horse.trainingBoost ? Math.max(0, Math.round(horse.trainingBoost / 2)) : 0;
-    if (discipline === 'dressage') {
-      horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + rnd(1, 3) + bonus);
-    }
-    if (discipline === 'jumping' || discipline === 'hunter') {
-      horse.stats.jumping[skill] = clampSkill(horse, discipline, horse.stats.jumping[skill] + rnd(1, 3) + bonus);
-    }
-    if (discipline === 'eventing') {
-      if (horse.stats.dressage[skill] != null) {
-        horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + rnd(1, 3) + bonus);
+    const gain = rnd(1, 3) + bonus;
+    if (skillGains < skillCap) {
+      if (discipline === 'dressage') {
+        horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + gain);
       }
-      if (horse.stats.jumping[skill] != null) {
-        horse.stats.jumping[skill] = clampSkill(horse, discipline, horse.stats.jumping[skill] + rnd(1, 3) + bonus);
+      if (discipline === 'jumping' || discipline === 'hunter') {
+        horse.stats.jumping[skill] = clampSkill(horse, discipline, horse.stats.jumping[skill] + gain);
       }
+      if (discipline === 'eventing') {
+        if (horse.stats.dressage[skill] != null) {
+          horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + gain);
+        }
+        if (horse.stats.jumping[skill] != null) {
+          horse.stats.jumping[skill] = clampSkill(horse, discipline, horse.stats.jumping[skill] + gain);
+        }
+      }
+      skillGains += 1;
     }
     horse.managed.trained = true;
     horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
@@ -756,17 +910,41 @@ function hydrateFromSave(data) {
     h.requiresBreakingIn = Boolean(h.requiresBreakingIn);
     h.trainerNotes = Array.isArray(h.trainerNotes) ? h.trainerNotes : [];
     h.lastFeedIssue = h.lastFeedIssue && typeof h.lastFeedIssue === 'object' ? h.lastFeedIssue : null;
+    h.lastFeedMoodOverride = h.lastFeedMoodOverride || '';
     h.lastTurnoutIssue = h.lastTurnoutIssue || '';
     h.lastTrainingIssue = h.lastTrainingIssue || '';
     h.turnoutAssignmentHours = Number.isFinite(h.turnoutAssignmentHours) ? h.turnoutAssignmentHours : 0;
+    h.wrongFeedMonthsYear = Number.isFinite(h.wrongFeedMonthsYear) ? h.wrongFeedMonthsYear : 0;
+    h.overTrainingCountYear = Number.isFinite(h.overTrainingCountYear) ? h.overTrainingCountYear : 0;
+    h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
+    h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
+    h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
+    h.hasJointSupport = h.hasJointSupport || false;
+    h.bond = Number.isFinite(h.bond) ? h.bond : 0;
+    h.isRescue = h.isRescue || false;
+    h.rescueWeightDelay = Number.isFinite(h.rescueWeightDelay) ? h.rescueWeightDelay : 0;
+    h.rescueWeightCooldown = Number.isFinite(h.rescueWeightCooldown) ? h.rescueWeightCooldown : 0;
+    if (h.healthTrackingYear !== app.year) {
+      h.overTrainingCountYear = 0;
+      h.pendingOvertrainingInjury = false;
+      h.wrongFeedMonthsYear = 0;
+      h.injuryCountYear = 0;
+      h.healthTrackingYear = app.year;
+    }
+    h.pendingCompetitions = Array.isArray(h.pendingCompetitions) ? h.pendingCompetitions : [];
+    h.titles = Array.isArray(h.titles) ? h.titles : [];
     h.height = h.height || heightFromBreed(h.breed);
     h.soundnessYears = Number.isFinite(h.soundnessYears) ? h.soundnessYears : rnd(1, 15);
     h.soundnessExpiredMonths = Number.isFinite(h.soundnessExpiredMonths) ? h.soundnessExpiredMonths : 0;
     h.lastSoundnessIssueMonth = Number.isFinite(h.lastSoundnessIssueMonth) ? h.lastSoundnessIssueMonth : 0;
     h.unridable = h.unridable || false;
-    h.rescueId = h.rescueId || '';
-    h.rescueFee = Number.isFinite(h.rescueFee) ? h.rescueFee : 0;
-    h.illnesses = Array.isArray(h.illnesses) ? h.illnesses.map((i) => ({ hidden: false, ...i })) : [];
+    h.illnesses = Array.isArray(h.illnesses) ? h.illnesses : [];
+    h.illnesses.forEach((ill) => {
+      ill.remaining = Number.isFinite(ill.remaining) ? ill.remaining : 0;
+      if (typeof ill.active !== 'boolean') {
+        ill.active = ill.remaining > 0;
+      }
+    });
     h.pedigree = h.pedigree || {
       sire: null,
       dam: null,
@@ -801,9 +979,7 @@ function hydrateFromSave(data) {
       : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
     h.hiddenIllnesses = Array.isArray(h.hiddenIllnesses) ? h.hiddenIllnesses : [];
   });
-  if (!app.rescueBarn.length) {
-    refreshNpcAds();
-  }
+  refreshRescueHorses();
 }
 
 function resetGame() {
@@ -1384,6 +1560,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     requiresBreakingIn: false,
     trainerNotes: [],
     lastFeedIssue: null,
+    lastFeedMoodOverride: '',
     lastTurnoutIssue: '',
     lastTrainingIssue: '',
     wrongFeedMonthsYear: 0,
@@ -1576,6 +1753,71 @@ function maybeAddOvertrainingInjury(horse) {
   pushReport(`${horse.name} picked up ${picked.name} after overtraining. Recovery ${remaining} month(s).`);
 }
 
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
@@ -1691,12 +1933,7 @@ function createHorseCard(horse) {
       return article;
     })();
   const activeIssue = horse.illnesses.find((i) => i.active);
-  const illnessLine = (() => {
-    const visible = visibleIllnesses(horse, true);
-    if (!visible.length) return 'None';
-    return visible.map((i) => `${i.name}${i.active ? ` (${i.remaining} mo)` : ''}`).join(', ');
-  })();
-  const titleLabel = horse.registryInspection?.title ? `${horse.registryInspection.title} Champion` : '';
+  const titleLabel = formattedHorseTitles(horse);
   const autoOptions = autoTrainingOptionsForHorse(horse);
   const autoFocusOptions = [
     { value: '', label: 'None' },
@@ -1918,7 +2155,7 @@ function horseProfileMarkup(horse, options = {}) {
   const hiddenNote = !revealAll && hiddenCount > 0 ? ` (+${hiddenCount} hidden)` : '';
   return `
     <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}</p>
-    <p class='small'>Illnesses: ${illnessLine}${hiddenNote}</p>
+    ${titlesLine}
     <div class='grid two'>
       <div><h4>Jump Training</h4><ul class='stats'>${jumping}</ul></div>
       <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
@@ -2377,6 +2614,7 @@ function registerShowEntry(horse, discipline, level) {
   horse.pendingCompetitions.push(entry);
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
   pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Results will arrive next month.`);
+  saveGame(false);
 }
 
 function resolvePendingCompetitions(horse) {
@@ -2480,6 +2718,18 @@ function tryCharge(cost) {
   return true;
 }
 
+function findTreatableIllness(horse) {
+  if (!horse?.illnesses) return null;
+  const active = horse.illnesses.find((i) => i.active);
+  if (active) return active;
+  const lingering = horse.illnesses.find((i) => (i.remaining || 0) > 0);
+  if (lingering) {
+    lingering.active = true;
+    return lingering;
+  }
+  return null;
+}
+
 function renderVet() {
   const mares = app.horses.filter((h) => h.gender === 'Mare' && !h.retiredForever);
   const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
@@ -2558,7 +2808,7 @@ function renderVet() {
   document.getElementById('vet-injury').onclick = () => {
     const h = selectedHorse();
     if (!h || !tryCharge(1000)) return;
-    const issue = h.illnesses.find((i) => i.active);
+    const issue = findTreatableIllness(h);
     if (issue) {
       vetNote(h, `${h.name} has ${issue.name}. Estimated recovery ${issue.remaining} months.`);
     } else if (h.hiddenIllnesses?.length) {
@@ -2574,7 +2824,7 @@ function renderVet() {
   document.getElementById('vet-heal').onclick = () => {
     const h = selectedHorse();
     if (!h || !tryCharge(750)) return;
-    const issue = h.illnesses.find((i) => i.active);
+    const issue = findTreatableIllness(h);
     if (!issue) {
       vetNote(h, `${h.name} had no active condition to treat.`);
     } else {
@@ -2806,6 +3056,7 @@ function renderTraining() {
       return;
     }
     if (h.retiredForever || h.retiredToBreeding || disciplineAtPotential(h, d)) {
+      h.manualTrainingThisMonth = true;
       applyExerciseSession(h);
       render();
       return;
@@ -3139,7 +3390,7 @@ function renderRescue() {
       horse.weightStatus = rescue.weightStatus;
       horse.mood = rnd(1, 100) <= 95 ? pick(['Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy']) : horse.mood;
       horse.isRescue = true;
-      horse.bond = rnd(-50, 0);
+      horse.bond = rnd(-50, -1);
       horse.rescueWeightDelay = rescue.rescueWeightDelay;
       horse.rescueWeightCooldown = rescue.rescueWeightDelay;
       horse.hiddenIllnesses = rescue.issues || [];
@@ -3156,6 +3407,70 @@ function injuryChanceByGenetics(horse) {
   if (horse.healthGenetics === 'Low') return 8;
   if (horse.healthGenetics === 'High') return 3;
   return 5;
+}
+
+function pickIllnessWithModifiers(horse) {
+  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
+  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
+  if (wrongFeedMonths > 5) {
+    baseWeights.forEach((item) => {
+      if (item.entry.name === 'Colic') item.weight *= 1.5;
+      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
+    });
+  }
+  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of baseWeights) {
+    roll -= item.weight;
+    if (roll <= 0) return item.entry;
+  }
+  return SICKNESS_TYPES[0];
+}
+
+function addIllness(horse, illness) {
+  if (!illness) return;
+  const remaining = injuryRecoveryMonths(illness.severity);
+  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
+  const lastSevere = horse.injuryProtection?.[illness.name];
+  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
+    if (rnd(1, 100) <= 90) return;
+  }
+  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
+  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
+    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
+    if (died) {
+      horse.deceased = true;
+      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
+      return;
+    }
+  }
+  horse.illnesses.push({
+    name: illness.name,
+    impact: illness.impact,
+    remaining,
+    active: true,
+    severity: illness.severity,
+    retirementRisk: illness.retirementRisk || 0
+  });
+  applySoundnessLoss(horse, illness.severity);
+  if (isSevere) {
+    horse.injuryProtection[illness.name] = currentMonthIndex();
+  }
+  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
+  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (horse.illnesses.some((i) => i.active)) return;
+  const count = horse.overTrainingCountYear || 0;
+  if (!horse.pendingOvertrainingInjury || count < 4) return;
+  if (count >= 8) {
+    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
+    horse.pendingOvertrainingInjury = false;
+    return;
+  }
+  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
+  horse.pendingOvertrainingInjury = false;
 }
 
 function maybeAddRandomIllness(horse) {
