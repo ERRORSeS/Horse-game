@@ -801,7 +801,9 @@ function hydrateFromSave(data) {
       : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
     h.hiddenIllnesses = Array.isArray(h.hiddenIllnesses) ? h.hiddenIllnesses : [];
   });
-  refreshRescueHorses();
+  if (!app.rescueBarn.length) {
+    refreshNpcAds();
+  }
 }
 
 function resetGame() {
@@ -1553,6 +1555,25 @@ function refreshNpcAds() {
 
 function refreshRescueHorses() {
   refreshNpcAds();
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (!horse || horse.illnesses.some((i) => i.active)) return;
+  const preferred = horse.preferredTrainingSessions || 25;
+  if ((horse.trainingSessionsThisMonth || 0) <= preferred) return;
+  if (rnd(1, 100) > 12) return;
+  const picked = pick(SICKNESS_TYPES);
+  const remaining = injuryRecoveryMonths(picked.severity);
+  horse.illnesses.push({
+    name: picked.name,
+    impact: picked.impact,
+    remaining,
+    active: true,
+    severity: picked.severity,
+    retirementRisk: picked.retirementRisk || 0
+  });
+  applySoundnessLoss(horse, picked.severity);
+  pushReport(`${horse.name} picked up ${picked.name} after overtraining. Recovery ${remaining} month(s).`);
 }
 
 function updateHeader() {
