@@ -132,15 +132,19 @@ const app = {
   reports: [],
   competitionReports: [],
   rescueHorses: [],
+  settings: {
+    barnName: 'Oxer to Oxer Stable Manager',
+    breedingCode: '',
+    breedingCodePosition: 'front'
+  },
   showOffspringWindow: true,
   trainingSelection: { horseId: '', discipline: 'jumping', exercise: '' },
   selectedHorseId: ''
 };
 
 const options = {};
-const illnessLine = '';
 const SAVE_KEY = 'horse_game_save_v1';
-const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue'];
+const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'settings'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -169,6 +173,15 @@ const FEEDS = [
 let wrongFeedUsed = null;
 const MOODS = ['Motivated', 'Happy', 'Try-Hard', 'Neutral', 'Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy'];
 const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overweight'];
+const TACK = {
+  bridle: ['Snaffle Bridle', 'Flash Bridle', 'Drop Noseband Bridle', 'Figure-8 Bridle', 'Double Bridle'],
+  bit: ['Loose Ring Snaffle', 'Eggbutt Snaffle', 'D-Ring Bit', 'Pelham Bit', 'Gag Bit'],
+  saddle: ['All-Purpose Saddle', 'Jumping Saddle', 'Dressage Saddle', 'Racing / Close-Contact Saddle', 'Ill-Fitting Saddle'],
+  pad: ['Basic Pad', 'Shock-Absorbing Pad', 'Incorrect Size Pad', 'Therapeutic Pad', 'No Pad'],
+  footwear: ['Tendon Boots'],
+  headwear: ['Halter', 'Rope Halter', 'Grazing Muzzle', 'Fly Mask', 'Tight Halter'],
+  body: ['No Blanket', 'Light Blanket', 'Medium Blanket', 'Heavy Blanket']
+};
 const EXERCISE_MENU = {
   jumping: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
   dressage: ['Collection', 'Balance', 'Connection', 'Gaits', 'Rhythm', 'Flowiness'],
@@ -751,6 +764,74 @@ function applyAutoTraining(horse) {
   }
 }
 
+
+function controlabilityFromPersonality(personality) {
+  const roll = rnd(1, 100);
+  switch (personality) {
+    case 'Easy-Going': return roll <= 45 ? rnd(35, 60) : rnd(60, 100);
+    case 'Bomb-proof': return roll <= 30 ? rnd(40, 65) : rnd(65, 100);
+    case 'Spooky': return roll <= 70 ? rnd(10, 50) : rnd(50, 90);
+    case 'Stubborn': return roll <= 85 ? rnd(15, 60) : rnd(60, 95);
+    case 'Energetic': return roll <= 65 ? rnd(20, 70) : rnd(70, 100);
+    case 'Lazy': return roll <= 70 ? rnd(15, 50) : rnd(50, 90);
+    case 'Unfocused': return roll <= 85 ? rnd(10, 50) : rnd(50, 90);
+    default: return rnd(25, 85);
+  }
+}
+
+function tackControlabilityDelta(horse, discipline = 'flatwork') {
+  const tack = horse.tack || {};
+  let delta = 0;
+  if (tack.bridle === 'Flash Bridle') delta += 3;
+  if (tack.bridle === 'Drop Noseband Bridle') delta += 5;
+  if (tack.bridle === 'Figure-8 Bridle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 6 : -2;
+  if (tack.bridle === 'Double Bridle') delta += (horse.bond || 0) >= 45 ? 8 : -8;
+
+  if (tack.bit === 'Eggbutt Snaffle') delta += 2;
+  if (tack.bit === 'D-Ring Bit') delta += 4;
+  if (tack.bit === 'Pelham Bit') delta += 6;
+  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' || ['Distress', 'Bad moods', 'Grumpy'].includes(horse.mood) ? -8 : 6;
+
+  if (tack.saddle === 'Jumping Saddle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 4 : -1;
+  if (tack.saddle === 'Dressage Saddle') delta += discipline === 'dressage' || discipline === 'flatwork' ? 4 : -1;
+  if (tack.saddle === 'Racing / Close-Contact Saddle') delta += -4;
+  if (tack.saddle === 'Ill-Fitting Saddle') delta += -12;
+
+  if (tack.pad === 'Shock-Absorbing Pad' || tack.pad === 'Therapeutic Pad') delta += 2;
+  if (tack.pad === 'Incorrect Size Pad') delta += -6;
+  if (tack.pad === 'No Pad') delta += -10;
+
+  if (tack.headwear === 'Rope Halter') delta += 2;
+  if (tack.headwear === 'Fly Mask') delta += 2;
+  if (tack.headwear === 'Tight Halter') delta += -5;
+  if (tack.headwear === 'Grazing Muzzle') delta += -3;
+
+  if (tack.body === 'Light Blanket') delta += 1;
+  if (tack.body === 'Medium Blanket') delta += -1;
+  if (tack.body === 'Heavy Blanket') delta += -4;
+  return delta;
+}
+
+function trainingControlabilitySession(horse, focus) {
+  const mood = horse.mood || 'Neutral';
+  const baseSuccess = 58;
+  const moodMod = ['Motivated', 'Happy', 'Try-Hard'].includes(mood) ? 18 : ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Uncomfortable'].includes(mood) ? -18 : 0;
+  const personalityMod = ['Easy-Going', 'Bomb-proof'].includes(horse.personality) ? 12 : ['Stubborn', 'Spooky', 'Unfocused'].includes(horse.personality) ? -12 : 0;
+  const tackMod = tackControlabilityDelta(horse, 'flatwork');
+  const successChance = clamp(baseSuccess + moodMod + personalityMod + tackMod, 10, 95);
+  const roll = rnd(1, 100);
+  if (roll <= successChance) {
+    const gain = rnd(5, 10);
+    horse.controlability = clamp((horse.controlability || 0) + gain, 0, 100);
+    pushReport(`${horse.name} responded well to ${focus}. Controlability +${gain}%.`);
+    return true;
+  }
+  const loss = rnd(1, 4);
+  horse.controlability = clamp((horse.controlability || 0) - loss, 0, 100);
+  pushReport(`${horse.name} struggled with ${focus}. Controlability -${loss}%.`);
+  return false;
+}
+
 function updateMonthlyCare(horse) {
   if (horse.retiredForever && !horse.retiredToBreeding) return;
   evaluateFeedEffects(horse);
@@ -775,6 +856,8 @@ function updateMonthlyCare(horse) {
   }
 
   let mood = horse.mood;
+  const tackDelta = tackControlabilityDelta(horse, 'flatwork');
+  if (tackDelta <= -8 && !['Distress', 'No energy'].includes(mood)) mood = 'Uncomfortable';
   if (!horse.lastFeedMoodOverride && (!mood || mood === 'Neutral')) {
     mood = applyMonthlyMoodShift(horse);
   }
@@ -849,6 +932,11 @@ function hydrateFromSave(data) {
   app.reports = Array.isArray(data.reports) ? data.reports : [];
   app.competitionReports = Array.isArray(data.competitionReports) ? data.competitionReports : [];
   app.rescueHorses = Array.isArray(data.rescueHorses) ? data.rescueHorses : [];
+  app.settings = typeof data.settings === 'object' && data.settings ? {
+    barnName: data.settings.barnName || 'Oxer to Oxer Stable Manager',
+    breedingCode: data.settings.breedingCode || '',
+    breedingCodePosition: data.settings.breedingCodePosition === 'end' ? 'end' : 'front'
+  } : { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
   app.showOffspringWindow = data.showOffspringWindow !== false;
   app.selectedHorseId = data.selectedHorseId || '';
   app.trainingSelection = typeof data.trainingSelection === 'object' && data.trainingSelection
@@ -900,6 +988,15 @@ function hydrateFromSave(data) {
     h.manualTrainingThisMonth = h.manualTrainingThisMonth || false;
     h.farrierThisMonth = h.farrierThisMonth || false;
     h.turnoutHours = Number.isFinite(h.turnoutHours) ? h.turnoutHours : 0;
+    h.controlability = Number.isFinite(h.controlability) ? h.controlability : 50;
+    h.tack = typeof h.tack === 'object' && h.tack ? h.tack : {};
+    h.tack.bridle = h.tack.bridle || 'Snaffle Bridle';
+    h.tack.bit = h.tack.bit || 'Loose Ring Snaffle';
+    h.tack.saddle = h.tack.saddle || 'All-Purpose Saddle';
+    h.tack.pad = h.tack.pad || 'Basic Pad';
+    h.tack.footwear = h.tack.footwear || 'Tendon Boots';
+    h.tack.headwear = h.tack.headwear || 'Halter';
+    h.tack.body = h.tack.body || 'No Blanket';
     h.trainingBoost = Number.isFinite(h.trainingBoost) ? h.trainingBoost : 0;
     h.competitionBoost = Number.isFinite(h.competitionBoost) ? h.competitionBoost : 0;
     h.feedPerformanceDelta = Number.isFinite(h.feedPerformanceDelta) ? h.feedPerformanceDelta : 0;
@@ -998,6 +1095,7 @@ function resetGame() {
   app.reports = [];
   app.competitionReports = [];
   app.rescueHorses = [];
+  app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
   app.selectedHorseId = '';
@@ -1522,6 +1620,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     faceMarking: pick(FACE_MARKINGS),
     personality: pick(PERSONALITIES),
     behavior: 0,
+    controlability: 50,
     extraPotential: false,
     healthGenetics: pick(['Low', 'Medium', 'High']),
     injuryProtection: {},
@@ -1549,6 +1648,15 @@ function baseHorse(type = 'trained', origin = 'player') {
     manualTrainingThisMonth: false,
     farrierThisMonth: false,
     turnoutHours: 0,
+    tack: {
+      bridle: 'Snaffle Bridle',
+      bit: 'Loose Ring Snaffle',
+      saddle: 'All-Purpose Saddle',
+      pad: 'Basic Pad',
+      footwear: 'Tendon Boots',
+      headwear: 'Halter',
+      body: 'No Blanket'
+    },
     turnoutAssignmentHours: 0,
     trainingBoost: 0,
     competitionBoost: 0,
@@ -1618,6 +1726,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     }
   };
   horse.height = heightFromBreed(horse.breed);
+  horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
   if (origin === 'npc') {
     const { sireBreed, damBreed, sirePercent, damPercent } = pedigreeBaseFromBreed(horse.breed);
@@ -2080,9 +2189,76 @@ function refreshRescueHorses() {
   }
 }
 
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
+  const titleEl = document.querySelector('.topbar h1');
+  if (titleEl) titleEl.textContent = app.settings?.barnName || 'Oxer to Oxer Stable Manager';
   if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
   if (moneyEl) moneyEl.innerHTML = `<span class="money">${money(app.money)}</span>`;
 }
@@ -2263,6 +2439,15 @@ function createHorseCard(horse) {
     <button data-action='clear-feed'>Clear Feed Plan</button>
     ${horse.feedPlan.length ? `<div class='box'><p class='small'>${horse.feedPlan.map((f) => `${f.type} (${f.grams}g)`).join(', ')}</p></div>` : '<p class="small">No feed assigned.</p>'}
     <p class='small'>Preferred feed range: ${feedRangeBounds(horse)[0]}-${feedRangeBounds(horse)[1]}g (you don’t need to be exact, just within range).</p>
+    <label>Controlability</label>
+    <p class='small'>${horse.controlability || 0}%</p>
+    <label>Tack: Bridle</label><select class='tack-bridle'>${TACK.bridle.map((x) => `<option ${horse.tack?.bridle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <label>Tack: Bit</label><select class='tack-bit'>${TACK.bit.map((x) => `<option ${horse.tack?.bit === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <label>Tack: Saddle</label><select class='tack-saddle'>${TACK.saddle.map((x) => `<option ${horse.tack?.saddle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <label>Tack: Saddle Pad</label><select class='tack-pad'>${TACK.pad.map((x) => `<option ${horse.tack?.pad === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <label>Tack: Headwear</label><select class='tack-headwear'>${TACK.headwear.map((x) => `<option ${horse.tack?.headwear === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <label>Tack: Body</label><select class='tack-body'>${TACK.body.map((x) => `<option ${horse.tack?.body === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <button data-action='save-tack'>Save Tack</button>
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
@@ -2368,6 +2553,16 @@ function createHorseCard(horse) {
         horse.notes = text;
       }
       if (action === 'toggle-notes') horse.showNotes = !horse.showNotes;
+      if (action === 'save-tack') {
+        horse.tack = horse.tack || {};
+        horse.tack.bridle = node.querySelector('.tack-bridle')?.value || horse.tack.bridle;
+        horse.tack.bit = node.querySelector('.tack-bit')?.value || horse.tack.bit;
+        horse.tack.saddle = node.querySelector('.tack-saddle')?.value || horse.tack.saddle;
+        horse.tack.pad = node.querySelector('.tack-pad')?.value || horse.tack.pad;
+        horse.tack.headwear = node.querySelector('.tack-headwear')?.value || horse.tack.headwear;
+        horse.tack.body = node.querySelector('.tack-body')?.value || horse.tack.body;
+        pushReport(`Updated tack for ${horse.name}.`);
+      }
       if (action === 'save-turnout') {
         const value = Number(node.querySelector('.turnout-hours')?.value);
         if (Number.isFinite(value)) horse.turnoutAssignmentHours = Math.max(0.5, Math.min(14, value));
@@ -2821,6 +3016,26 @@ function calculateCompetitionResult(horse, discipline, level) {
     timeScoreText = `Score ${score.toFixed(1)}`;
     resultText = penaltiesText;
   }
+  horse.managed.showEntry = true;
+  const idx = levelIndex(discipline, level);
+  const maxIdx = highestAllowedLevelIndex(horse, discipline);
+  if (idx > maxIdx) {
+    pushReport(`${horse.name} is not trained enough for ${discipline} ${level}. Max allowed right now: ${SHOW_LEVELS[discipline][maxIdx]}.`);
+    return;
+  }
+  const entry = {
+    id: uid(),
+    discipline,
+    level,
+    date: dateLabel(),
+    monthIndex: currentMonthIndex()
+  };
+  horse.pendingCompetitions = horse.pendingCompetitions || [];
+  horse.pendingCompetitions.push(entry);
+  horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
+  pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Results will arrive next month.`);
+  saveGame(false);
+}
 
   const placingBase = Math.ceil(((100 - score) / 100) * fieldSize);
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
@@ -3241,7 +3456,11 @@ function renderTraining() {
         <label>Horse</label><select id='train-horse'>${opts}</select>
         <label>Discipline</label><select id='train-disc'>${Object.keys(SHOW_LEVELS).map((d) => `<option>${d}</option>`).join('')}</select>
         <label>Exercise</label><select id='train-ex'></select>
+        <label>Controlability Work</label><select id='train-control'>
+          <option>Flat Work</option><option>Hand Work</option><option>Sensitivity</option><option>Controlability</option><option>Manners</option>
+        </select>
         <button id='do-train'>Train</button>
+        <button id='do-control-train'>Controlability Session</button>
       </div>
       <div class='box'>
         <h3>Training Clinic</h3>
@@ -3355,6 +3574,18 @@ function renderTraining() {
     h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
     h.manualTrainingThisMonth = true;
     pushReport(`${h.name} ${good ? 'improved during' : 'struggled with'} ${ex}.`);
+    render();
+  };
+
+  document.getElementById('do-control-train').onclick = () => {
+    const h = app.horses.find((x) => x.id === horseSelect.value);
+    const focus = document.getElementById('train-control').value;
+    if (!h) return;
+    if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
+    trainingControlabilitySession(h, focus);
+    h.managed.trained = true;
+    h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
+    h.manualTrainingThisMonth = true;
     render();
   };
 
@@ -3738,6 +3969,75 @@ function maybeAddOvertrainingInjury(horse) {
   horse.pendingOvertrainingInjury = false;
 }
 
+function pickIllnessWithModifiers(horse) {
+  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
+  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
+  if (wrongFeedMonths > 5) {
+    baseWeights.forEach((item) => {
+      if (item.entry.name === 'Colic') item.weight *= 1.5;
+      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
+    });
+  }
+  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of baseWeights) {
+    roll -= item.weight;
+    if (roll <= 0) return item.entry;
+  }
+  return SICKNESS_TYPES[0];
+}
+
+function addIllness(horse, illness) {
+  if (!illness) return;
+  const remaining = injuryRecoveryMonths(illness.severity);
+  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
+  const lastSevere = horse.injuryProtection?.[illness.name];
+  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
+    if (rnd(1, 100) <= 90) return;
+  }
+  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
+  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
+    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
+    if (died) {
+      horse.deceased = true;
+      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
+      return;
+    }
+  }
+  horse.illnesses.push({
+    name: illness.name,
+    impact: illness.impact,
+    remaining,
+    active: true,
+    severity: illness.severity,
+    retirementRisk: illness.retirementRisk || 0
+  });
+  applySoundnessLoss(horse, illness.severity);
+  const controlLoss = illness.severity === 'Easy' ? rnd(5, 10)
+    : illness.severity === 'Medium' ? rnd(10, 15)
+      : illness.severity === 'More Than Medium' ? rnd(15, 25)
+        : rnd(25, 45);
+  horse.controlability = clamp((horse.controlability || 0) - controlLoss, 0, 100);
+  if (isSevere) {
+    horse.injuryProtection[illness.name] = currentMonthIndex();
+  }
+  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
+  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (horse.illnesses.some((i) => i.active)) return;
+  const count = horse.overTrainingCountYear || 0;
+  if (!horse.pendingOvertrainingInjury || count < 4) return;
+  if (count >= 8) {
+    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
+    horse.pendingOvertrainingInjury = false;
+    return;
+  }
+  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
+  horse.pendingOvertrainingInjury = false;
+}
+
 function maybeAddRandomIllness(horse) {
   if (horse.illnesses.some((i) => i.active)) return;
   const jointSupportBonus = horse.hasJointSupport ? 0.6 : 1;
@@ -3806,7 +4106,13 @@ function processPregnancy(horse, newborns) {
       : (damHorse?.breed || horse.breed);
     foal.height = heightFromBreed(foal.breed);
     applyBreedTraits(foal);
-    foal.name = `Foal of ${damName}`;
+    const rawFoalName = `Foal of ${damName}`;
+    const code = (app.settings?.breedingCode || '').trim();
+    if (code) {
+      foal.name = app.settings?.breedingCodePosition === 'end' ? `${rawFoalName} ${code}` : `${code} ${rawFoalName}`;
+    } else {
+      foal.name = rawFoalName;
+    }
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
     foal.gender = pick(['Mare', 'Stallion']);
@@ -3917,6 +4223,41 @@ function monthlyProgress() {
 }
 
 
+
+function renderSettings() {
+  const current = app.settings || { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
+  document.getElementById('settings').innerHTML = `
+    <h2>Settings</h2>
+    <div class='box'>
+      <label>Barn Name</label>
+      <input id='settings-barn-name' type='text' value='${current.barnName || ''}' placeholder='Barn name' />
+      <label>Breeding Code</label>
+      <input id='settings-breeding-code' type='text' maxlength='12' value='${current.breedingCode || ''}' placeholder='e.g. OTO' />
+      <label>Breeding Code Position</label>
+      <select id='settings-code-position'>
+        <option value='front' ${current.breedingCodePosition === 'front' ? 'selected' : ''}>Front (Code FoalName)</option>
+        <option value='end' ${current.breedingCodePosition === 'end' ? 'selected' : ''}>End (FoalName Code)</option>
+      </select>
+      <button id='settings-save'>Save Settings</button>
+      <p class='small'>Barn name updates the top header. Breeding code is auto-applied to newborn foal names.</p>
+    </div>
+  `;
+  const saveBtn = document.getElementById('settings-save');
+  if (saveBtn) {
+    saveBtn.onclick = () => {
+      app.settings = {
+        barnName: (document.getElementById('settings-barn-name').value || '').trim() || 'Oxer to Oxer Stable Manager',
+        breedingCode: (document.getElementById('settings-breeding-code').value || '').trim(),
+        breedingCodePosition: document.getElementById('settings-code-position').value === 'end' ? 'end' : 'front'
+      };
+      pushReport('Settings updated.');
+      render();
+      saveGame(false);
+    };
+  }
+}
+
+
 function render() {
   ensurePanels();
   safeRun('updateHeader', updateHeader);
@@ -3934,6 +4275,7 @@ function render() {
   safeRun('renderBreeders', renderBreeders);
   safeRun('renderFreezer', renderFreezer);
   safeRun('renderRescue', renderRescue);
+  safeRun('renderSettings', renderSettings);
 }
 
 const skipBtn = document.getElementById('skipMonthBtn');
