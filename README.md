@@ -23,4 +23,5 @@ Then open `http://localhost:4173`.
 - Horse management cards with stats, conformation, pedigree COI, and management toggles.
 - NPC market, player sale barn, stud/freezer reproduction flow.
 - Vet, farrier, training, shows, registries, breeders show pages.
+- Interactive text-RPG training sessions with discipline-specific choices and weighted outcomes.
 - Training clinic-style report generation and in-app report feed.
