@@ -1,0 +1,78 @@
+:root {
+  color-scheme: dark;
+  --bg: #12171d;
+  --surface: #1f2933;
+  --surface-alt: #273545;
+  --accent: #4fa5d5;
+  --text: #f5f7fa;
+  --muted: #a9b4bf;
+  --good: #2ecc71;
+  --warn: #f39c12;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(180deg, #1b2530, #0e141b);
+  color: var(--text);
+}
+.topbar {
+  padding: 1rem 1.5rem;
+  background: #0c1117;
+  border-bottom: 1px solid #304050;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar h1 { margin: 0 0 .5rem; font-size: 1.5rem; }
+.status { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid #304050;
+  background: #141c25;
+  position: sticky;
+  top: 78px;
+  z-index: 9;
+}
+button {
+  border: 1px solid #3f546a;
+  background: #243343;
+  color: var(--text);
+  padding: .45rem .75rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:hover { background: #2f4458; }
+.tab-btn.active { border-color: var(--accent); }
+main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+.panel { display: block; }
+.hidden { display: none; }
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.horse-card, .box {
+  background: var(--surface);
+  border: 1px solid #35475a;
+  border-radius: 12px;
+  padding: 1rem;
+}
+.grid { display: grid; gap: .75rem; }
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .grid.two { grid-template-columns: 1fr; } .tabs{top:110px;} }
+.stats { padding-left: 1rem; margin: 0; }
+.stats li { color: var(--muted); }
+.subline { margin: .25rem 0; color: #dbe3eb; }
+.meta { margin: 0 0 .75rem; color: var(--muted); font-size: .9rem; }
+label, select, input { display: block; width: 100%; }
+input, select {
+  background: var(--surface-alt);
+  border: 1px solid #49617a;
+  border-radius: 8px;
+  color: var(--text);
+  padding: .45rem;
+  margin: .35rem 0 .7rem;
+}
+.money { color: var(--good); font-weight: 700; }
+.small { font-size: .85rem; color: var(--muted); }
+.inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

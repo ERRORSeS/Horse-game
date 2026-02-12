@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oxer to Oxer Stable Manager</title>
+  <link rel="stylesheet" href="styles.css?v=6" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Oxer to Oxer Stable Manager</h1>
+    <div class="status">
+      <span id="monthLabel"></span>
+      <span id="moneyLabel"></span>
+      <button id="skipMonthBtn">Skip Month</button>
+      <button id="addMoneyBtn">Add $100,000</button>
+      <button id="saveGameBtn">Save Game</button>
+      <button id="loadGameBtn">Load Game</button>
+      <button id="resetGameBtn">Reset Game</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <main>
+    <section id="dashboard" class="panel"></section>
+    <section id="horses" class="panel hidden"></section>
+    <section id="market" class="panel hidden"></section>
+    <section id="sales" class="panel hidden"></section>
+    <section id="stud" class="panel hidden"></section>
+    <section id="shows" class="panel hidden"></section>
+    <section id="vet" class="panel hidden"></section>
+    <section id="farrier" class="panel hidden"></section>
+    <section id="training" class="panel hidden"></section>
+    <section id="breeding" class="panel hidden"></section>
+    <section id="registries" class="panel hidden"></section>
+    <section id="breeders" class="panel hidden"></section>
+    <section id="freezer" class="panel hidden"></section>
+  </main>
+
+  <template id="horseCardTemplate">
+    <article class="horse-card">
+      <h3 class="horse-name"></h3>
+      <p class="subline"></p>
+      <p class="meta"></p>
+      <div class="grid two">
+        <div>
+          <h4>Jump Training</h4>
+          <ul class="stats jump-stats"></ul>
+        </div>
+        <div>
+          <h4>Dressage Training</h4>
+          <ul class="stats dressage-stats"></ul>
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="results"></div>
+        <div class="manage"></div>
+      </div>
+    </article>
+  </template>
+
+  <script src="script.js?v=6"></script>
+</body>
+</html>
