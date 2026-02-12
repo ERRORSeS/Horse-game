@@ -391,6 +391,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Transition up promptly', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 1 } },
         { label: 'End on this good note', success: 90, neutral: 8, fail: 2, moodMod: {}, personalityMod: {}, effects: { bond: 1, skill: 0 } }
       ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is nervous and sensitive, spooking at small objects.',
+      options: [
+        { label: 'Halt and calm with voice', success: 80, neutral: 15, fail: 5, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Circle to regain focus', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Ignore it and continue', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Spooky: -10 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is energetic and playful, stepping high and prancing.',
+      options: [
+        { label: 'Sit quietly and maintain rhythm', success: 75, neutral: 20, fail: 5, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Ask for bending', success: 70, neutral: 20, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 1 } },
+        { label: 'Allow prancing briefly', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is lazy and stubborn, dragging behind.',
+      options: [
+        { label: 'Apply leg pressure', success: 75, neutral: 15, fail: 10, moodMod: { 'Try-Hard': 10 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Use voice encouragement', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Lazy: -10 }, effects: { bond: 1, skill: 0 } },
+        { label: 'Accept slow pace', success: 60, neutral: 25, fail: 15, moodMod: { 'No energy': -10 }, personalityMod: { Lazy: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
     }
   ],
   trot: [
@@ -446,6 +473,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Add circles and diagonals', success: 70, neutral: 20, fail: 10, moodMod: { Happy: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 2 } },
         { label: 'Ask canter transition now', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Energetic: 5 }, effects: { bond: 0, skill: 1 } },
         { label: 'Reward and finish this set', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 1, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is strong and pulling, rushing ahead.',
+      options: [
+        { label: 'Half-halt and rebalance', success: 70, neutral: 20, fail: 10, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -5, Stubborn: -5 }, effects: { bond: 1, skill: 2 } },
+        { label: 'Circle to regain control', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -5 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Allow a few strides before correcting', success: 65, neutral: 20, fail: 15, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 0 } },
+        { label: 'Return to walk', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is distracted and curious, drifting sideways.',
+      options: [
+        { label: 'Circle to regain focus', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Shorten reins', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Ignore and continue', success: 60, neutral: 25, fail: 15, moodMod: {}, personalityMod: {}, effects: { bond: -1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is energetic and playful, trotting in exaggerated steps.',
+      options: [
+        { label: 'Ride quietly', success: 75, neutral: 20, fail: 5, moodMod: { Happy: 5 }, personalityMod: { Energetic: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Add light lateral work', success: 70, neutral: 20, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept short bursts', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
       ]
     }
   ],
@@ -503,6 +557,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Push again immediately', success: 40, neutral: 20, fail: 40, moodMod: { Distress: -10 }, personalityMod: { Stubborn: -10, Spooky: -10 }, effects: { bond: -1, skill: 0, refusal: 12 } },
         { label: 'Stop jumping and reset next ride', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -4 } }
       ]
+    },
+    {
+      text: 'You approach the jump. The horse suddenly bolts after spooking at a shadow near the fence.',
+      options: [
+        { label: 'Halt and regain control before retrying', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1, refusal: -3 } },
+        { label: 'Circle to reset rhythm and confidence', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1, refusal: -6 } },
+        { label: 'Push forward and jump despite distraction', success: 60, neutral: 25, fail: 15, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1, refusal: 2 } },
+        { label: 'End session to avoid stress', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -2 } }
+      ]
+    },
+    {
+      text: 'At takeoff, the horse bucks lightly and lifts unevenly after a sudden arena noise.',
+      options: [
+        { label: 'Sit deep and ride forward to support landing', success: 65, neutral: 20, fail: 15, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -10 }, effects: { bond: 0, skill: 1, refusal: 2 } },
+        { label: 'Lower the fence for confidence', success: 80, neutral: 15, fail: 5, moodMod: { Happy: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1, refusal: -8 } },
+        { label: 'Repeat at the same height carefully', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1, refusal: -2 } },
+        { label: 'End jumping immediately', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -1 } }
+      ]
+    },
+    {
+      text: 'After landing from a jump, the horse bolts for a few strides with tense hindquarters.',
+      options: [
+        { label: 'Apply rein and leg aids to regain control', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 1, refusal: 0 } },
+        { label: 'Circle and calm before continuing', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1, refusal: -3 } },
+        { label: 'Halt immediately to prevent injury', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 0, refusal: -2 } },
+        { label: 'End jumping session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -2 } }
+      ]
     }
   ],
   dressage: [
@@ -559,6 +640,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Reward and then repeat once', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 2, skill: 1 } },
         { label: 'End on a perfect note', success: 90, neutral: 10, fail: 0, moodMod: {}, personalityMod: {}, effects: { bond: 2, skill: 0 } }
       ]
+    },
+    {
+      text: 'You ask for more collection. The horse is lazy and stubborn, shortening stride but losing rhythm.',
+      options: [
+        { label: 'Add leg', success: 70, neutral: 20, fail: 10, moodMod: { 'Try-Hard': 5 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept lighter collection', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { 'Easy-Going': 5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Return to working gait', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
+        { label: 'End exercise', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for lateral movement. The horse is nervous and sensitive, fidgeting and spooking sideways.',
+      options: [
+        { label: 'Calm with voice', success: 75, neutral: 20, fail: 5, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Simplify exercise', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Return to straight line', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 1 } },
+        { label: 'End lateral work', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You attempt a higher-level movement. The horse is distracted and curious, bolting forward or breaking gait.',
+      options: [
+        { label: 'Circle to regain focus', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Repeat movement slowly', success: 75, neutral: 15, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept short attempt', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { 'Easy-Going': 5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
     }
   ],
   canter: [
@@ -614,6 +722,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Circle smaller to regain control', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
         { label: 'Let forward then stabilize later', success: 60, neutral: 25, fail: 15, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: -1, skill: 0 } },
         { label: 'Return to trot early', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is lazy and stubborn, struggling to pick up gait.',
+      options: [
+        { label: 'Add leg aid', success: 75, neutral: 15, fail: 10, moodMod: { 'Try-Hard': 10 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Repeat canter cue', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Accept slow canter', success: 60, neutral: 25, fail: 15, moodMod: { 'No energy': -10 }, personalityMod: { Lazy: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'Return to trot', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is nervous and sensitive, bolting suddenly.',
+      options: [
+        { label: 'Half-halt and circle', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Allow forward stride then regain control', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'Halt and reset', success: 80, neutral: 15, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is energetic and playful, bucking lightly.',
+      options: [
+        { label: 'Sit deep and ride forward', success: 75, neutral: 15, fail: 10, moodMod: { Happy: 5 }, personalityMod: { Energetic: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Circle to calm', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
+        { label: 'Accept mild bucking', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: -1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
       ]
     }
   ],
