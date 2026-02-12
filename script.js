@@ -126,6 +126,7 @@ const app = {
   semenStraws: [],
   embryos: [],
   saleBarn: [],
+  rescueBarn: [],
   npcSales: [],
   npcStuds: [],
   reports: [],
@@ -141,6 +142,7 @@ const app = {
   selectedHorseId: ''
 };
 
+const options = {};
 const SAVE_KEY = 'horse_game_save_v1';
 const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'settings'];
 
@@ -168,6 +170,7 @@ const FEEDS = [
   'Diet Feed',
   'Joint Support'
 ];
+let wrongFeedUsed = null;
 const MOODS = ['Motivated', 'Happy', 'Try-Hard', 'Neutral', 'Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy'];
 const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overweight'];
 const TACK = {
@@ -714,6 +717,10 @@ function applyAutoTraining(horse) {
       horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
       trainedSessions += 1;
     }
+    if (horse.requiresBreakingIn && horse.behavior >= 100) {
+      horse.requiresBreakingIn = false;
+      pushReport(`${horse.name} completed breaking in and can begin regular training.`);
+    }
     if (trainedSessions) {
       pushReport(`${horse.name} completed ${trainedSessions} breaking-in session(s) this month.`);
     }
@@ -919,6 +926,7 @@ function hydrateFromSave(data) {
   app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
   app.embryos = Array.isArray(data.embryos) ? data.embryos : [];
   app.saleBarn = Array.isArray(data.saleBarn) ? data.saleBarn : [];
+  app.rescueBarn = Array.isArray(data.rescueBarn) ? data.rescueBarn : [];
   app.npcSales = Array.isArray(data.npcSales) ? data.npcSales : [];
   app.npcStuds = Array.isArray(data.npcStuds) ? data.npcStuds : [];
   app.reports = Array.isArray(data.reports) ? data.reports : [];
@@ -991,7 +999,14 @@ function hydrateFromSave(data) {
     h.tack.body = h.tack.body || 'No Blanket';
     h.trainingBoost = Number.isFinite(h.trainingBoost) ? h.trainingBoost : 0;
     h.competitionBoost = Number.isFinite(h.competitionBoost) ? h.competitionBoost : 0;
+    h.feedPerformanceDelta = Number.isFinite(h.feedPerformanceDelta) ? h.feedPerformanceDelta : 0;
+    h.feedTrainingDelta = Number.isFinite(h.feedTrainingDelta) ? h.feedTrainingDelta : 0;
+    h.turnoutEffect = Number.isFinite(h.turnoutEffect) ? h.turnoutEffect : 0;
+    h.trainingPerformanceDelta = Number.isFinite(h.trainingPerformanceDelta) ? h.trainingPerformanceDelta : 0;
     h.healingBoost = Number.isFinite(h.healingBoost) ? h.healingBoost : 0;
+    h.titles = Array.isArray(h.titles) ? h.titles : [];
+    h.failedInspection = Boolean(h.failedInspection);
+    h.requiresBreakingIn = Boolean(h.requiresBreakingIn);
     h.trainerNotes = Array.isArray(h.trainerNotes) ? h.trainerNotes : [];
     h.lastFeedIssue = h.lastFeedIssue && typeof h.lastFeedIssue === 'object' ? h.lastFeedIssue : null;
     h.lastFeedMoodOverride = h.lastFeedMoodOverride || '';
@@ -1074,6 +1089,7 @@ function resetGame() {
   app.semenStraws = [];
   app.embryos = [];
   app.saleBarn = [];
+  app.rescueBarn = [];
   app.npcSales = [];
   app.npcStuds = [];
   app.reports = [];
@@ -1274,10 +1290,21 @@ function breedNorms(breed) {
 
 function heightFromBreed(breed) {
   const norms = breedNorms(breed);
-  if (!norms) return `${rnd(14, 18)}.${rnd(0, 3)} hh`;
+  const pickHeight = (min, max) => {
+    const heights = [];
+    for (let whole = Math.floor(min); whole <= Math.floor(max); whole += 1) {
+      [1, 2, 3].forEach((decimal) => {
+        const value = Number((whole + decimal / 10).toFixed(1));
+        if (value >= min && value <= max) heights.push(value);
+      });
+    }
+    if (!heights.length) return min;
+    return pick(heights);
+  };
+  if (!norms) return `${pickHeight(14, 18).toFixed(1)} hh`;
   const min = Math.min(norms.minHeight, norms.maxHeight);
   const max = Math.max(norms.minHeight, norms.maxHeight);
-  const height = Math.round((min + Math.random() * (max - min)) * 10) / 10;
+  const height = pickHeight(min, max);
   return `${height.toFixed(1)} hh`;
 }
 
@@ -1294,6 +1321,27 @@ function applyBreedTraits(horse) {
     horse.potential.hunter = Math.max(0, horse.potential.hunter - 10);
   }
   horse.breedTraitsApplied = horse.breed;
+}
+
+function visibleIllnesses(horse, revealAll) {
+  return (horse.illnesses || []).filter((i) => revealAll || !i.hidden);
+}
+
+function applyFoalHandling(horse, exercise) {
+  const plan = FOAL_TRAINING[exercise];
+  if (!plan) return;
+  horse.behavior = Math.max(0, (horse.behavior || 0) + rnd(plan.behavior[0], plan.behavior[1]));
+  (plan.dressage || []).forEach((skill) => {
+    horse.stats.dressage[skill] = clampSkill(horse, 'dressage', horse.stats.dressage[skill] + rnd(1, 2));
+  });
+  (plan.jumping || []).forEach((skill) => {
+    horse.stats.jumping[skill] = clampSkill(horse, 'jumping', horse.stats.jumping[skill] + rnd(1, 2));
+  });
+  horse.managed.trained = true;
+  if (horse.requiresBreakingIn && horse.behavior >= 100) {
+    horse.requiresBreakingIn = false;
+    pushReport(`${horse.name} completed breaking in and can begin regular training.`);
+  }
 }
 
 function pedigreeBaseFromBreed(breed) {
@@ -1416,6 +1464,9 @@ function disciplineAtPotential(horse, discipline) {
 }
 
 function autoTrainingOptionsForHorse(horse) {
+  if (horse.requiresBreakingIn && (horse.behavior || 0) < 100) {
+    return [{ value: 'Breaking in', label: 'Breaking in (lunging, accept touch, light work)' }];
+  }
   if (horse.age < 3) {
     return [{ value: 'Breaking in', label: 'Breaking in (lunging, accept touch, light work)' }];
   }
@@ -1609,7 +1660,14 @@ function baseHorse(type = 'trained', origin = 'player') {
     turnoutAssignmentHours: 0,
     trainingBoost: 0,
     competitionBoost: 0,
+    feedPerformanceDelta: 0,
+    feedTrainingDelta: 0,
+    turnoutEffect: 0,
+    trainingPerformanceDelta: 0,
     healingBoost: 0,
+    titles: [],
+    failedInspection: false,
+    requiresBreakingIn: false,
     trainerNotes: [],
     lastFeedIssue: null,
     lastFeedMoodOverride: '',
@@ -1686,6 +1744,32 @@ function baseHorse(type = 'trained', origin = 'player') {
   return horse;
 }
 
+function createRescueHorse() {
+  const horse = baseHorse('untrained', 'npc');
+  horse.age = rnd(1, 4);
+  horse.owner = 'Rescue Organization';
+  horse.requiresBreakingIn = rnd(1, 100) <= 45;
+  if (horse.requiresBreakingIn) horse.behavior = rnd(0, 40);
+  const illnessCount = rnd(1, 3);
+  horse.illnesses = Array.from({ length: illnessCount }, () => {
+    const picked = pick(SICKNESS_TYPES);
+    const remaining = rnd(1, 4);
+    return {
+      name: picked.name,
+      impact: picked.impact,
+      remaining,
+      active: true,
+      severity: picked.severity,
+      retirementRisk: picked.retirementRisk || 0,
+      hidden: rnd(1, 100) <= 55
+    };
+  });
+  horse.soundnessYears = Math.max(0, horse.soundnessYears - rnd(0, 3));
+  horse.rescueId = uid();
+  horse.rescueFee = rnd(300, 900);
+  return horse;
+}
+
 function inheritExtraPotential(dam, sire) {
   const inheritedChance = dam?.extraPotential || sire?.extraPotential ? 35 : 18;
   return rnd(1, 100) <= inheritedChance;
@@ -1737,6 +1821,7 @@ function seedShowHistory(horse, count, highClassChance) {
 function refreshNpcAds() {
   const saleCount = rnd(2, 4);
   const studCount = rnd(2, 3);
+  const rescueCount = rnd(2, 4);
   app.npcSales = Array.from({ length: saleCount }, () => {
     const horse = baseHorse(pick(['untrained', 'trained', 'fully']), 'npc');
     horse.owner = pick(['Evergreen Stables', 'Valley Creek Farm', 'Blue Ridge Sporthorses', 'Silverleaf Stables']);
@@ -1744,6 +1829,7 @@ function refreshNpcAds() {
     const price = Math.round(calculateHorsePrice(horse, true) * rnd(95, 110) / 100);
     return { ...horse, price, saleId: uid() };
   });
+  app.rescueBarn = Array.from({ length: rescueCount }, () => createRescueHorse());
   app.npcStuds = Array.from({ length: studCount }, () => {
     const stallion = baseHorse('trained', 'npc');
     stallion.gender = 'Stallion';
@@ -1752,7 +1838,420 @@ function refreshNpcAds() {
     const fee = Math.round(calculateHorsePrice(stallion, true) * 0.18 + 1200);
     return { ...stallion, fee, studId: uid() };
   });
-  pushReport('NPC sale and stud ads have been refreshed.');
+  pushReport('NPC sale, rescue, and stud ads have been refreshed.');
+}
+
+function refreshRescueHorses() {
+  refreshNpcAds();
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (!horse || horse.illnesses.some((i) => i.active)) return;
+  const preferred = horse.preferredTrainingSessions || 25;
+  if ((horse.trainingSessionsThisMonth || 0) <= preferred) return;
+  if (rnd(1, 100) > 12) return;
+  const picked = pick(SICKNESS_TYPES);
+  const remaining = injuryRecoveryMonths(picked.severity);
+  horse.illnesses.push({
+    name: picked.name,
+    impact: picked.impact,
+    remaining,
+    active: true,
+    severity: picked.severity,
+    retirementRisk: picked.retirementRisk || 0
+  });
+  applySoundnessLoss(horse, picked.severity);
+  pushReport(`${horse.name} picked up ${picked.name} after overtraining. Recovery ${remaining} month(s).`);
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
 }
 
 function randomRescueBreed() {
@@ -1971,6 +2470,7 @@ function createHorseCard(horse) {
     <h4>Competition Results</h4>
     <p>Total Points: ${horse.totalPoints} | Championships: ${horse.championships} | Reserves: ${horse.reserves}</p>
     <p>Lifetime Earnings: ${money(horse.earnings)}</p>
+    <p class='small'>Illnesses: ${illnessLine}</p>
     <p>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>
     <p>Top Mare/Filly: ${horse.topWins.mareFilly} | Best Breed: ${horse.topWins.breed} | Best Overall: ${horse.topWins.overall}</p>
     ${horse.showResults.length ? `<p class='small'>Latest: ${horse.showResults[horse.showResults.length - 1].discipline} ${horse.showResults[horse.showResults.length - 1].level} — #${horse.showResults[horse.showResults.length - 1].placing} (${horse.showResults[horse.showResults.length - 1].resultText || horse.showResults[horse.showResults.length - 1].score})</p>` : '<p class="small">No show entries yet.</p>'}
@@ -2171,6 +2671,13 @@ function horseProfileMarkup(horse) {
   const titlesLine = titles ? `<p class='small'>Titles: ${titles}</p>` : '';
   const record = showRecordSummary(horse);
   const showRecordLine = `<p class='small'>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>`;
+  const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
+  const visible = visibleIllnesses(horse, revealAll);
+  const hiddenCount = (horse.illnesses || []).length - visible.length;
+  const illnessLine = visible.length
+    ? visible.map((i) => `${i.name}${i.active ? ` (${i.remaining} mo)` : ''}`).join(', ')
+    : 'None';
+  const hiddenNote = !revealAll && hiddenCount > 0 ? ` (+${hiddenCount} hidden)` : '';
   return `
     <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine}</p>
     ${titlesLine}
@@ -2272,6 +2779,19 @@ function renderMarket() {
         <button id='buy-${k.key}'>Buy</button>
       </div>
     `).join('')}</div>
+    <h2>Rescue Barn</h2>
+    <div class='cards' id='rescue-barn'>
+      ${app.rescueBarn.length ? app.rescueBarn.map((h) => `
+        <div class='box'>
+          <h3>${horseDisplayName(h)}</h3>
+          <p>${h.breed} • ${h.age} • ${h.gender}</p>
+          <p>Adoption Fee: ${money(h.rescueFee || 0)}</p>
+          ${h.requiresBreakingIn && h.behavior < 100 ? `<p class='small'>Requires breaking in (behavior ${h.behavior}/100).</p>` : ''}
+          <details><summary>View Profile</summary>${horseProfileMarkup(h, { revealAll: false })}</details>
+          <button data-rescue='${h.rescueId}'>Adopt</button>
+        </div>
+      `).join('') : '<p class="small">No rescue horses available right now.</p>'}
+    </div>
   `;
 
   kinds.forEach((k) => {
@@ -2286,6 +2806,21 @@ function renderMarket() {
       horse.marking = normalizeMarkingForBreed(horse.marking, horse.breed);
       app.horses.push(horse);
       pushReport(`Bought ${horse.name} from Prospects Pasture.`);
+      render();
+    };
+  });
+
+  document.querySelectorAll('#rescue-barn button[data-rescue]').forEach((btn) => {
+    btn.onclick = () => {
+      const horse = app.rescueBarn.find((h) => h.rescueId === btn.dataset.rescue);
+      if (!horse) return;
+      if (app.money < (horse.rescueFee || 0)) return alert('Not enough money');
+      app.money -= horse.rescueFee || 0;
+      horse.owner = 'Your Stable';
+      horse.illnesses = (horse.illnesses || []).map((i) => ({ ...i, hidden: false }));
+      app.horses.push(horse);
+      app.rescueBarn = app.rescueBarn.filter((h) => h.rescueId !== horse.rescueId);
+      pushReport(`Adopted ${horse.name} from the rescue barn.`);
       render();
     };
   });
@@ -2783,7 +3318,9 @@ function renderVet() {
 
   document.getElementById('vet-gelding').onclick = () => {
     const h = selectedHorse();
-    if (!h || !tryCharge(500)) return;
+    if (!h) return;
+    if (!confirm('You sure you want to geld this horse?')) return;
+    if (!tryCharge(500)) return;
     h.gender = 'Gelding';
     Object.keys(h.potential).forEach((k) => { h.potential[k] += rnd(0, 5); });
     if (['Stubborn', 'Spooky', 'Unfocused'].includes(h.personality)) {
@@ -2955,7 +3492,8 @@ function renderFarrier() {
 
 function renderTraining() {
   const opts = app.horses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
-  const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
+  const foalCandidates = app.horses.filter((h) => h.age < 3 || (h.requiresBreakingIn && (h.behavior || 0) < 100));
+  const foalOpts = foalCandidates.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   document.getElementById('training').innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
     <div class='grid two'>
@@ -2976,8 +3514,8 @@ function renderTraining() {
       </div>
     </div>
     <div class='box'>
-      <h3>Foal Handling (under age 3)</h3>
-      ${foalOpts ? `<label>Foal</label><select id='foal-horse'>${foalOpts}</select>` : '<p class="small">No foals or young horses available.</p>'}
+      <h3>Foal Handling / Breaking In</h3>
+      ${foalOpts ? `<label>Foal</label><select id='foal-horse'>${foalOpts}</select>` : '<p class="small">No foals or breaking-in horses available.</p>'}
       <label>Exercise</label>
       <select id='foal-ex' ${foalOpts ? '' : 'disabled'}>
         <option>Weaning</option>
@@ -2986,7 +3524,7 @@ function renderTraining() {
         <option>Standing Still</option>
       </select>
       <button id='do-foal-train' ${foalOpts ? '' : 'disabled'}>Handle Foal</button>
-      <p class='small'>Foal handling boosts behavior and gives tiny skill gains.</p>
+      <p class='small'>Foal handling boosts behavior and gives tiny skill gains. Rescue horses flagged for breaking in must reach behavior 100 before normal training.</p>
     </div>
   `;
 
@@ -2995,12 +3533,6 @@ function renderTraining() {
     dressage: ['Collection', 'Balance', 'Connection', 'Gaits', 'Rhythm', 'Flowiness'],
     hunter: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
     eventing: ['Collection', 'Connection', 'Rhythm', 'Striding', 'Confidence', 'Speed']
-  };
-  const FOAL_TRAINING = {
-    Weaning: { behavior: [1, 2], dressage: ['Balance', 'Rhythm'] },
-    Lunging: { behavior: [1, 2], jumping: ['Striding', 'Balance'] },
-    Petting: { behavior: [2, 3], dressage: ['Connection'], jumping: ['Confidence'] },
-    'Standing Still': { behavior: [1, 2], dressage: ['Collection'], jumping: ['Structure'] }
   };
 
   const disciplineSelect = document.getElementById('train-disc');
@@ -3056,6 +3588,10 @@ function renderTraining() {
       h.manualTrainingThisMonth = true;
       applyExerciseSession(h);
       render();
+      return;
+    }
+    if (h.requiresBreakingIn && (h.behavior || 0) < 100) {
+      alert('This horse needs breaking in. Use Foal Handling until behavior reaches 100.');
       return;
     }
     const profile = personalityProfile(h.personality);
@@ -3117,20 +3653,12 @@ function renderTraining() {
       const foalId = document.getElementById('foal-horse')?.value;
       const foal = app.horses.find((x) => x.id === foalId);
       const ex = document.getElementById('foal-ex')?.value;
-      if (!foal || foal.age >= 3 || !FOAL_TRAINING[ex]) return;
+      if (!foal || !FOAL_TRAINING[ex]) return;
       if (foal.illnesses.some((i) => i.active)) {
         alert('This foal is recovering and cannot be handled yet.');
         return;
       }
-      const plan = FOAL_TRAINING[ex];
-      foal.behavior = Math.max(0, (foal.behavior || 0) + rnd(plan.behavior[0], plan.behavior[1]));
-      (plan.dressage || []).forEach((skill) => {
-        foal.stats.dressage[skill] = clampSkill(foal, 'dressage', foal.stats.dressage[skill] + rnd(1, 2));
-      });
-      (plan.jumping || []).forEach((skill) => {
-        foal.stats.jumping[skill] = clampSkill(foal, 'jumping', foal.stats.jumping[skill] + rnd(1, 2));
-      });
-      foal.managed.trained = true;
+      applyFoalHandling(foal, ex);
       pushReport(`${foal.name} completed foal handling: ${ex}.`);
       render();
     };
@@ -3417,9 +3945,9 @@ function renderRescue() {
 }
 
 function injuryChanceByGenetics(horse) {
-  if (horse.healthGenetics === 'Low') return 5;
-  if (horse.healthGenetics === 'High') return 12;
-  return 8;
+  if (horse.healthGenetics === 'Low') return 8;
+  if (horse.healthGenetics === 'High') return 3;
+  return 5;
 }
 
 function pickIllnessWithModifiers(horse) {
