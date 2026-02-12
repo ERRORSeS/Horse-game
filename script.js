@@ -139,6 +139,7 @@ const app = {
   },
   showOffspringWindow: true,
   trainingSelection: { horseId: '', discipline: 'jumping', exercise: '' },
+  trainingRpgConfig: { walk: 1, trot: 1, canter: 1, discipline: 1, coolDown: 2 },
   trainingRpg: null,
   selectedHorseId: ''
 };
@@ -428,8 +429,42 @@ function pickTrainingVariant(action) {
   return pick(list);
 }
 
-function buildTrainingRpgSession(horse, discipline) {
-  const steps = TRAINING_ACTIONS_BY_DISCIPLINE[discipline] || ['scheme', 'walk', 'trot', 'canter'];
+function defaultTrainingRpgConfig() {
+  return { walk: 1, trot: 1, canter: 1, discipline: 1, coolDown: 2 };
+}
+
+function normalizeTrainingRpgConfig(config) {
+  const base = defaultTrainingRpgConfig();
+  const src = (config && typeof config === 'object') ? config : {};
+  return {
+    walk: clamp(Number(src.walk) || base.walk, 1, 4),
+    trot: clamp(Number(src.trot) || base.trot, 1, 4),
+    canter: clamp(Number(src.canter) || base.canter, 1, 4),
+    discipline: clamp(Number(src.discipline) || base.discipline, 1, 6),
+    coolDown: clamp(Number(src.coolDown) || base.coolDown, 1, 4)
+  };
+}
+
+function primaryDisciplineAction(discipline) {
+  if (discipline === 'dressage') return 'dressage';
+  return 'jumping';
+}
+
+function buildTrainingRpgSteps(discipline, config) {
+  const c = normalizeTrainingRpgConfig(config);
+  const primary = primaryDisciplineAction(discipline);
+  const steps = ['scheme'];
+  for (let i = 0; i < c.walk; i += 1) steps.push('walk');
+  for (let i = 0; i < c.trot; i += 1) steps.push('trot');
+  for (let i = 0; i < c.canter; i += 1) steps.push('canter');
+  for (let i = 0; i < c.discipline; i += 1) steps.push(primary);
+  if (discipline === 'dressage') steps.push('work_in_hand');
+  for (let i = 0; i < c.coolDown; i += 1) steps.push('cool_down');
+  return steps;
+}
+
+function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConfig) {
+  const steps = buildTrainingRpgSteps(discipline, config);
   const stepIndex = 0;
   const action = steps[stepIndex];
   const variant = pickTrainingVariant(action);
@@ -1094,6 +1129,7 @@ function hydrateFromSave(data) {
         exercise: data.trainingSelection.exercise || ''
       }
     : { horseId: '', discipline: 'jumping', exercise: '' };
+  app.trainingRpgConfig = normalizeTrainingRpgConfig(data.trainingRpgConfig);
   app.trainingRpg = typeof data.trainingRpg === 'object' && data.trainingRpg ? data.trainingRpg : null;
 
   app.horses.forEach((h) => {
@@ -1247,6 +1283,7 @@ function resetGame() {
   app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
+  app.trainingRpgConfig = defaultTrainingRpgConfig();
   app.trainingRpg = null;
   app.selectedHorseId = '';
   seed();
@@ -2599,6 +2636,71 @@ function refreshRescueHorses() {
   }
 }
 
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
@@ -2706,6 +2808,11 @@ function renderDashboard() {
 }
 
 function createHorseCard(horse) {
+  horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
+  horse.managed = horse.managed || { fed: false, vet: false, farrier: false, trained: false, shown: false };
+  horse.stats = horse.stats || { dressage: {}, jumping: {} };
+  horse.stats.dressage = horse.stats.dressage || {};
+  horse.stats.jumping = horse.stats.jumping || {};
   const tpl = document.getElementById('horseCardTemplate');
   const node = tpl?.content?.firstElementChild
     ? tpl.content.firstElementChild.cloneNode(true)
@@ -3027,6 +3134,7 @@ function renderHorses() {
 
   const selectedHorse = app.horses.find((h) => h.id === app.selectedHorseId);
   const profileEl = el.querySelector('#horse-profile');
+  if (!profileEl) return;
   profileEl.innerHTML = '';
   if (selectedHorse) {
     profileEl.append(createHorseCard(selectedHorse));
@@ -3845,6 +3953,11 @@ function renderTraining() {
         <label>Horse</label><select id='train-horse'>${opts}</select>
         <label>Discipline</label><select id='train-disc'>${Object.keys(SHOW_LEVELS).map((d) => `<option>${d}</option>`).join('')}</select>
         <label>Exercise</label><select id='train-ex'></select>
+        <label>Longer Walk (repeats)</label><select id='train-rpg-walk'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option></select>
+        <label>Longer Trot (repeats)</label><select id='train-rpg-trot'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option></select>
+        <label>Longer Canter (repeats)</label><select id='train-rpg-canter'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option></select>
+        <label>Jump/Discipline Practice (repeats)</label><select id='train-rpg-discipline'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option><option value='5'>5</option><option value='6'>6</option></select>
+        <label>Cooldown Repeats</label><select id='train-rpg-cooldown'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option></select>
         <label>Controlability Work</label><select id='train-control'>
           <option>Flat Work</option><option>Hand Work</option><option>Sensitivity</option><option>Controlability</option><option>Manners</option>
         </select>
@@ -3913,7 +4026,29 @@ function renderTraining() {
   };
   horseSelect.onchange = updateSelection;
   exerciseSelect.onchange = updateSelection;
+  const applyRpgConfigSelection = () => {
+    app.trainingRpgConfig = normalizeTrainingRpgConfig(app.trainingRpgConfig);
+    document.getElementById('train-rpg-walk').value = String(app.trainingRpgConfig.walk);
+    document.getElementById('train-rpg-trot').value = String(app.trainingRpgConfig.trot);
+    document.getElementById('train-rpg-canter').value = String(app.trainingRpgConfig.canter);
+    document.getElementById('train-rpg-discipline').value = String(app.trainingRpgConfig.discipline);
+    document.getElementById('train-rpg-cooldown').value = String(app.trainingRpgConfig.coolDown);
+  };
+  const updateRpgConfig = () => {
+    app.trainingRpgConfig = normalizeTrainingRpgConfig({
+      walk: document.getElementById('train-rpg-walk').value,
+      trot: document.getElementById('train-rpg-trot').value,
+      canter: document.getElementById('train-rpg-canter').value,
+      discipline: document.getElementById('train-rpg-discipline').value,
+      coolDown: document.getElementById('train-rpg-cooldown').value
+    });
+  };
+  ['train-rpg-walk', 'train-rpg-trot', 'train-rpg-canter', 'train-rpg-discipline', 'train-rpg-cooldown'].forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) node.onchange = updateRpgConfig;
+  });
   applyTrainingSelection();
+  applyRpgConfigSelection();
 
   document.getElementById('do-train').onclick = () => {
     const h = app.horses.find((x) => x.id === horseSelect.value);
@@ -3921,7 +4056,7 @@ function renderTraining() {
     if (!h) return;
     if (h.age < 3) return alert('Foals and young horses should use Foal Handling until age 3.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
-    app.trainingRpg = buildTrainingRpgSession(h, d);
+    app.trainingRpg = buildTrainingRpgSession(h, d, app.trainingRpgConfig);
     renderTraining();
   };
 
@@ -4250,6 +4385,75 @@ function injuryChanceByGenetics(horse) {
   if (horse.healthGenetics === 'Low') return 8;
   if (horse.healthGenetics === 'High') return 3;
   return 5;
+}
+
+function pickIllnessWithModifiers(horse) {
+  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
+  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
+  if (wrongFeedMonths > 5) {
+    baseWeights.forEach((item) => {
+      if (item.entry.name === 'Colic') item.weight *= 1.5;
+      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
+    });
+  }
+  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
+  let roll = Math.random() * total;
+  for (const item of baseWeights) {
+    roll -= item.weight;
+    if (roll <= 0) return item.entry;
+  }
+  return SICKNESS_TYPES[0];
+}
+
+function addIllness(horse, illness) {
+  if (!illness) return;
+  const remaining = injuryRecoveryMonths(illness.severity);
+  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
+  const lastSevere = horse.injuryProtection?.[illness.name];
+  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
+    if (rnd(1, 100) <= 90) return;
+  }
+  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
+  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
+    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
+    if (died) {
+      horse.deceased = true;
+      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
+      return;
+    }
+  }
+  horse.illnesses.push({
+    name: illness.name,
+    impact: illness.impact,
+    remaining,
+    active: true,
+    severity: illness.severity,
+    retirementRisk: illness.retirementRisk || 0
+  });
+  applySoundnessLoss(horse, illness.severity);
+  const controlLoss = illness.severity === 'Easy' ? rnd(5, 10)
+    : illness.severity === 'Medium' ? rnd(10, 15)
+      : illness.severity === 'More Than Medium' ? rnd(15, 25)
+        : rnd(25, 45);
+  horse.controlability = clamp((horse.controlability || 0) - controlLoss, 0, 100);
+  if (isSevere) {
+    horse.injuryProtection[illness.name] = currentMonthIndex();
+  }
+  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
+  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (horse.illnesses.some((i) => i.active)) return;
+  const count = horse.overTrainingCountYear || 0;
+  if (!horse.pendingOvertrainingInjury || count < 4) return;
+  if (count >= 8) {
+    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
+    horse.pendingOvertrainingInjury = false;
+    return;
+  }
+  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
+  horse.pendingOvertrainingInjury = false;
 }
 
 function pickIllnessWithModifiers(horse) {
