@@ -1990,6 +1990,58 @@ function seed() {
   refreshRescueHorses();
 }
 
+function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
+  horse.showResults = Array.isArray(horse.showResults) ? horse.showResults : [];
+  const disciplines = Object.keys(SHOW_LEVELS);
+  const safeCount = Math.max(0, showCount);
+  for (let i = 0; i < safeCount; i += 1) {
+    const discipline = pick(disciplines);
+    const levels = SHOW_LEVELS[discipline] || [];
+    if (!levels.length) continue;
+    const levelCap = Math.min(levels.length - 1, Math.max(0, maxLevelIndex));
+    const level = levels[rnd(0, levelCap)];
+    const placing = rnd(1, 12);
+    const score = rnd(58, 98);
+    const prize = Math.max(0, Math.round((13 - placing) * rnd(60, 180)));
+    horse.showResults.push({
+      date: dateLabel(),
+      discipline,
+      level,
+      score,
+      placing,
+      prize,
+      resultText: `Score ${score}`
+    });
+    horse.totalPoints = (horse.totalPoints || 0) + Math.max(0, 30 - placing);
+    horse.earnings = (horse.earnings || 0) + prize;
+    if (placing === 1) horse.championships = (horse.championships || 0) + 1;
+    if (placing === 2) horse.reserves = (horse.reserves || 0) + 1;
+  }
+  updateHorseTitles(horse);
+}
+
+function refreshNpcAds() {
+  const saleCount = 6;
+  const studCount = 5;
+  app.npcSales = Array.from({ length: saleCount }, () => {
+    const horse = baseHorse(pick(['trained', 'fully']), 'npc');
+    seedShowHistory(horse, rnd(1, 4), 8);
+    horse.owner = pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']);
+    horse.saleId = uid();
+    horse.price = Math.round(calculateHorsePrice(horse, true) * rnd(90, 118) / 100);
+    return horse;
+  });
+  app.npcStuds = Array.from({ length: studCount }, () => {
+    const stallion = baseHorse('fully', 'npc');
+    stallion.gender = 'Stallion';
+    seedShowHistory(stallion, rnd(2, 6), 10);
+    stallion.owner = pick(['Blue Stone Stud', 'Goldleaf Stallions', 'Westwind Breeding', 'Pine Hollow Sporthorses']);
+    stallion.studId = uid();
+    stallion.fee = Math.max(500, Math.round(horseWorth(stallion) * rnd(4, 9) / 100));
+    return stallion;
+  });
+}
+
 function generateRescueHorse() {
   const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
   const age = rnd(3, 18);
@@ -2218,6 +2270,13 @@ function createHorseCard(horse) {
     })();
   const activeIssue = (horse.illnesses || []).find((i) => i.active);
   const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name}` : '';
+  const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
+  const visible = visibleIllnesses(horse, revealAll);
+  const hiddenCount = Math.max(0, (horse.illnesses || []).length - visible.length);
+  const illnessLine = visible.length
+    ? visible.map((i) => `${i.name}${i.active ? ` (${i.remaining} mo)` : ''}`).join(', ')
+    : 'None';
+  const illnessLineWithHidden = !revealAll && hiddenCount > 0 ? `${illnessLine} (+${hiddenCount} hidden)` : illnessLine;
   const titleLabel = formattedHorseTitles(horse);
   const autoOptions = autoTrainingOptionsForHorse(horse);
   const autoFocusOptions = [
@@ -2251,7 +2310,7 @@ function createHorseCard(horse) {
     <h4>Competition Results</h4>
     <p>Total Points: ${horse.totalPoints} | Championships: ${horse.championships} | Reserves: ${horse.reserves}</p>
     <p>Lifetime Earnings: ${money(horse.earnings)}</p>
-    <p class='small'>Illnesses: ${illnessLine}</p>
+    <p class='small'>Illnesses: ${illnessLineWithHidden}</p>
     <p>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>
     <p>Top Mare/Filly: ${horse.topWins.mareFilly} | Best Breed: ${horse.topWins.breed} | Best Overall: ${horse.topWins.overall}</p>
     ${horse.showResults.length ? `<p class='small'>Latest: ${horse.showResults[horse.showResults.length - 1].discipline} ${horse.showResults[horse.showResults.length - 1].level} — #${horse.showResults[horse.showResults.length - 1].placing} (${horse.showResults[horse.showResults.length - 1].resultText || horse.showResults[horse.showResults.length - 1].score})</p>` : '<p class="small">No show entries yet.</p>'}
