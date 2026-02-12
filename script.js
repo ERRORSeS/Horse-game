@@ -2254,6 +2254,71 @@ function refreshRescueHorses() {
   }
 }
 
+function randomRescueBreed() {
+  const roll = rnd(1, 100);
+  const one = pick(BREEDS);
+  if (roll <= 15) return `${one} 100%`;
+  if (roll <= 50) {
+    const two = pick(BREEDS.filter((b) => b !== one));
+    return `${one} 50% x ${two} 50%`;
+  }
+  if (roll <= 85) {
+    const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+    return picks.map((b) => `${b} 25%`).join(' x ');
+  }
+  const picks = [one, pick(BREEDS), pick(BREEDS), pick(BREEDS), pick(BREEDS)];
+  return picks.map((b) => `${b} 15%`).join(' x ');
+}
+
+function rescueHealthIssues() {
+  const pool = [
+    { name: 'Internal Parasites', severity: 'Medium' },
+    { name: 'Chronic Infection', severity: 'More Than Medium' },
+    { name: 'Laminitis', severity: 'Severe' },
+    { name: 'Anhidrosis', severity: 'Medium' },
+    { name: 'Melanoma', severity: 'Severe' },
+    { name: 'Kissing Spines', severity: 'Very Severe' }
+  ];
+  if (rnd(1, 100) > 75) return [];
+  const count = rnd(1, 4);
+  return Array.from({ length: count }, () => pick(pool));
+}
+
+function generateRescueHorse() {
+  const name = `${pick(['Hope', 'Misty', 'Shadow', 'Brave', 'Willow', 'Ash', 'Storm', 'Echo'])} ${pick(['Rescue', 'Heart', 'Spirit', 'Horizon', 'Promise'])}`;
+  const age = rnd(3, 18);
+  const ageLabel = rnd(1, 100) <= 15 ? `${age}` : `${rnd(Math.max(2, age - 3), age + 3)}-${rnd(age + 4, age + 8)}`;
+  const breed = randomRescueBreed();
+  const gender = pick(['Mare', 'Stallion', 'Gelding']);
+  const weightStatus = pick(['Very Underweight', 'Underweight', 'Fleshy', 'Overweight']);
+  const issues = rescueHealthIssues();
+  const deadlineMonths = rnd(1, 8);
+  const deadlineMonthIndex = currentMonthIndex() + deadlineMonths;
+  return {
+    id: uid(),
+    name,
+    age,
+    ageLabel,
+    breed,
+    gender,
+    weightStatus,
+    issues,
+    deadlineMonthIndex,
+    price: rnd(500, 1500),
+    note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
+    rescueWeightDelay: rnd(4, 12)
+  };
+}
+
+function refreshRescueHorses() {
+  const now = currentMonthIndex();
+  if (!Array.isArray(app.rescueHorses)) app.rescueHorses = [];
+  app.rescueHorses = app.rescueHorses.filter((h) => h.deadlineMonthIndex > now);
+  while (app.rescueHorses.length < 15) {
+    app.rescueHorses.push(generateRescueHorse());
+  }
+}
+
 function updateHeader() {
   const monthEl = document.getElementById('monthLabel');
   const moneyEl = document.getElementById('moneyLabel');
@@ -3016,26 +3081,6 @@ function calculateCompetitionResult(horse, discipline, level) {
     timeScoreText = `Score ${score.toFixed(1)}`;
     resultText = penaltiesText;
   }
-  horse.managed.showEntry = true;
-  const idx = levelIndex(discipline, level);
-  const maxIdx = highestAllowedLevelIndex(horse, discipline);
-  if (idx > maxIdx) {
-    pushReport(`${horse.name} is not trained enough for ${discipline} ${level}. Max allowed right now: ${SHOW_LEVELS[discipline][maxIdx]}.`);
-    return;
-  }
-  const entry = {
-    id: uid(),
-    discipline,
-    level,
-    date: dateLabel(),
-    monthIndex: currentMonthIndex()
-  };
-  horse.pendingCompetitions = horse.pendingCompetitions || [];
-  horse.pendingCompetitions.push(entry);
-  horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
-  pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Results will arrive next month.`);
-  saveGame(false);
-}
 
   const placingBase = Math.ceil(((100 - score) / 100) * fieldSize);
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
@@ -3949,70 +3994,6 @@ function addIllness(horse, illness) {
     retirementRisk: illness.retirementRisk || 0
   });
   applySoundnessLoss(horse, illness.severity);
-  if (isSevere) {
-    horse.injuryProtection[illness.name] = currentMonthIndex();
-  }
-  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
-  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
-}
-
-function maybeAddOvertrainingInjury(horse) {
-  if (horse.illnesses.some((i) => i.active)) return;
-  const count = horse.overTrainingCountYear || 0;
-  if (!horse.pendingOvertrainingInjury || count < 4) return;
-  if (count >= 8) {
-    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
-    horse.pendingOvertrainingInjury = false;
-    return;
-  }
-  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
-  horse.pendingOvertrainingInjury = false;
-}
-
-function pickIllnessWithModifiers(horse) {
-  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
-  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
-  if (wrongFeedMonths > 5) {
-    baseWeights.forEach((item) => {
-      if (item.entry.name === 'Colic') item.weight *= 1.5;
-      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
-    });
-  }
-  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
-  let roll = Math.random() * total;
-  for (const item of baseWeights) {
-    roll -= item.weight;
-    if (roll <= 0) return item.entry;
-  }
-  return SICKNESS_TYPES[0];
-}
-
-function addIllness(horse, illness) {
-  if (!illness) return;
-  const remaining = injuryRecoveryMonths(illness.severity);
-  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
-  const lastSevere = horse.injuryProtection?.[illness.name];
-  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
-    if (rnd(1, 100) <= 90) return;
-  }
-  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
-  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
-    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
-    if (died) {
-      horse.deceased = true;
-      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
-      return;
-    }
-  }
-  horse.illnesses.push({
-    name: illness.name,
-    impact: illness.impact,
-    remaining,
-    active: true,
-    severity: illness.severity,
-    retirementRisk: illness.retirementRisk || 0
-  });
-  applySoundnessLoss(horse, illness.severity);
   const controlLoss = illness.severity === 'Easy' ? rnd(5, 10)
     : illness.severity === 'Medium' ? rnd(10, 15)
       : illness.severity === 'More Than Medium' ? rnd(15, 25)
@@ -4311,5 +4292,14 @@ try {
   render();
 } catch (error) {
   console.error('Startup failed', error);
-  showFatal(error.message);
+  try {
+    resetGame();
+    ensurePanels();
+    buildTabs();
+    render();
+    pushReport('Startup recovered by resetting invalid state.');
+  } catch (fallbackError) {
+    console.error('Startup fallback failed', fallbackError);
+    showFatal(`${error.message} (fallback failed: ${fallbackError.message})`);
+  }
 }
