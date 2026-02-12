@@ -99,6 +99,81 @@ function callOptionalHook(name) {
   }
 }
 
+function normalizeHorse(h) {
+  if (!h || typeof h !== 'object') return null;
+  h.id = h.id || uid();
+  h.name = h.name || `Horse ${h.id}`;
+  h.breed = h.breed || pick(BREEDS);
+  h.gender = ['Mare', 'Stallion', 'Gelding'].includes(h.gender) ? h.gender : pick(['Mare', 'Stallion', 'Gelding']);
+  h.age = Number.isFinite(h.age) ? h.age : rnd(4, 12);
+  h.coat = h.coat || pick(COATS);
+  h.socks = h.socks || pick(SOCKS);
+  h.faceMarking = h.faceMarking || pick(FACE_MARKINGS);
+  h.marking = normalizeMarkingForBreed(h.marking || 'None', h.breed);
+  h.personality = PERSONALITIES.includes(h.personality) ? h.personality : pick(PERSONALITIES);
+  h.conformation = CONFORMATION.includes(h.conformation) ? h.conformation : pick(CONFORMATION);
+  h.height = h.height || `${rnd(14, 18)}.${rnd(0, 3)} hh`;
+  h.soundnessYears = Number.isFinite(h.soundnessYears) ? h.soundnessYears : rnd(1, 15);
+  h.managed = {
+    fed: Boolean(h.managed?.fed),
+    vet: Boolean(h.managed?.vet),
+    farrier: Boolean(h.managed?.farrier),
+    showEntry: Boolean(h.managed?.showEntry),
+    breedersEntry: Boolean(h.managed?.breedersEntry),
+    trained: Boolean(h.managed?.trained)
+  };
+  h.due = {
+    checkup: h.due?.checkup !== false,
+    farrier: Boolean(h.due?.farrier)
+  };
+  h.illnesses = Array.isArray(h.illnesses) ? h.illnesses : [];
+  h.vetNotes = Array.isArray(h.vetNotes) ? h.vetNotes : [];
+  h.healthRisks = Array.isArray(h.healthRisks) && h.healthRisks.length ? h.healthRisks : [pick(['Metabolic', 'Colic', 'Laminitis', 'Tendon Strain']), pick(['Arthritis', 'Respiratory', 'Ulcers', 'None'])];
+  h.offspring = Array.isArray(h.offspring) ? h.offspring : [];
+  h.showResults = Array.isArray(h.showResults) ? h.showResults : [];
+  h.topWins = {
+    mareFilly: Number(h.topWins?.mareFilly) || 0,
+    breed: Number(h.topWins?.breed) || 0,
+    overall: Number(h.topWins?.overall) || 0,
+    highestScore: Number(h.topWins?.highestScore) || 0
+  };
+  h.totalPoints = Number(h.totalPoints) || 0;
+  h.championships = Number(h.championships) || 0;
+  h.reserves = Number(h.reserves) || 0;
+  h.earnings = Number(h.earnings) || 0;
+  h.breedersEntries = Number(h.breedersEntries) || 0;
+  h.coi = Number.isFinite(h.coi) ? h.coi : rnd(0, 25);
+  h.potential = {
+    dressage: Math.max(0, Math.min(100, Number(h.potential?.dressage) || rnd(35, 100))),
+    jumping: Math.max(0, Math.min(100, Number(h.potential?.jumping) || rnd(35, 100))),
+    eventing: Math.max(0, Math.min(100, Number(h.potential?.eventing) || rnd(35, 100))),
+    hunter: Math.max(0, Math.min(100, Number(h.potential?.hunter) || rnd(35, 100)))
+  };
+  h.stats = h.stats || { dressage: {}, jumping: {} };
+  const d = h.stats.dressage || {};
+  const j = h.stats.jumping || {};
+  h.stats.dressage = {
+    Collection: Math.max(0, Math.min(100, Number(d.Collection ?? d.Relaxation ?? rnd(0, 20)))) ,
+    Balance: Math.max(0, Math.min(100, Number(d.Balance ?? d.Straightness ?? rnd(0, 20)))) ,
+    Connection: Math.max(0, Math.min(100, Number(d.Connection ?? rnd(0, 20)))) ,
+    Gaits: Math.max(0, Math.min(100, Number(d.Gaits ?? d.Impulsion ?? rnd(0, 20)))) ,
+    Rhythm: Math.max(0, Math.min(100, Number(d.Rhythm ?? rnd(0, 20)))) ,
+    Flowiness: Math.max(0, Math.min(100, Number(d.Flowiness ?? rnd(0, 20))))
+  };
+  h.stats.jumping = {
+    Striding: Math.max(0, Math.min(100, Number(j.Striding ?? j.Adjustability ?? rnd(0, 20)))) ,
+    Confidence: Math.max(0, Math.min(100, Number(j.Confidence ?? rnd(0, 20)))) ,
+    Balance: Math.max(0, Math.min(100, Number(j.Balance ?? rnd(0, 20)))) ,
+    Power: Math.max(0, Math.min(100, Number(j.Power ?? rnd(0, 20)))) ,
+    Speed: Math.max(0, Math.min(100, Number(j.Speed ?? rnd(0, 20)))) ,
+    Structure: Math.max(0, Math.min(100, Number(j.Structure ?? j.Bascule ?? rnd(0, 20))))
+  };
+  h.lastFarrierMonth = Number.isFinite(h.lastFarrierMonth)
+    ? h.lastFarrierMonth
+    : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
+  return h;
+}
+
 function normalizeMarkingForBreed(marking, breed) {
   if (!marking.includes('Rabicano')) return marking;
   const lower = String(breed || '').toLowerCase();
@@ -186,34 +261,7 @@ function hydrateFromSave(data) {
       }
     : { horseId: '', discipline: 'jumping', exercise: '' };
 
-  app.horses.forEach((h) => {
-    h.socks = h.socks || pick(SOCKS);
-    h.faceMarking = h.faceMarking || pick(FACE_MARKINGS);
-    h.marking = normalizeMarkingForBreed(h.marking || 'None', h.breed);
-    h.personality = h.personality || pick(PERSONALITIES);
-    h.stats = h.stats || { dressage: {}, jumping: {} };
-    const d = h.stats.dressage || {};
-    const j = h.stats.jumping || {};
-    h.stats.dressage = {
-      Collection: d.Collection ?? d.Relaxation ?? rnd(0, 20),
-      Balance: d.Balance ?? d.Straightness ?? rnd(0, 20),
-      Connection: d.Connection ?? rnd(0, 20),
-      Gaits: d.Gaits ?? d.Impulsion ?? rnd(0, 20),
-      Rhythm: d.Rhythm ?? rnd(0, 20),
-      Flowiness: d.Flowiness ?? rnd(0, 20)
-    };
-    h.stats.jumping = {
-      Striding: j.Striding ?? j.Adjustability ?? rnd(0, 20),
-      Confidence: j.Confidence ?? rnd(0, 20),
-      Balance: j.Balance ?? rnd(0, 20),
-      Power: j.Power ?? rnd(0, 20),
-      Speed: j.Speed ?? rnd(0, 20),
-      Structure: j.Structure ?? j.Bascule ?? rnd(0, 20)
-    };
-    h.lastFarrierMonth = Number.isFinite(h.lastFarrierMonth)
-      ? h.lastFarrierMonth
-      : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
-  });
+  app.horses = app.horses.map((h) => normalizeHorse(h)).filter(Boolean);
 }
 
 function resetGame() {
@@ -458,7 +506,7 @@ function buildTabs() {
 }
 
 function renderDashboard() {
-  const sick = app.horses.filter((h) => h.illnesses.some((i) => i.active)).length;
+  const sick = app.horses.filter((h) => Array.isArray(h.illnesses) && h.illnesses.some((i) => i.active)).length;
   document.getElementById('dashboard').innerHTML = `
     <div class="grid two">
       <div class="box">
@@ -565,7 +613,7 @@ function renderHorses() {
   const el = document.getElementById('horses');
   el.innerHTML = `<h2>Your Horses</h2><div class='cards'></div>`;
   const cards = el.querySelector('.cards');
-  app.horses.forEach((h) => cards.append(createHorseCard(h)));
+  app.horses.forEach((h) => { const safeHorse = normalizeHorse(h); if (safeHorse) cards.append(createHorseCard(safeHorse)); });
 }
 
 function renderMarket() {
@@ -844,7 +892,7 @@ function renderVet() {
     const h = selectedHorse();
     if (!h || !tryCharge(500)) return;
     h.gender = 'Gelding';
-    Object.keys(h.potential).forEach((k) => { h.potential[k] += rnd(0, 5); });
+    Object.keys(h.potential).forEach((k) => { h.potential[k] = Math.min(100, h.potential[k] + rnd(0, 5)); });
     vetNote(h, `${h.name} was gelded; performance trainability may improve.`);
     render();
   };
@@ -1306,6 +1354,8 @@ function monthlyProgress() {
   const survivors = [];
   const newborns = [];
   app.horses.forEach((h) => {
+    h = normalizeHorse(h);
+    if (!h) return;
     processPregnancy(h, newborns);
     maybeAddRandomIllness(h);
     if (h.deceased) {
@@ -1333,6 +1383,7 @@ function monthlyProgress() {
 
 
 function render() {
+  app.horses = app.horses.map((h) => normalizeHorse(h)).filter(Boolean);
   ensurePanels();
   safeRun('updateHeader', updateHeader);
   safeRun('renderDashboard', renderDashboard);
