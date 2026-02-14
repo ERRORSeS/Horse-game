@@ -1038,10 +1038,15 @@ function soundnessForecastLine(years) {
   return 'Should retire from competing... (less then 1 year left)';
 }
 
+function trainingSessionBounds(level) {
+  if (level === 'Low') return [1, 3];
+  if (level === 'High') return [6, 10];
+  return [3, 6];
+}
+
 function trainingStaminaRange(level) {
-  if (level === 'Low') return '10-15';
-  if (level === 'High') return '30-50';
-  return '15-30';
+  const [minSessions, maxSessions] = trainingSessionBounds(level);
+  return `${minSessions}-${maxSessions}`;
 }
 
 function turnoutRange(level) {
@@ -1174,6 +1179,8 @@ function evaluateFeedEffects(horse) {
   const hasInjury = horse.illnesses.some((i) => i.active);
   const totalGrams = (horse.feedPlan || []).reduce((sum, f) => sum + f.grams, 0);
   const hasSportsFeed = (horse.feedPlan || []).some((f) => f.type === 'Sports Feed');
+  const hasCalmFeed = (horse.feedPlan || []).some((f) => f.type === 'Calm nd Ez');
+  const hasRecoveryFeed = (horse.feedPlan || []).some((f) => f.type === 'Recovery');
   const hasOldHorseFeed = (horse.feedPlan || []).some((f) => f.type === 'Old Horse Feed');
   const hasJointSupport = (horse.feedPlan || []).some((f) => f.type === 'Joint Support');
   const pref = horse.preferredFeedGrams || 150;
@@ -1222,7 +1229,7 @@ function evaluateFeedEffects(horse) {
         break;
       case 'Calm nd Ez':
         if (['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality)) {
-          moodOverride = 'No energy';
+          moodOverride = 'Uncomfortable';
           competitionBoost -= 1;
           wrongFeedUsed = true;
           feedIssue = { badFeed: 'Calm nd Ez', betterFeed: 'Basic Feed' };
@@ -1230,7 +1237,7 @@ function evaluateFeedEffects(horse) {
           moodOverride = 'Neutral';
           competitionBoost += 1;
         }
-        if (hasInjury) moodOverride = 'No energy';
+        if (hasInjury) moodOverride = 'Neutral';
         break;
       case 'Youngster Feed':
         if (horse.age > 5 || horse.retiredForever || horse.retiredToBreeding) {
@@ -1288,7 +1295,7 @@ function evaluateFeedEffects(horse) {
           feedIssue = { badFeed: 'Diet Feed', betterFeed: 'Basic Feed' };
         }
         if (feed.grams > 60) {
-          moodOverride = 'No energy';
+          moodOverride = 'Distress';
           wrongFeedUsed = true;
         }
         break;
@@ -1306,11 +1313,14 @@ function evaluateFeedEffects(horse) {
     }
   });
 
-  if (competitionCount >= 2 && !hasSportsFeed) {
+  if (competitionCount > 3 && !hasSportsFeed) {
     moodOverride = 'No energy';
   }
   if ((horse.age >= 20 || horse.retiredToBreeding || horse.retiredForever) && !hasOldHorseFeed) {
     weightDelta -= 1;
+  }
+  if (hasInjury && hasCalmFeed && hasRecoveryFeed && weightDelta > 0) {
+    weightDelta = 0;
   }
   if (wrongFeedUsed) {
     horse.wrongFeedMonthsYear = (horse.wrongFeedMonthsYear || 0) + 1;
@@ -1330,8 +1340,9 @@ function applyAutoTraining(horse) {
   if (!horse.autoTrainingFocus) return;
   const allowedFocuses = autoTrainingOptionsForHorse(horse).map((option) => option.value);
   if (!allowedFocuses.includes(horse.autoTrainingFocus)) return;
-  const preferred = Math.max(1, Math.min(50, horse.preferredTrainingSessions || 25));
   const stamina = horse.trainingPreference || 'Medium';
+  const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
+  const preferred = clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
   const skillCap = stamina === 'Low' ? rnd(2, 5) : stamina === 'High' ? rnd(7, 10) : rnd(5, 7);
   let skillGains = 0;
   let trainedSessions = 0;
@@ -1493,17 +1504,19 @@ function updateMonthlyCare(horse) {
   horse.turnoutHours = (horse.illnesses || []).some((i) => i.active) ? 0 : Math.max(0.5, Math.min(14, effectiveTurnout));
   horse.lastTurnoutIssue = '';
   horse.lastTrainingIssue = '';
-  const preferred = horse.preferredTrainingSessions || 25;
+  const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
+  horse.preferredTrainingSessions = clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
   const sessions = horse.trainingSessionsThisMonth || 0;
+  const shows = horse.showEntriesThisMonth || 0;
   horse.lastTrainingSessions = sessions;
-  horse.lastShowEntries = horse.showEntriesThisMonth || 0;
-  if (sessions > preferred) {
+  horse.lastShowEntries = shows;
+  if (sessions > maxTrainingSessions || shows > 3) {
     horse.lastTrainingIssue = 'high';
     horse.overTrainingCountYear = (horse.overTrainingCountYear || 0) + 1;
     if ([4, 8].includes(horse.overTrainingCountYear)) {
       horse.pendingOvertrainingInjury = true;
     }
-  } else if (sessions < Math.max(1, Math.floor(preferred * 0.4))) {
+  } else if (sessions < minTrainingSessions) {
     horse.lastTrainingIssue = 'low';
   }
 
@@ -1514,19 +1527,21 @@ function updateMonthlyCare(horse) {
     mood = applyMonthlyMoodShift(horse);
   }
   if ((horse.illnesses || []).some((i) => i.active)) {
-    mood = (horse.feedPlan || []).some((f) => f.type === 'Calm nd Ez') ? 'No energy' : 'Distress';
+    mood = 'Distress';
   }
   if (horse.turnoutHours < minTurnout) {
     mood = 'Distress';
     horse.lastTurnoutIssue = 'low';
     updateWeight(horse, 1);
   } else if (horse.turnoutHours > maxTurnout) {
-    mood = 'No energy';
+    mood = 'Uncomfortable';
     horse.lastTurnoutIssue = 'high';
     updateWeight(horse, -1);
   }
+  const hasSportsFeed = (horse.feedPlan || []).some((f) => f.type === 'Sports Feed');
   if (horse.lastTrainingIssue === 'high') {
-    mood = 'No energy';
+    if (!hasSportsFeed) mood = 'No energy';
+    else if (mood === 'No energy') mood = 'Neutral';
   } else if (horse.lastTrainingIssue === 'low') {
     if (!['Distress', 'No energy'].includes(mood)) mood = 'Overly-Active';
   }
@@ -1636,7 +1651,9 @@ function hydrateFromSave(data) {
     h.mood = h.mood || 'Neutral';
     h.weightStatus = h.weightStatus || 'Moderate';
     h.trainingPreference = h.trainingPreference || pick(['Low', 'Medium', 'High']);
-    h.preferredTrainingSessions = Number.isFinite(h.preferredTrainingSessions) ? h.preferredTrainingSessions : rnd(10, 50);
+    const [prefMin, prefMax] = trainingSessionBounds(h.trainingPreference);
+    h.preferredTrainingSessions = Number.isFinite(h.preferredTrainingSessions) ? Math.round(h.preferredTrainingSessions) : rnd(prefMin, prefMax);
+    h.preferredTrainingSessions = clamp(h.preferredTrainingSessions, prefMin, prefMax);
     h.trainingSessionsThisMonth = Number.isFinite(h.trainingSessionsThisMonth) ? h.trainingSessionsThisMonth : 0;
     h.lastTrainingSessions = Number.isFinite(h.lastTrainingSessions) ? h.lastTrainingSessions : 0;
     h.showEntriesThisMonth = Number.isFinite(h.showEntriesThisMonth) ? h.showEntriesThisMonth : 0;
@@ -2306,7 +2323,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     mood: 'Neutral',
     weightStatus: 'Moderate',
     trainingPreference: pick(['Low', 'Medium', 'High']),
-    preferredTrainingSessions: rnd(10, 50),
+    preferredTrainingSessions: 0,
     trainingSessionsThisMonth: 0,
     lastTrainingSessions: 0,
     showEntriesThisMonth: 0,
@@ -2392,6 +2409,8 @@ function baseHorse(type = 'trained', origin = 'player') {
       damDam: null
     }
   };
+  const [prefMin, prefMax] = trainingSessionBounds(horse.trainingPreference);
+  horse.preferredTrainingSessions = rnd(prefMin, prefMax);
   horse.height = heightFromBreed(horse.breed);
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
@@ -2501,6 +2520,7 @@ function refreshNpcAds() {
   const studCount = 5;
   app.npcSales = Array.from({ length: saleCount }, () => {
     const horse = baseHorse(pick(['trained', 'fully']), 'npc');
+    horse.age = rnd(3, 25);
     seedShowHistory(horse, rnd(1, 4), 8);
     horse.owner = pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']);
     horse.saleId = uid();
