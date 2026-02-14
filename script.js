@@ -182,8 +182,8 @@ const TACK = {
   saddle: ['All-Purpose Saddle', 'Jumping Saddle', 'Dressage Saddle', 'Racing / Close-Contact Saddle', 'Ill-Fitting Saddle'],
   pad: ['Basic Pad', 'Shock-Absorbing Pad', 'Incorrect Size Pad', 'Therapeutic Pad', 'No Pad'],
   footwear: ['Tendon Boots'],
-  headwear: ['Halter', 'Rope Halter', 'Grazing Muzzle', 'Fly Mask', 'Tight Halter'],
-  body: ['No Blanket', 'Light Blanket', 'Medium Blanket', 'Heavy Blanket']
+  headwear: ['Halter', 'Ear-Bonnet', 'Race Mask'],
+  body: ['No Body Aid', 'Martingal', 'Draw Reins']
 };
 const EXERCISE_MENU = {
   jumping: ['Striding', 'Confidence', 'Balance', 'Power', 'Speed', 'Structure'],
@@ -391,6 +391,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Transition up promptly', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 1 } },
         { label: 'End on this good note', success: 90, neutral: 8, fail: 2, moodMod: {}, personalityMod: {}, effects: { bond: 1, skill: 0 } }
       ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is nervous and sensitive, spooking at small objects.',
+      options: [
+        { label: 'Halt and calm with voice', success: 80, neutral: 15, fail: 5, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Circle to regain focus', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Ignore it and continue', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Spooky: -10 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is energetic and playful, stepping high and prancing.',
+      options: [
+        { label: 'Sit quietly and maintain rhythm', success: 75, neutral: 20, fail: 5, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Ask for bending', success: 70, neutral: 20, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 1 } },
+        { label: 'Allow prancing briefly', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You begin walk warm-up. The horse is lazy and stubborn, dragging behind.',
+      options: [
+        { label: 'Apply leg pressure', success: 75, neutral: 15, fail: 10, moodMod: { 'Try-Hard': 10 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Use voice encouragement', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Lazy: -10 }, effects: { bond: 1, skill: 0 } },
+        { label: 'Accept slow pace', success: 60, neutral: 25, fail: 15, moodMod: { 'No energy': -10 }, personalityMod: { Lazy: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
     }
   ],
   trot: [
@@ -446,6 +473,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Add circles and diagonals', success: 70, neutral: 20, fail: 10, moodMod: { Happy: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 2 } },
         { label: 'Ask canter transition now', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Energetic: 5 }, effects: { bond: 0, skill: 1 } },
         { label: 'Reward and finish this set', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 1, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is strong and pulling, rushing ahead.',
+      options: [
+        { label: 'Half-halt and rebalance', success: 70, neutral: 20, fail: 10, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -5, Stubborn: -5 }, effects: { bond: 1, skill: 2 } },
+        { label: 'Circle to regain control', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -5 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Allow a few strides before correcting', success: 65, neutral: 20, fail: 15, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 0 } },
+        { label: 'Return to walk', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is distracted and curious, drifting sideways.',
+      options: [
+        { label: 'Circle to regain focus', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Shorten reins', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Ignore and continue', success: 60, neutral: 25, fail: 15, moodMod: {}, personalityMod: {}, effects: { bond: -1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for trot warm-up. The horse is energetic and playful, trotting in exaggerated steps.',
+      options: [
+        { label: 'Ride quietly', success: 75, neutral: 20, fail: 5, moodMod: { Happy: 5 }, personalityMod: { Energetic: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Add light lateral work', success: 70, neutral: 20, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept short bursts', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
       ]
     }
   ],
@@ -503,6 +557,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Push again immediately', success: 40, neutral: 20, fail: 40, moodMod: { Distress: -10 }, personalityMod: { Stubborn: -10, Spooky: -10 }, effects: { bond: -1, skill: 0, refusal: 12 } },
         { label: 'Stop jumping and reset next ride', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -4 } }
       ]
+    },
+    {
+      text: 'You approach the jump. The horse suddenly bolts after spooking at a shadow near the fence.',
+      options: [
+        { label: 'Halt and regain control before retrying', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1, refusal: -3 } },
+        { label: 'Circle to reset rhythm and confidence', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1, refusal: -6 } },
+        { label: 'Push forward and jump despite distraction', success: 60, neutral: 25, fail: 15, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1, refusal: 2 } },
+        { label: 'End session to avoid stress', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -2 } }
+      ]
+    },
+    {
+      text: 'At takeoff, the horse bucks lightly and lifts unevenly after a sudden arena noise.',
+      options: [
+        { label: 'Sit deep and ride forward to support landing', success: 65, neutral: 20, fail: 15, moodMod: { 'Overly-Active': -10 }, personalityMod: { Energetic: -10 }, effects: { bond: 0, skill: 1, refusal: 2 } },
+        { label: 'Lower the fence for confidence', success: 80, neutral: 15, fail: 5, moodMod: { Happy: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1, refusal: -8 } },
+        { label: 'Repeat at the same height carefully', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1, refusal: -2 } },
+        { label: 'End jumping immediately', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -1 } }
+      ]
+    },
+    {
+      text: 'After landing from a jump, the horse bolts for a few strides with tense hindquarters.',
+      options: [
+        { label: 'Apply rein and leg aids to regain control', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 1, refusal: 0 } },
+        { label: 'Circle and calm before continuing', success: 75, neutral: 15, fail: 10, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1, refusal: -3 } },
+        { label: 'Halt immediately to prevent injury', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 0, refusal: -2 } },
+        { label: 'End jumping session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0, refusal: -2 } }
+      ]
     }
   ],
   dressage: [
@@ -559,6 +640,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Reward and then repeat once', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 2, skill: 1 } },
         { label: 'End on a perfect note', success: 90, neutral: 10, fail: 0, moodMod: {}, personalityMod: {}, effects: { bond: 2, skill: 0 } }
       ]
+    },
+    {
+      text: 'You ask for more collection. The horse is lazy and stubborn, shortening stride but losing rhythm.',
+      options: [
+        { label: 'Add leg', success: 70, neutral: 20, fail: 10, moodMod: { 'Try-Hard': 5 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept lighter collection', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { 'Easy-Going': 5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Return to working gait', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
+        { label: 'End exercise', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for lateral movement. The horse is nervous and sensitive, fidgeting and spooking sideways.',
+      options: [
+        { label: 'Calm with voice', success: 75, neutral: 20, fail: 5, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Simplify exercise', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Return to straight line', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 1 } },
+        { label: 'End lateral work', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You attempt a higher-level movement. The horse is distracted and curious, bolting forward or breaking gait.',
+      options: [
+        { label: 'Circle to regain focus', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: { Unfocused: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Repeat movement slowly', success: 75, neutral: 15, fail: 10, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: 0, skill: 2 } },
+        { label: 'Accept short attempt', success: 65, neutral: 25, fail: 10, moodMod: {}, personalityMod: { 'Easy-Going': 5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'End session', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
     }
   ],
   canter: [
@@ -614,6 +722,33 @@ const TRAINING_RPG_VARIANTS = {
         { label: 'Circle smaller to regain control', success: 75, neutral: 20, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
         { label: 'Let forward then stabilize later', success: 60, neutral: 25, fail: 15, moodMod: { Motivated: 5 }, personalityMod: {}, effects: { bond: -1, skill: 0 } },
         { label: 'Return to trot early', success: 80, neutral: 15, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is lazy and stubborn, struggling to pick up gait.',
+      options: [
+        { label: 'Add leg aid', success: 75, neutral: 15, fail: 10, moodMod: { 'Try-Hard': 10 }, personalityMod: { Lazy: -10, Stubborn: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Repeat canter cue', success: 70, neutral: 20, fail: 10, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Accept slow canter', success: 60, neutral: 25, fail: 15, moodMod: { 'No energy': -10 }, personalityMod: { Lazy: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'Return to trot', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is nervous and sensitive, bolting suddenly.',
+      options: [
+        { label: 'Half-halt and circle', success: 70, neutral: 20, fail: 10, moodMod: { Distress: -10 }, personalityMod: { Spooky: -10 }, effects: { bond: 1, skill: 1 } },
+        { label: 'Allow forward stride then regain control', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Energetic: -5 }, effects: { bond: 0, skill: 0 } },
+        { label: 'Halt and reset', success: 80, neutral: 15, fail: 5, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
+      ]
+    },
+    {
+      text: 'You ask for canter warm-up. The horse is energetic and playful, bucking lightly.',
+      options: [
+        { label: 'Sit deep and ride forward', success: 75, neutral: 15, fail: 10, moodMod: { Happy: 5 }, personalityMod: { Energetic: -10 }, effects: { bond: 0, skill: 1 } },
+        { label: 'Circle to calm', success: 70, neutral: 20, fail: 10, moodMod: { Neutral: 5 }, personalityMod: {}, effects: { bond: 1, skill: 1 } },
+        { label: 'Accept mild bucking', success: 65, neutral: 20, fail: 15, moodMod: {}, personalityMod: { Stubborn: -5 }, effects: { bond: -1, skill: 0 } },
+        { label: 'End session', success: 85, neutral: 10, fail: 5, moodMod: {}, personalityMod: {}, effects: { bond: 0, skill: 0 } }
       ]
     }
   ],
@@ -1303,18 +1438,33 @@ function tackControlabilityDelta(horse, discipline = 'flatwork') {
   if (tack.pad === 'Incorrect Size Pad') delta += -6;
   if (tack.pad === 'No Pad') delta += -10;
 
-  if (tack.headwear === 'Rope Halter') delta += 2;
-  if (tack.headwear === 'Fly Mask') delta += 2;
-  if (tack.headwear === 'Tight Halter') delta += -5;
-  if (tack.headwear === 'Grazing Muzzle') delta += -3;
+  if (tack.headwear === 'Ear-Bonnet') {
+    delta += 2;
+    if (horse.personality === 'Spooky' || horse.personality === 'Energetic' || ['Overly-Active', 'Distress'].includes(horse.mood)) delta += 3;
+  }
+  if (tack.headwear === 'Race Mask') {
+    delta += 2;
+    if (horse.personality === 'Unfocused' || horse.personality === 'Spooky') delta += 4;
+  }
 
-  if (tack.body === 'Light Blanket') delta += 1;
-  if (tack.body === 'Medium Blanket') delta += -1;
-  if (tack.body === 'Heavy Blanket') delta += -4;
+  if (tack.body === 'Martingal') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 6 : 1;
+  if (tack.body === 'Draw Reins') {
+    const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
+    delta += hotBlooded ? 6 : -30;
+  }
   return delta;
 }
 
 function trainingControlabilitySession(horse, focus) {
+  if (focus === 'Hand Work') {
+    const handSessions = horse.handTrainingSessionsThisMonth || 0;
+    horse.handTrainingSessionsThisMonth = handSessions + 1;
+    if (handSessions < 1) {
+      horse.mood = 'No energy';
+      pushReport(`${horse.name} completed Hand Work and feels low on energy. No controlability gains this session.`);
+      return false;
+    }
+  }
   const mood = horse.mood || 'Neutral';
   const baseSuccess = 58;
   const moodMod = ['Motivated', 'Happy', 'Try-Hard'].includes(mood) ? 18 : ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Uncomfortable'].includes(mood) ? -18 : 0;
@@ -1384,6 +1534,7 @@ function updateMonthlyCare(horse) {
   horse.mood = mood;
   trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
+  horse.handTrainingSessionsThisMonth = 0;
   horse.showEntriesThisMonth = 0;
 }
 
@@ -1501,7 +1652,13 @@ function hydrateFromSave(data) {
     h.tack.pad = h.tack.pad || 'Basic Pad';
     h.tack.footwear = h.tack.footwear || 'Tendon Boots';
     h.tack.headwear = h.tack.headwear || 'Halter';
-    h.tack.body = h.tack.body || 'No Blanket';
+    h.tack.body = h.tack.body || 'No Body Aid';
+    if (!TACK.headwear.includes(h.tack.headwear)) {
+      h.tack.headwear = h.tack.headwear === 'Fly Mask' ? 'Race Mask' : 'Halter';
+    }
+    if (!TACK.body.includes(h.tack.body)) {
+      h.tack.body = 'No Body Aid';
+    }
     h.trainingBoost = Number.isFinite(h.trainingBoost) ? h.trainingBoost : 0;
     h.competitionBoost = Number.isFinite(h.competitionBoost) ? h.competitionBoost : 0;
     h.feedPerformanceDelta = Number.isFinite(h.feedPerformanceDelta) ? h.feedPerformanceDelta : 0;
@@ -1521,6 +1678,7 @@ function hydrateFromSave(data) {
     h.wrongFeedMonthsYear = Number.isFinite(h.wrongFeedMonthsYear) ? h.wrongFeedMonthsYear : 0;
     h.overTrainingCountYear = Number.isFinite(h.overTrainingCountYear) ? h.overTrainingCountYear : 0;
     h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
+    h.handTrainingSessionsThisMonth = Number.isFinite(h.handTrainingSessionsThisMonth) ? h.handTrainingSessionsThisMonth : 0;
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
     h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
     h.hasJointSupport = h.hasJointSupport || false;
@@ -2153,6 +2311,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     lastTrainingSessions: 0,
     showEntriesThisMonth: 0,
     lastShowEntries: 0,
+    handTrainingSessionsThisMonth: 0,
     manualTrainingThisMonth: false,
     farrierThisMonth: false,
     turnoutHours: 0,
@@ -2163,7 +2322,7 @@ function baseHorse(type = 'trained', origin = 'player') {
       pad: 'Basic Pad',
       footwear: 'Tendon Boots',
       headwear: 'Halter',
-      body: 'No Blanket'
+      body: 'No Body Aid'
     },
     turnoutAssignmentHours: 0,
     trainingBoost: 0,
@@ -3184,11 +3343,32 @@ function calculateCompetitionResult(horse, discipline, level) {
   const jump = horse.stats.jumping;
   const dress = horse.stats.dressage;
   const jumpCount = competitionJumpCount(discipline, level);
+  const tack = horse.tack || {};
+  const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
+  let tackPenaltyBias = 0;
+  let tackRefusalBias = 0;
+  if (tack.headwear === 'Ear-Bonnet') {
+    tackPenaltyBias -= 1;
+    tackRefusalBias -= 2;
+    if (horse.personality === 'Spooky' || horse.personality === 'Energetic') tackRefusalBias -= 2;
+  }
+  if (tack.headwear === 'Race Mask') {
+    tackRefusalBias -= horse.personality === 'Unfocused' || horse.personality === 'Spooky' ? 3 : 1;
+    if (horse.personality === 'Unfocused' || horse.personality === 'Spooky') tackPenaltyBias -= 1;
+  }
+  if (tack.body === 'Martingal' && ['jumping', 'eventing', 'hunter'].includes(discipline)) {
+    tackPenaltyBias -= 1;
+    tackRefusalBias -= 2;
+  }
+  if (tack.body === 'Draw Reins' && !hotBlooded) {
+    tackPenaltyBias += 3;
+    tackRefusalBias += 6;
+  }
 
   if (discipline === 'jumping') {
     const railBias = Math.max(0, 4 - Math.floor((jump.Striding + jump.Structure + jump.Power) / 95));
-    rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias), 0, 8);
-    const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias, 5, 60);
+    rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias), 0, 8);
+    const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias, 5, 60);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
@@ -3213,8 +3393,8 @@ function calculateCompetitionResult(horse, discipline, level) {
     timeScoreText = `${pct.toFixed(2)}%`;
     resultText = penaltiesText;
   } else if (discipline === 'eventing') {
-    rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias)), 0, 6);
-    const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias, 5, 55);
+    rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias)), 0, 6);
+    const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias, 5, 55);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
@@ -3688,7 +3868,11 @@ function renderTraining() {
         const opt = variant.options[Number(btn.dataset.rpg)];
         const result = resolveRpgOption(opt, horse);
         const d = session.discipline;
-        const gain = result.outcome === 'success' ? rnd(Math.max(1, result.skillBase), Math.max(2, result.skillBase + 2)) : result.outcome === 'neutral' ? Math.max(0, result.skillBase - 1) : 0;
+        let gain = result.outcome === 'success' ? rnd(Math.max(1, result.skillBase), Math.max(2, result.skillBase + 2)) : result.outcome === 'neutral' ? Math.max(0, result.skillBase - 1) : 0;
+        if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
+          gain = 0;
+          horse.mood = 'No energy';
+        }
         if (gain > 0) {
           const skill = pick(EXERCISE_MENU[d] || EXERCISE_MENU.jumping);
           if (d === 'dressage') horse.stats.dressage[skill] = clampSkill(horse, d, (horse.stats.dressage[skill] || 0) + gain);
@@ -3699,8 +3883,6 @@ function renderTraining() {
           }
         }
         horse.managed.trained = true;
-        horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
-        horse.manualTrainingThisMonth = true;
         const outcomeLabel = result.outcome === 'success' ? 'Success' : 'Fail';
         app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel}`;
         pushReport(`${horse.name} interactive ${actionLabel(session.action)}: ${outcomeLabel}.`);
@@ -3831,6 +4013,9 @@ function renderTraining() {
     if (!h) return;
     if (h.age < 3) return alert('Foals and young horses should use Foal Handling until age 3.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
+    h.managed.trained = true;
+    h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
+    h.manualTrainingThisMonth = true;
     app.trainingRpg = buildTrainingRpgSession(h, d, app.trainingRpgConfig);
     renderTraining();
   };
