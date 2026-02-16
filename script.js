@@ -142,12 +142,17 @@ const app = {
   trainingRpgConfig: { walk: 1, trot: 1, canter: 1, discipline: 1, coolDown: 2 },
   trainingRpg: null,
   trainingRpgFeedback: '',
-  selectedHorseId: ''
+  selectedHorseId: '',
+  showSelections: {},
+  vetSelection: { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' },
+  trainingClinicSelection: { discipline: 'jumping' },
+  calendarReminders: [],
+  closedReminderIds: []
 };
 
 const options = {};
 const SAVE_KEY = 'horse_game_save_v1';
-const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'settings'];
+const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -1365,7 +1370,7 @@ function applyAutoTraining(horse) {
       horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
       trainedSessions += 1;
     }
-    if (horse.requiresBreakingIn && horse.behavior >= 100) {
+    if (horse.requiresBreakingIn && horse.behavior >= 500) {
       horse.requiresBreakingIn = false;
       pushReport(`${horse.name} completed breaking in and can begin regular training.`);
     }
@@ -1617,6 +1622,11 @@ function hydrateFromSave(data) {
   app.trainingRpgConfig = normalizeTrainingRpgConfig(data.trainingRpgConfig);
   app.trainingRpg = typeof data.trainingRpg === 'object' && data.trainingRpg ? data.trainingRpg : null;
   app.trainingRpgFeedback = typeof data.trainingRpgFeedback === 'string' ? data.trainingRpgFeedback : '';
+  app.showSelections = typeof data.showSelections === 'object' && data.showSelections ? data.showSelections : {};
+  app.vetSelection = typeof data.vetSelection === 'object' && data.vetSelection ? data.vetSelection : { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
+  app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
+  app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
+  app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
 
   app.horses.forEach((h) => {
     h.socks = h.socks || pick(SOCKS);
@@ -1782,6 +1792,11 @@ function resetGame() {
   app.trainingRpg = null;
   app.trainingRpgFeedback = '';
   app.selectedHorseId = '';
+  app.showSelections = {};
+  app.vetSelection = { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
+  app.trainingClinicSelection = { discipline: 'jumping' };
+  app.calendarReminders = [];
+  app.closedReminderIds = [];
   seed();
   saveGame(false);
 }
@@ -1823,8 +1838,21 @@ function pushCompetitionReport(report) {
   app.competitionReports.push(report);
 }
 
+function requiredBehaviorForRiding(horse) {
+  if (!horse) return 0;
+  if (horse.requiresBreakingIn) return 500;
+  if (horse.bredBy === 'Your Stable') return 500;
+  return 0;
+}
+
+function canRideUnderSaddle(horse) {
+  if (!horse || horse.unridable) return false;
+  const required = requiredBehaviorForRiding(horse);
+  return (horse.behavior || 0) >= required;
+}
+
 function canCompeteUnderSaddle(horse) {
-  return horse.age >= 3 && !horse.unridable && !horse.retiredToBreeding && !horse.retiredForever;
+  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever;
 }
 
 function horseLifeStage(horse) {
@@ -2021,7 +2049,7 @@ function applyFoalHandling(horse, exercise) {
     horse.stats.jumping[skill] = clampSkill(horse, 'jumping', horse.stats.jumping[skill] + rnd(1, 2));
   });
   horse.managed.trained = true;
-  if (horse.requiresBreakingIn && horse.behavior >= 100) {
+  if (horse.requiresBreakingIn && horse.behavior >= 500) {
     horse.requiresBreakingIn = false;
     pushReport(`${horse.name} completed breaking in and can begin regular training.`);
   }
@@ -2147,7 +2175,7 @@ function disciplineAtPotential(horse, discipline) {
 }
 
 function autoTrainingOptionsForHorse(horse) {
-  if (horse.requiresBreakingIn && (horse.behavior || 0) < 100) {
+  if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) {
     return [{ value: 'Breaking in', label: 'Breaking in (lunging, accept touch, light work)' }];
   }
   if (horse.age < 3) {
@@ -2374,7 +2402,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     lastSoundnessIssueMonth: 0,
     unridable: false,
     owner: 'Your Stable',
-    bredBy: 'Your Stable',
+    bredBy: origin === 'npc' ? pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']) : 'Unknown',
     retiredToBreeding: false,
     retiredForever: false,
     managed: { fed: false, vet: false, farrier: false, showEntry: false, breedersEntry: false, trained: false },
@@ -2515,12 +2543,28 @@ function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
   updateHorseTitles(horse);
 }
 
+
+function applySalesAgeSkillBand(horse) {
+  const age = horse.age || 3;
+  let maxSkill = 95;
+  if (age <= 4) maxSkill = 20;
+  else if (age <= 6) maxSkill = 40;
+  else if (age <= 8) maxSkill = 50;
+  Object.keys(horse.stats.dressage || {}).forEach((k) => {
+    horse.stats.dressage[k] = rnd(0, maxSkill);
+  });
+  Object.keys(horse.stats.jumping || {}).forEach((k) => {
+    horse.stats.jumping[k] = rnd(0, maxSkill);
+  });
+}
+
 function refreshNpcAds() {
   const saleCount = 6;
   const studCount = 5;
   app.npcSales = Array.from({ length: saleCount }, () => {
     const horse = baseHorse(pick(['trained', 'fully']), 'npc');
     horse.age = rnd(3, 25);
+    applySalesAgeSkillBand(horse);
     seedShowHistory(horse, rnd(1, 4), 8);
     horse.owner = pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']);
     horse.saleId = uid();
@@ -2560,7 +2604,8 @@ function generateRescueHorse() {
     deadlineMonthIndex,
     price: rnd(500, 1500),
     note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
-    rescueWeightDelay: rnd(4, 12)
+    rescueWeightDelay: rnd(4, 12),
+    isGreen: rnd(1, 100) <= 35
   };
 }
 
@@ -2598,9 +2643,18 @@ function rescueHealthIssues() {
     { name: 'Melanoma', severity: 'Severe' },
     { name: 'Kissing Spines', severity: 'Very Severe' }
   ];
-  if (rnd(1, 100) > 75) return [];
-  const count = rnd(1, 4);
-  return Array.from({ length: count }, () => pick(pool));
+  if (rnd(1, 100) <= 10) return [];
+  const count = rnd(1, 5);
+  const issues = [];
+  for (let i = 0; i < count; i += 1) {
+    if (rnd(1, 100) <= 10) {
+      issues.push({ name: 'Kissing Spines', severity: 'Very Severe' });
+    } else {
+      const nonKissing = pool.filter((x) => x.name !== 'Kissing Spines');
+      issues.push(pick(nonKissing));
+    }
+  }
+  return issues;
 }
 
 function generateRescueHorse() {
@@ -2625,7 +2679,8 @@ function generateRescueHorse() {
     deadlineMonthIndex,
     price: rnd(500, 1500),
     note: 'After buying a rescue horse, make sure to give them a vet check! They might have a hidden illness or two…',
-    rescueWeightDelay: rnd(4, 12)
+    rescueWeightDelay: rnd(4, 12),
+    isGreen: rnd(1, 100) <= 35
   };
 }
 
@@ -2693,6 +2748,7 @@ function buildTabs() {
 }
 
 function renderDashboard() {
+  const reminders = activeRemindersForCurrentMonth();
   const sick = app.horses.filter((h) => h.illnesses.some((i) => i.active)).length;
   const competitionReports = app.competitionReports.slice(-6).reverse().map((report) => `
     <details class='report'>
@@ -2715,6 +2771,7 @@ function renderDashboard() {
     </details>
   `).join('') || '<p class="small">No competition reports yet.</p>';
   document.getElementById('dashboard').innerHTML = `
+    ${reminders.length ? `<div class='box' style='border:2px solid #c40000;background:#ffe7e7'><h3 style='color:#c40000'>Reminders</h3>${reminders.map((r) => `<p><strong>${r.type}:</strong> ${r.note || 'No note'} <button data-rem-close='${r.id}'>Close</button></p>`).join('')}</div>` : ''}
     <div class="grid two">
       <div class="box">
         <h2>Stable Snapshot</h2>
@@ -2734,6 +2791,13 @@ function renderDashboard() {
       ${competitionReports}
     </div>
   `;
+  document.querySelectorAll('[data-rem-close]').forEach((btn) => {
+    btn.onclick = () => {
+      app.closedReminderIds = Array.isArray(app.closedReminderIds) ? app.closedReminderIds : [];
+      if (!app.closedReminderIds.includes(btn.dataset.remClose)) app.closedReminderIds.push(btn.dataset.remClose);
+      renderDashboard();
+    };
+  });
   const clearBtn = document.getElementById('clear-competition-reports');
   if (clearBtn) {
     clearBtn.onclick = () => {
@@ -3116,19 +3180,6 @@ function renderMarket() {
         <button id='buy-${k.key}'>Buy</button>
       </div>
     `).join('')}</div>
-    <h2>Rescue Barn</h2>
-    <div class='cards' id='rescue-barn'>
-      ${app.rescueBarn.length ? app.rescueBarn.map((h) => `
-        <div class='box'>
-          <h3>${horseDisplayName(h)}</h3>
-          <p>${h.breed} • ${h.age} • ${h.gender}</p>
-          <p>Adoption Fee: ${money(h.rescueFee || 0)}</p>
-          ${h.requiresBreakingIn && h.behavior < 100 ? `<p class='small'>Requires breaking in (behavior ${h.behavior}/100).</p>` : ''}
-          <details><summary>View Profile</summary>${horseProfileMarkup(h, { revealAll: false })}</details>
-          <button data-rescue='${h.rescueId}'>Adopt</button>
-        </div>
-      `).join('') : '<p class="small">No rescue horses available right now.</p>'}
-    </div>
   `;
 
   kinds.forEach((k) => {
@@ -3147,20 +3198,6 @@ function renderMarket() {
     };
   });
 
-  document.querySelectorAll('#rescue-barn button[data-rescue]').forEach((btn) => {
-    btn.onclick = () => {
-      const horse = app.rescueBarn.find((h) => h.rescueId === btn.dataset.rescue);
-      if (!horse) return;
-      if (app.money < (horse.rescueFee || 0)) return alert('Not enough money');
-      app.money -= horse.rescueFee || 0;
-      horse.owner = 'Your Stable';
-      horse.illnesses = (horse.illnesses || []).map((i) => ({ ...i, hidden: false }));
-      app.horses.push(horse);
-      app.rescueBarn = app.rescueBarn.filter((h) => h.rescueId !== horse.rescueId);
-      pushReport(`Adopted ${horse.name} from the rescue barn.`);
-      render();
-    };
-  });
 }
 
 function renderSales() {
@@ -3472,7 +3509,9 @@ function calculateCompetitionResult(horse, discipline, level) {
 
 function registerShowEntry(horse, discipline, level) {
   if (!canCompeteUnderSaddle(horse)) {
-    pushReport(`${horse.name} cannot enter under-saddle shows until age 3.`);
+    if (horse.unridable) pushReport('This horse is unridable.');
+    else if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) pushReport(`${horse.name} is unbroken/green and needs behavior 500 before under-saddle work.`);
+    else pushReport(`${horse.name} cannot enter under-saddle shows until age 3.`);
     return;
   }
   if ((horse.illnesses || []).some((i) => i.active)) {
@@ -3552,6 +3591,7 @@ function renderShows() {
     { key: 'hunter', names: ['OTO Hunter Show', 'OTO Pony Hunter Classic', 'OTO Young Horse Hunter Show'] }
   ];
 
+  app.showSelections = app.showSelections || {};
   document.getElementById('shows').innerHTML = `
     <h2>Enter Shows</h2>
     ${shows.map((s) => `
@@ -3560,7 +3600,7 @@ function renderShows() {
         ${s.names.map((n) => `<p>${n} (0/250) — Oxer To Oxer Showgrounds</p>`).join('')}
         <label>Horse</label>
         <select id='show-horse-${s.key}'>
-          ${app.horses.filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+          ${app.horses.filter((h) => !h.retiredForever && h.age >= 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
         </select>
         <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
@@ -3572,14 +3612,33 @@ function renderShows() {
   `;
 
   Object.keys(SHOW_LEVELS).forEach((d) => {
+    const horseSelect = document.getElementById(`show-horse-${d}`);
+    const levelSelect = document.getElementById(`show-level-${d}`);
+    const sel = app.showSelections[d] || {};
+    if (horseSelect && sel.horseId) horseSelect.value = sel.horseId;
+    if (levelSelect && sel.level) levelSelect.value = sel.level;
+    if (horseSelect) horseSelect.onchange = () => {
+      app.showSelections[d] = { ...(app.showSelections[d] || {}), horseId: horseSelect.value, level: levelSelect?.value || '' };
+    };
+    if (levelSelect) levelSelect.onchange = () => {
+      app.showSelections[d] = { ...(app.showSelections[d] || {}), horseId: horseSelect?.value || '', level: levelSelect.value };
+    };
+  });
+
+  Object.keys(SHOW_LEVELS).forEach((d) => {
     const btn = document.getElementById(`enter-${d}`);
     if (!btn) return;
     btn.onclick = () => {
       const id = document.getElementById(`show-horse-${d}`).value;
       const level = document.getElementById(`show-level-${d}`).value;
+      app.showSelections[d] = { horseId: id, level };
       const horse = app.horses.find((h) => h.id === id);
       if (!horse) return alert('No eligible horse selected.');
-      if (!canCompeteUnderSaddle(horse)) return alert('This horse is in-hand only until age 3.');
+      if (!canCompeteUnderSaddle(horse)) {
+        if (horse.unridable) return alert('This horse is unridable.');
+        if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle work.');
+        return alert('This horse is in-hand only until age 3.');
+      }
       registerShowEntry(horse, d, level);
       render();
     };
@@ -3614,6 +3673,7 @@ function findTreatableIllness(horse) {
 }
 
 function renderVet() {
+  app.vetSelection = app.vetSelection || { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   const mares = app.horses.filter((h) => h.gender === 'Mare' && !h.retiredForever);
   const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
   const opts = app.horses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
@@ -3646,6 +3706,28 @@ function renderVet() {
       </div>
     </div>
   `;
+
+  const vetHorseSelect = document.getElementById('vet-horse');
+  const vetMareSelect = document.getElementById('vet-mare');
+  const vetStallionSelect = document.getElementById('vet-stallion');
+  const vetStrawSelect = document.getElementById('vet-straw');
+  const vetEmbryoSelect = document.getElementById('vet-embryo');
+  if (vetHorseSelect && app.vetSelection.horseId) vetHorseSelect.value = app.vetSelection.horseId;
+  if (vetMareSelect && app.vetSelection.mareId) vetMareSelect.value = app.vetSelection.mareId;
+  if (vetStallionSelect && app.vetSelection.stallionId) vetStallionSelect.value = app.vetSelection.stallionId;
+  if (vetStrawSelect && app.vetSelection.strawId) vetStrawSelect.value = app.vetSelection.strawId;
+  if (vetEmbryoSelect && app.vetSelection.embryoId) vetEmbryoSelect.value = app.vetSelection.embryoId;
+  const syncVetSelection = () => {
+    app.vetSelection = {
+      horseId: vetHorseSelect?.value || '',
+      mareId: vetMareSelect?.value || '',
+      stallionId: vetStallionSelect?.value || '',
+      strawId: vetStrawSelect?.value || '',
+      embryoId: vetEmbryoSelect?.value || ''
+    };
+  };
+  [vetHorseSelect, vetMareSelect, vetStallionSelect, vetStrawSelect, vetEmbryoSelect].forEach((node) => { if (node) node.onchange = syncVetSelection; });
+  syncVetSelection();
 
   const selectedHorse = () => app.horses.find((h) => h.id === document.getElementById('vet-horse').value);
   const selectedMare = () => app.horses.find((h) => h.id === document.getElementById('vet-mare').value);
@@ -4026,12 +4108,20 @@ function renderTraining() {
   });
   applyTrainingSelection();
   applyRpgConfigSelection();
+  app.trainingClinicSelection = app.trainingClinicSelection || { discipline: 'jumping' };
+  const clinicDiscSelect = document.getElementById('clinic-disc');
+  if (clinicDiscSelect) {
+    clinicDiscSelect.value = app.trainingClinicSelection.discipline || 'jumping';
+    clinicDiscSelect.onchange = () => { app.trainingClinicSelection.discipline = clinicDiscSelect.value; };
+  }
 
   document.getElementById('do-train').onclick = () => {
     const h = app.horses.find((x) => x.id === horseSelect.value);
     const d = disciplineSelect.value;
     if (!h) return;
     if (h.age < 3) return alert('Foals and young horses should use Foal Handling until age 3.');
+    if (h.unridable) return alert('This horse is unridable.');
+    if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle training.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     h.managed.trained = true;
     h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
@@ -4055,6 +4145,7 @@ function renderTraining() {
   document.getElementById('clinic').onclick = () => {
     const h = app.horses.find((x) => x.id === horseSelect.value);
     const disc = document.getElementById('clinic-disc').value;
+    app.trainingClinicSelection.discipline = disc;
     if (!h) return;
     const maxByPotential = SHOW_LEVELS[disc][highestAllowedLevelIndex(h, disc)];
     pushReport(`Clinic: ${h.name} ${cap(disc)} potential ${h.potential[disc]}%. Suggested current max level: ${maxByPotential}.`);
@@ -4322,7 +4413,8 @@ function renderRescue() {
       <p>Age Range: ${h.ageLabel}</p>
       <p>Breed: ${h.breed}</p>
       <p>Gender: ${h.gender}</p>
-      <p>Health: ${h.issues.length ? `${h.issues.length} issue(s)` : 'Unknown'}</p>
+      <p>Health: ${h.issues.length ? `${h.issues.length} issue(s)` : 'No known injury'}</p>
+      <p>${h.isGreen ? 'Green horse (needs behavior 500 before riding).' : 'Already started under saddle.'}</p>
       <p>Months Left: ${Math.max(1, h.deadlineMonthIndex - currentMonthIndex())}</p>
       <p>Price: ${money(h.price)}</p>
       <p class='small'>Note: ${h.note}</p>
@@ -4331,7 +4423,6 @@ function renderRescue() {
   `).join('') || '<p class="small">No rescue horses available.</p>';
 
   document.getElementById('rescue').innerHTML = `
-    <h2>Rescue Barn</h2>
     <p class='small'>Rescue horses are in poor condition and take longer to recover. Bonding will be tougher at first.</p>
     <div class='cards'>${cards}</div>
   `;
@@ -4352,6 +4443,9 @@ function renderRescue() {
       horse.rescueWeightDelay = rescue.rescueWeightDelay;
       horse.rescueWeightCooldown = rescue.rescueWeightDelay;
       horse.hiddenIllnesses = rescue.issues || [];
+      horse.requiresBreakingIn = rescue.isGreen || false;
+      if (horse.requiresBreakingIn) horse.behavior = rnd(0, 220);
+      if ((rescue.issues || []).some((issue) => issue.name === 'Kissing Spines')) horse.unridable = true;
       app.horses.push(horse);
       app.rescueHorses = app.rescueHorses.filter((r) => r.id !== rescue.id);
       refreshRescueHorses();
@@ -4513,6 +4607,8 @@ function processPregnancy(horse, newborns) {
     }
     foal.bredBy = 'Your Stable';
     foal.owner = 'Your Stable';
+    foal.requiresBreakingIn = true;
+    foal.behavior = Math.min(foal.behavior || 0, 120);
     foal.gender = pick(['Mare', 'Stallion']);
     foal.potential = foalPotential(damHorse, sireHorse);
     foal.extraPotential = inheritExtraPotential(damHorse, sireHorse);
@@ -4616,11 +4712,87 @@ function monthlyProgress() {
     if (!processAgingAndMortality(h)) survivors.push(h);
   });
   app.horses = survivors.concat(newborns);
+  app.closedReminderIds = [];
   refreshNpcAds();
   refreshRescueHorses();
 }
 
 
+
+
+function reminderDueThisMonth(reminder) {
+  const monthIndex = currentMonthIndex();
+  if (reminder.repeatEveryMonths > 0) {
+    if (monthIndex < reminder.startMonthIndex) return false;
+    return (monthIndex - reminder.startMonthIndex) % reminder.repeatEveryMonths === 0;
+  }
+  if (Number.isFinite(reminder.year) && Number.isFinite(reminder.month)) {
+    return reminder.year === app.year && reminder.month === app.month;
+  }
+  if (Number.isFinite(reminder.onceMonth)) {
+    return reminder.onceMonth === app.month;
+  }
+  return false;
+}
+
+function activeRemindersForCurrentMonth() {
+  const closed = new Set(app.closedReminderIds || []);
+  return (app.calendarReminders || []).filter((r) => reminderDueThisMonth(r) && !closed.has(r.id));
+}
+
+function renderCalendar() {
+  const reminders = app.calendarReminders || [];
+  document.getElementById('calendar').innerHTML = `
+    <h2>Calendar</h2>
+    <div class='box'>
+      <label>Type</label>
+      <select id='cal-type'><option>Vet Check</option><option>Farrier</option><option>Feed Change</option><option>Custom Note</option></select>
+      <label>Note</label><input id='cal-note' type='text' placeholder='Written by hand note' />
+      <label>Schedule</label>
+      <select id='cal-schedule'>
+        <option value='date'>On Date (Y/M)</option>
+        <option value='repeat'>Every X Months</option>
+        <option value='yearly'>Once a Year (Month)</option>
+      </select>
+      <label>Year</label><input id='cal-year' type='number' min='1' value='${app.year}' />
+      <label>Month</label><input id='cal-month' type='number' min='1' max='12' value='${app.month}' />
+      <label>Every X Months</label><input id='cal-every' type='number' min='1' max='24' value='3' />
+      <button id='cal-add'>Add Reminder</button>
+    </div>
+    <div class='cards'>
+      ${reminders.map((r) => `<div class='box'><h3>${r.type}</h3><p>${r.note || '-'}</p><p class='small'>${r.scheduleText}</p><button data-cal-del='${r.id}'>Delete</button></div>`).join('') || '<p class="small">No reminders yet.</p>'}
+    </div>
+  `;
+  document.getElementById('cal-add').onclick = () => {
+    const type = document.getElementById('cal-type').value;
+    const note = document.getElementById('cal-note').value.trim();
+    const schedule = document.getElementById('cal-schedule').value;
+    const year = Number(document.getElementById('cal-year').value);
+    const month = clamp(Number(document.getElementById('cal-month').value) || app.month, 1, 12);
+    const every = Math.max(1, Number(document.getElementById('cal-every').value) || 1);
+    const reminder = { id: uid(), type, note, startMonthIndex: currentMonthIndex(), repeatEveryMonths: 0, onceMonth: null, year: null, month: null, scheduleText: '' };
+    if (schedule === 'repeat') {
+      reminder.repeatEveryMonths = every;
+      reminder.scheduleText = `Every ${every} month(s), starting ${dateLabel()}`;
+    } else if (schedule === 'yearly') {
+      reminder.onceMonth = month;
+      reminder.scheduleText = `Every year in month ${month}`;
+    } else {
+      reminder.year = Math.max(1, year || app.year);
+      reminder.month = month;
+      reminder.scheduleText = `On Y${reminder.year} M${reminder.month}`;
+    }
+    app.calendarReminders = app.calendarReminders || [];
+    app.calendarReminders.push(reminder);
+    renderCalendar();
+  };
+  document.querySelectorAll('[data-cal-del]').forEach((btn) => {
+    btn.onclick = () => {
+      app.calendarReminders = (app.calendarReminders || []).filter((r) => r.id !== btn.dataset.calDel);
+      renderCalendar();
+    };
+  });
+}
 
 function renderSettings() {
   const current = app.settings || { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
@@ -4673,6 +4845,7 @@ function render() {
   safeRun('renderBreeders', renderBreeders);
   safeRun('renderFreezer', renderFreezer);
   safeRun('renderRescue', renderRescue);
+  safeRun('renderCalendar', renderCalendar);
   safeRun('renderSettings', renderSettings);
 }
 
