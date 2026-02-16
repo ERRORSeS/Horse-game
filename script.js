@@ -177,6 +177,61 @@ const TRAINING_EVENT_POOL = {
   realistic: ['A perfect transition lands exactly on your aid.', 'There is a brief misunderstanding of the aid, then a soft correction.', 'The first really confident jump effort appears in good balance.']
 };
 
+const COMPETITION_CONTROLS = {
+  steer: 'Arrows / WASD',
+  jump: 'Spacebar',
+  pace: 'Up/Down or Shift/Ctrl'
+};
+
+const COMPETITION_RANDOM_EVENTS = [
+  { key: 'buck', text: 'A playful buck appears between efforts.', mod: -10 },
+  { key: 'add_stride', text: 'The horse adds an extra stride and gets deep.', mod: -8 },
+  { key: 'leave_stride', text: 'The horse leaves a stride out and jumps long.', mod: -6 },
+  { key: 'trip', text: 'A small trip interrupts rhythm for a stride.', mod: -12 },
+  { key: 'refusal', text: 'The horse hesitates and questions the question.', mod: -18 },
+  { key: 'funny', text: 'A funny snort-and-headshake moment boosts morale.', mod: 6 },
+  { key: 'breakthrough', text: 'A rare breakthrough: perfect rider-horse sync.', mod: 14 }
+];
+
+const TRAINING_OPTION_LIBRARY = {
+  walk: [
+    { label: 'Sit deeper and apply gentle half-halts to slow the rhythm.', success: 65, neutral: 25, fail: 10, intent: 'calm_and_balance', effects: { bond: 1, skill: 1 } },
+    { label: 'Circle to encourage bending and focus.', success: 70, neutral: 20, fail: 10, intent: 'refocus', effects: { bond: 1, skill: 1 } },
+    { label: 'Halt briefly and restart the walk.', success: 75, neutral: 15, fail: 10, intent: 'reset_attention', effects: { bond: 1, skill: 0 } },
+    { label: 'Allow the forward energy but keep soft contact.', success: 55, neutral: 30, fail: 15, intent: 'allow_release', effects: { bond: 0, skill: 0 } }
+  ],
+  trot: [
+    { label: 'Apply steady half-halts to rebalance tempo.', success: 65, neutral: 25, fail: 10, intent: 'regulate_rhythm', effects: { bond: 1, skill: 2 } },
+    { label: 'Ride a large circle to soften and slow naturally.', success: 70, neutral: 20, fail: 10, intent: 'balance', effects: { bond: 1, skill: 1 } },
+    { label: 'Transition back to walk and re-ask calmly.', success: 75, neutral: 15, fail: 10, intent: 'reset_transition', effects: { bond: 1, skill: 1 } },
+    { label: 'Allow forward energy briefly before correcting.', success: 55, neutral: 30, fail: 15, intent: 'release_energy', effects: { bond: 0, skill: 0 } }
+  ],
+  canter: [
+    { label: 'Sit deep and apply steady half-halts to regulate tempo.', success: 65, neutral: 25, fail: 10, intent: 'regulate_rhythm', effects: { bond: 1, skill: 2 } },
+    { label: 'Ride a large circle to rebalance naturally.', success: 70, neutral: 20, fail: 10, intent: 'balance', effects: { bond: 1, skill: 1 } },
+    { label: 'Transition back to trot and retry quietly.', success: 75, neutral: 15, fail: 10, intent: 'reset_transition', effects: { bond: 1, skill: 1 } },
+    { label: 'Allow a few energetic strides before correcting.', success: 55, neutral: 30, fail: 15, intent: 'release_energy', effects: { bond: 0, skill: 0 } }
+  ],
+  jumping: [
+    { label: 'Keep the same rhythm and maintain steady contact.', success: 85, neutral: 10, fail: 5, intent: 'maintain_balance', effects: { bond: 1, skill: 2 } },
+    { label: 'Add a half-halt to shorten slightly before takeoff.', success: 75, neutral: 15, fail: 10, intent: 'adjust_stride', effects: { bond: 1, skill: 2 } },
+    { label: 'Circle away and reset the approach for precision.', success: 80, neutral: 15, fail: 5, intent: 'repetition', effects: { bond: 1, skill: 1 } },
+    { label: 'Let the horse jump out of stride and fix later.', success: 55, neutral: 30, fail: 15, intent: 'allow_forward', effects: { bond: -1, skill: 0 } }
+  ],
+  dressage: [
+    { label: 'Continue in a steady rhythm and build gradually.', success: 85, neutral: 10, fail: 5, intent: 'establish_foundation', effects: { bond: 1, skill: 2 } },
+    { label: 'Add circles and serpentines for suppleness.', success: 80, neutral: 15, fail: 5, intent: 'suppleness', effects: { bond: 1, skill: 2 } },
+    { label: 'Transition down and reset before asking again.', success: 75, neutral: 15, fail: 10, intent: 'reset', effects: { bond: 1, skill: 1 } },
+    { label: 'Keep pushing through resistance cautiously.', success: 60, neutral: 25, fail: 15, intent: 'ride_through', effects: { bond: -1, skill: 1 } }
+  ],
+  cool_down: [
+    { label: 'Continue walking on a long rein to relax muscles.', success: 95, neutral: 5, fail: 0, intent: 'relax_muscles', effects: { bond: 1, skill: 0 } },
+    { label: 'Circle lightly to encourage stretching.', success: 90, neutral: 10, fail: 0, intent: 'improve_flexibility', effects: { bond: 1, skill: 0 } },
+    { label: 'Halt briefly and reward the horse.', success: 95, neutral: 5, fail: 0, intent: 'positive_reinforcement', effects: { bond: 1, skill: 0 } },
+    { label: 'End session and dismount calmly.', success: 95, neutral: 5, fail: 0, intent: 'welfare_priority', effects: { bond: 0, skill: 0 } }
+  ]
+};
+
 const RARE_MARKINGS = MARKINGS.filter((m) => m !== 'None');
 const PEDIGREE_RELATIONS = ['Sire', 'Dam', 'Sire\'s Sire', 'Sire\'s Dam', 'Dam\'s Sire', 'Dam\'s Dam'];
 const PEDIGREE_PREFIXES = ['OLD', 'HAN', 'RHF', 'BRW', 'STS', 'NTH', 'ELD', 'CRW'];
@@ -894,6 +949,7 @@ const TRAINING_ACTIONS_BY_DISCIPLINE = {
 };
 
 function actionLabel(action) {
+  if (action === 'cool_down') return 'COOL-DOWN';
   return action.replace('_', ' ').toUpperCase();
 }
 
@@ -934,8 +990,7 @@ function buildRpgNarrative(horse, session) {
     variant.text,
     `${horse.name} feels ${horse.mood.toLowerCase()} today, and that mood blends with a ${horse.personality.toLowerCase()} personality in every response to your aids.`,
     `The ${env.wind.toLowerCase()} and ${env.noise.toLowerCase()} atmosphere combine with ${env.footing.toLowerCase()} footing, so ${pronoun} keeps checking ${env.visual}.`,
-    `Through the body you feel shifting tension and balance: the topline alternates between soft and braced while focus moves between you and the arena.`,
-    `This step is less about perfect execution and more about trust, timing, and whether horse and rider can stay emotionally connected.`
+    `You feel muscles alternately soften and brace through the topline while balance shifts in subtle waves under the saddle.`
   ];
   if (session.pendingEvent) lines.push(`Random event: ${session.pendingEvent.text}`);
   return lines.join(' ');
@@ -968,9 +1023,30 @@ function moodOutcomeModifier(mood) {
   return 0;
 }
 
-function pickTrainingVariant(action) {
-  const list = TRAINING_RPG_VARIANTS[action] || TRAINING_RPG_VARIANTS.trot;
-  return pick(list);
+function trainingActionPool(action) {
+  if (TRAINING_OPTION_LIBRARY[action]) return TRAINING_OPTION_LIBRARY[action];
+  if (action === 'work_in_hand') return TRAINING_OPTION_LIBRARY.cool_down;
+  return TRAINING_OPTION_LIBRARY.trot;
+}
+
+function buildTrainingActionText(action, horse, environment) {
+  const pronoun = horse.gender === 'Mare' ? 'she' : 'he';
+  const envLine = `Wind is ${environment.wind.toLowerCase()}, noise is ${environment.noise.toLowerCase()}, and footing feels ${environment.footing.toLowerCase()}.`;
+  if (action === 'walk') return `You begin warm-up at walk and ${horse.name} steps out with ears flicking between you and the arena. ${pronoun[0].toUpperCase() + pronoun.slice(1)} shows ${horse.personality.toLowerCase()} tendencies, while a ${horse.mood.toLowerCase()} mood colors each reaction to your aids. ${envLine} The body feels active but not fully settled, so early rhythm and trust matter more than flashy movement.`;
+  if (action === 'trot') return `You ask for trot and ${horse.name} moves into a working rhythm with visible effort through shoulder and back. ${pronoun[0].toUpperCase() + pronoun.slice(1)} reacts to your timing with a mix of willingness and tension shaped by ${horse.personality.toLowerCase()} behavior. ${envLine} The stride can either organize or unravel depending on how clearly you ride the line.`;
+  if (action === 'canter') return `You ask for canter and ${horse.name} offers energy that needs careful channeling. The horse body lifts, then wavers as balance, impulsion, and attention compete for control in each stride. ${envLine} With a ${horse.mood.toLowerCase()} mindset and ${horse.personality.toLowerCase()} tendencies, this moment tests feel, patience, and commitment.`;
+  if (action === 'jumping') return `Main work starts over fences with your eye on line, pace, and jump timing. ${horse.name} reads each question through ${horse.personality.toLowerCase()} instincts and a ${horse.mood.toLowerCase()} emotional state, so no effort is guaranteed. ${envLine} Muscles tighten and release around takeoff, and your choices now shape confidence as much as technical success.`;
+  if (action === 'dressage') return `Main flatwork begins with transitions, figures, and precision in the contact. ${horse.name} offers moments of softness and resistance as mood and personality filter every aid. ${envLine} Through the body, rhythm and balance fluctuate, making this a realistic conversation rather than automatic execution.`;
+  return `You begin cool-down and let ${horse.name} decompress after effort. Breathing starts to settle while tension drains out in uneven waves through neck, back, and stride. ${envLine} A calm finish reinforces trust, even if the earlier work was imperfect.`;
+}
+
+function pickTrainingVariant(action, horse, environment) {
+  const pool = trainingActionPool(action).map((opt) => ({ ...opt, moodMod: {}, personalityMod: {} }));
+  return {
+    id: rnd(1, 20),
+    text: buildTrainingActionText(action, horse, environment),
+    options: pool
+  };
 }
 
 function defaultTrainingRpgConfig() {
@@ -997,12 +1073,11 @@ function primaryDisciplineAction(discipline) {
 function buildTrainingRpgSteps(discipline, config) {
   const c = normalizeTrainingRpgConfig(config);
   const primary = primaryDisciplineAction(discipline);
-  const steps = ['scheme'];
+  const steps = [];
   for (let i = 0; i < c.walk; i += 1) steps.push('walk');
   for (let i = 0; i < c.trot; i += 1) steps.push('trot');
   for (let i = 0; i < c.canter; i += 1) steps.push('canter');
   for (let i = 0; i < c.discipline; i += 1) steps.push(primary);
-  if (discipline === 'dressage') steps.push('work_in_hand');
   for (let i = 0; i < c.coolDown; i += 1) steps.push('cool_down');
   return steps;
 }
@@ -1013,7 +1088,8 @@ function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConf
   const steps = buildTrainingRpgSteps(discipline, config);
   const stepIndex = 0;
   const action = steps[stepIndex];
-  const variant = pickTrainingVariant(action);
+  const environment = generateTrainingEnvironment();
+  const variant = pickTrainingVariant(action, horse, environment);
   return {
     horseId: horse.id,
     discipline,
@@ -1022,7 +1098,7 @@ function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConf
     steps,
     stepIndex,
     at: dateLabel(),
-    environment: generateTrainingEnvironment(),
+    environment,
     actionsSinceEvent: 0,
     nextEventAt: rnd(2, 4),
     pendingEvent: null,
@@ -1030,8 +1106,8 @@ function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConf
   };
 }
 
-function advanceTrainingRpgSession(session) {
-  const steps = Array.isArray(session.steps) && session.steps.length ? session.steps : (TRAINING_ACTIONS_BY_DISCIPLINE[session.discipline] || ['scheme', 'walk', 'trot', 'canter']);
+function advanceTrainingRpgSession(session, horse) {
+  const steps = Array.isArray(session.steps) && session.steps.length ? session.steps : (TRAINING_ACTIONS_BY_DISCIPLINE[session.discipline] || ['walk', 'trot', 'canter']);
   const stepIndex = (session.stepIndex || 0) + 1;
   if (stepIndex >= steps.length) return null;
   const action = steps[stepIndex];
@@ -1040,7 +1116,7 @@ function advanceTrainingRpgSession(session) {
     steps,
     stepIndex,
     action,
-    variant: pickTrainingVariant(action),
+    variant: pickTrainingVariant(action, horse, session.environment || generateTrainingEnvironment()),
     pendingEvent: null
   };
 }
@@ -3433,6 +3509,64 @@ function competitionFieldSize() {
   return rnd(8, 20);
 }
 
+function competitionMemoryPenalty(horse, discipline) {
+  const memories = Array.isArray(horse.competitionMemories) ? horse.competitionMemories : [];
+  if (!memories.length) return 0;
+  const relevant = memories.filter((m) => m.discipline === discipline).slice(-3);
+  return relevant.reduce((sum, m) => sum + (m.penalty || 0), 0);
+}
+
+function competitionInteractionPhases(discipline) {
+  if (discipline === 'dressage') return ['center line', 'transition sequence', 'lateral work', 'final halt'];
+  if (discipline === 'eventing') return ['dressage phase', 'showjumping phase', 'cross-country phase'];
+  if (discipline === 'hunter') return ['first line', 'bending line', 'single fence', 'hand gallop'];
+  return ['approach to fence 1', 'mid-course line', 'technical turn', 'final fence'];
+}
+
+function simulateCompetitionRide(horse, discipline, level) {
+  const confidenceField = discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
+  const baseSkill = effectiveDisciplineSkill(horse, discipline);
+  const moodMod = moodOutcomeModifier(horse.mood);
+  const personalityMod = personalityOutcomeModifier(horse.personality);
+  const memoryPenalty = competitionMemoryPenalty(horse, discipline);
+  const phases = competitionInteractionPhases(discipline);
+  const log = [];
+  let modifierTotal = 0;
+  phases.forEach((phase) => {
+    const event = rnd(1, 100) <= 45 ? pick(COMPETITION_RANDOM_EVENTS) : null;
+    const randomMod = event ? event.mod : rnd(-5, 8);
+    const successChance = clamp(Math.round(baseSkill + moodMod + personalityMod - memoryPenalty + randomMod + ((horse[confidenceField] || 50) - 50) * 0.4), 8, 92);
+    const partialChance = clamp(100 - successChance - rnd(10, 25), 10, 70);
+    const failChance = Math.max(5, 100 - successChance - partialChance);
+    const roll = rnd(1, 100);
+    const outcome = roll <= successChance ? 'success' : roll <= successChance + partialChance ? 'partial' : 'fail';
+    const stepMod = outcome === 'success' ? rnd(2, 6) : outcome === 'partial' ? rnd(-2, 2) : rnd(-8, -3);
+    modifierTotal += stepMod;
+    log.push({
+      phase,
+      outcome,
+      chances: { success: successChance, partial: partialChance, fail: failChance },
+      eventText: event ? event.text : 'No major event, just normal pressure and adjustment.'
+    });
+  });
+  const memory = {
+    date: dateLabel(),
+    discipline,
+    level,
+    penalty: modifierTotal < -5 ? rnd(1, 3) : 0,
+    note: modifierTotal < -5 ? 'Tense or mistake-heavy round remembered.' : 'Constructive competition memory.'
+  };
+  horse.competitionMemories = Array.isArray(horse.competitionMemories) ? horse.competitionMemories : [];
+  horse.competitionMemories.push(memory);
+  horse.competitionMemories = horse.competitionMemories.slice(-18);
+  return {
+    controls: COMPETITION_CONTROLS,
+    modifier: clamp(modifierTotal, -18, 14),
+    phases: log,
+    memoryPenalty
+  };
+}
+
 function competitionJumpCount(discipline, level) {
   if (discipline === 'jumping') {
     const height = Number(level);
@@ -3504,7 +3638,7 @@ function selectCompetitionSuggestion(horse) {
   return pick(COMPETITION_SUGGESTIONS.health);
 }
 
-function calculateCompetitionResult(horse, discipline, level) {
+function calculateCompetitionResult(horse, discipline, level, interaction = null) {
   const [minReq, maxReq] = requiredSkillBand(discipline, level);
   const skill = effectiveDisciplineSkill(horse, discipline);
   const skillBandBoost = ((skill - minReq) / Math.max(1, maxReq - minReq)) * 18;
@@ -3517,7 +3651,8 @@ function calculateCompetitionResult(horse, discipline, level) {
   const feedBoost = horse.competitionBoost || 0;
   const trainingBoost = trainingPerformanceDelta(horse);
   const turnoutBoost = turnoutPerformanceDelta(horse);
-  const baseScore = clamp(Math.round(55 + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + rnd(-6, 6)), 0, 100);
+  const interactionBoost = interaction?.modifier || 0;
+  const baseScore = clamp(Math.round(55 + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
   const fieldSize = competitionFieldSize();
   let score = baseScore;
   let resultText = `${baseScore}`;
@@ -3557,7 +3692,7 @@ function calculateCompetitionResult(horse, discipline, level) {
   if (discipline === 'jumping') {
     const railBias = Math.max(0, 4 - Math.floor((jump.Striding + jump.Structure + jump.Power) / 95));
     rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias), 0, 8);
-    const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias, 5, 60);
+    const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
@@ -3583,7 +3718,7 @@ function calculateCompetitionResult(horse, discipline, level) {
     resultText = penaltiesText;
   } else if (discipline === 'eventing') {
     rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias)), 0, 6);
-    const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias, 5, 55);
+    const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 55);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
@@ -3635,7 +3770,8 @@ function calculateCompetitionResult(horse, discipline, level) {
     fieldSize,
     highlights,
     comment,
-    suggestion
+    suggestion,
+    interactionBoost
   };
 }
 
@@ -3657,17 +3793,21 @@ function registerShowEntry(horse, discipline, level) {
     pushReport(`${horse.name} is not trained enough for ${discipline} ${level}. Max allowed right now: ${SHOW_LEVELS[discipline][maxIdx]}.`);
     return;
   }
+  const interaction = simulateCompetitionRide(horse, discipline, level);
   const entry = {
     id: uid(),
     discipline,
     level,
     date: dateLabel(),
-    monthIndex: currentMonthIndex()
+    monthIndex: currentMonthIndex(),
+    interaction
   };
   horse.pendingCompetitions = horse.pendingCompetitions || [];
   horse.pendingCompetitions.push(entry);
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
-  pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Results will arrive next month.`);
+  const opener = interaction.phases[0];
+  pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Controls: steer ${interaction.controls.steer}, jump/action ${interaction.controls.jump}, pace ${interaction.controls.pace}.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive next month.`);
   saveGame(false);
 }
 
@@ -3678,7 +3818,7 @@ function resolvePendingCompetitions(horse) {
   horse.pendingCompetitions = pending.filter((entry) => entry.monthIndex >= currentIndex);
   if (!due.length) return;
   due.forEach((entry) => {
-    const result = calculateCompetitionResult(horse, entry.discipline, entry.level);
+    const result = calculateCompetitionResult(horse, entry.discipline, entry.level, entry.interaction);
     horse.totalPoints += Math.max(0, 30 - result.placing);
     horse.earnings += result.prize;
     app.money += result.prize;
@@ -3707,7 +3847,7 @@ function resolvePendingCompetitions(horse) {
       horseBreed: horse.breed,
       placing: result.placing,
       fieldSize: result.fieldSize,
-      highlights: result.highlights,
+      highlights: [...(entry.interaction?.phases?.map((p) => `${cap(p.phase)}: ${p.outcome} (${p.eventText})`) || []).slice(0, 2), ...result.highlights].slice(0, 5),
       comment: result.comment,
       suggestion: result.suggestion
     });
@@ -4139,7 +4279,7 @@ function renderTraining() {
 
         app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel} (roll chances S${result.successChance}/P${result.neutralChance}/F${result.failChance})`;
         pushReport(`${horse.name} interactive ${actionLabel(session.action)}: ${outcomeLabel}.`);
-        app.trainingRpg = advanceTrainingRpgSession(session);
+        app.trainingRpg = advanceTrainingRpgSession(session, horse);
         if (!app.trainingRpg) {
           app.trainingRpgSummary = {
             horseName: horse.name,
