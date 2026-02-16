@@ -142,6 +142,7 @@ const app = {
   trainingRpgConfig: { walk: 1, trot: 1, canter: 1, discipline: 1, coolDown: 2 },
   trainingRpg: null,
   trainingRpgFeedback: '',
+  trainingRpgSummary: null,
   selectedHorseId: '',
   showSelections: {},
   vetSelection: { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' },
@@ -161,6 +162,20 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const money = (v) => `$${Math.round(v).toLocaleString()}`;
 const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
+
+const ENVIRONMENT_OPTIONS = {
+  wind: ['Calm', 'Light breeze', 'Steady wind', 'Gusty'],
+  noise: ['Quiet', 'Mild arena chatter', 'Busy and noisy', 'Unexpected loud sounds'],
+  footing: ['Consistent and springy', 'A little deep', 'Slightly slick in spots', 'Choppy and uneven'],
+  nearby: ['No nearby horses', 'One horse schooling nearby', 'Several horses nearby', 'Crowded schooling ring'],
+  visual: ['moving shadows', 'fluttering banners', 'an open gate', 'birds lifting from the fence line', 'a barking dog in the distance']
+};
+
+const TRAINING_EVENT_POOL = {
+  funny: ['A loud sneeze breaks the halt and earns a surprised ear flick.', 'A playful hop pops up between aids, more silly than dangerous.', 'A dramatic head toss appears for two strides before settling.'],
+  scary: ['A tarp snaps at the arena edge and tension runs through the neck.', 'A sudden clatter at the gate causes a quick shy off line.', 'A sharp noise sparks a brief bolt thought before control returns.'],
+  realistic: ['A perfect transition lands exactly on your aid.', 'There is a brief misunderstanding of the aid, then a soft correction.', 'The first really confident jump effort appears in good balance.']
+};
 
 const RARE_MARKINGS = MARKINGS.filter((m) => m !== 'None');
 const PEDIGREE_RELATIONS = ['Sire', 'Dam', 'Sire\'s Sire', 'Sire\'s Dam', 'Dam\'s Sire', 'Dam\'s Dam'];
@@ -882,6 +897,77 @@ function actionLabel(action) {
   return action.replace('_', ' ').toUpperCase();
 }
 
+function generateTrainingEnvironment() {
+  return {
+    wind: pick(ENVIRONMENT_OPTIONS.wind),
+    noise: pick(ENVIRONMENT_OPTIONS.noise),
+    footing: pick(ENVIRONMENT_OPTIONS.footing),
+    nearby: pick(ENVIRONMENT_OPTIONS.nearby),
+    visual: pick(ENVIRONMENT_OPTIONS.visual)
+  };
+}
+
+function randomTrainingEvent() {
+  const roll = rnd(1, 100);
+  if (roll <= 4) {
+    return {
+      category: 'breakthrough',
+      text: 'Breakthrough moment: horse and rider lock into true sync for several strides.',
+      confidenceBonus: 10,
+      bondBonus: 5
+    };
+  }
+  if (roll <= 35) return { category: 'funny', text: pick(TRAINING_EVENT_POOL.funny), confidenceBonus: 0, bondBonus: 1 };
+  if (roll <= 65) return { category: 'scary', text: pick(TRAINING_EVENT_POOL.scary), confidenceBonus: -2, bondBonus: 0 };
+  return { category: 'realistic', text: pick(TRAINING_EVENT_POOL.realistic), confidenceBonus: 1, bondBonus: 0 };
+}
+
+function disciplineConfidenceField(discipline) {
+  return discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
+}
+
+function buildRpgNarrative(horse, session) {
+  const pronoun = horse.gender === 'Mare' ? 'she' : 'he';
+  const variant = session.variant;
+  const env = session.environment;
+  const lines = [
+    variant.text,
+    `${horse.name} feels ${horse.mood.toLowerCase()} today, and that mood blends with a ${horse.personality.toLowerCase()} personality in every response to your aids.`,
+    `The ${env.wind.toLowerCase()} and ${env.noise.toLowerCase()} atmosphere combine with ${env.footing.toLowerCase()} footing, so ${pronoun} keeps checking ${env.visual}.`,
+    `Through the body you feel shifting tension and balance: the topline alternates between soft and braced while focus moves between you and the arena.`,
+    `This step is less about perfect execution and more about trust, timing, and whether horse and rider can stay emotionally connected.`
+  ];
+  if (session.pendingEvent) lines.push(`Random event: ${session.pendingEvent.text}`);
+  return lines.join(' ');
+}
+
+function personalityOutcomeModifier(personality) {
+  if (personality === 'Hot-Blooded') return -15;
+  if (personality === 'Excitable') return -10;
+  if (personality === 'Stubborn') return -8;
+  if (personality === 'Easy-Going') return 8;
+  if (personality === 'Bomb-proof') return 5;
+  if (personality === 'Energetic') return 4;
+  if (personality === 'Spooky') return -10;
+  if (personality === 'Lazy') return -4;
+  if (personality === 'Unfocused') return -8;
+  return 0;
+}
+
+function moodOutcomeModifier(mood) {
+  if (mood === 'Motivated') return 8;
+  if (mood === 'Happy') return 6;
+  if (mood === 'Try-Hard') return 5;
+  if (mood === 'Neutral') return 0;
+  if (mood === 'Uncomfortable') return -6;
+  if (mood === 'Distress') return -10;
+  if (mood === 'Overly-Active') return -7;
+  if (mood === 'No energy') return -8;
+  if (mood === 'Bad moods') return -6;
+  if (mood === 'Grumpy') return -5;
+  return 0;
+}
+
 function pickTrainingVariant(action) {
   const list = TRAINING_RPG_VARIANTS[action] || TRAINING_RPG_VARIANTS.trot;
   return pick(list);
@@ -923,11 +1009,25 @@ function buildTrainingRpgSteps(discipline, config) {
 
 function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConfig) {
   app.trainingRpgFeedback = '';
+  app.trainingRpgSummary = null;
   const steps = buildTrainingRpgSteps(discipline, config);
   const stepIndex = 0;
   const action = steps[stepIndex];
   const variant = pickTrainingVariant(action);
-  return { horseId: horse.id, discipline, action, variant, steps, stepIndex, at: dateLabel() };
+  return {
+    horseId: horse.id,
+    discipline,
+    action,
+    variant,
+    steps,
+    stepIndex,
+    at: dateLabel(),
+    environment: generateTrainingEnvironment(),
+    actionsSinceEvent: 0,
+    nextEventAt: rnd(2, 4),
+    pendingEvent: null,
+    summary: { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '' }
+  };
 }
 
 function advanceTrainingRpgSession(session) {
@@ -940,14 +1040,24 @@ function advanceTrainingRpgSession(session) {
     steps,
     stepIndex,
     action,
-    variant: pickTrainingVariant(action)
+    variant: pickTrainingVariant(action),
+    pendingEvent: null
   };
 }
 
-function resolveRpgOption(option, horse) {
+function resolveRpgOption(option, horse, session) {
   const moodBonus = option.moodMod?.[horse.mood] || 0;
   const personalityBonus = option.personalityMod?.[horse.personality] || 0;
-  const successChance = clamp(option.success + moodBonus + personalityBonus, 5, 95);
+  const bondBonus = Math.floor((horse.bond || 0) / 12);
+  const controlBonus = Math.floor((horse.controlability || 0) / 20);
+  const confidenceField = disciplineConfidenceField(session.discipline);
+  const confidenceBonus = Math.floor(((horse[confidenceField] ?? 50) - 50) / 5);
+  const environmentPenalty = session.environment && ['Gusty', 'Unexpected loud sounds', 'Slightly slick in spots', 'Choppy and uneven', 'Crowded schooling ring'].some((hazard) => Object.values(session.environment).includes(hazard)) ? -4 : 0;
+  const successChance = clamp(
+    option.success + moodBonus + personalityBonus + moodOutcomeModifier(horse.mood) + personalityOutcomeModifier(horse.personality) + bondBonus + controlBonus + confidenceBonus + environmentPenalty,
+    5,
+    95
+  );
   const neutralChance = clamp(option.neutral, 0, 95 - successChance);
   const failChance = Math.max(0, 100 - successChance - neutralChance);
   const roll = rnd(1, 100);
@@ -957,12 +1067,24 @@ function resolveRpgOption(option, horse) {
 
   const skillBase = option.effects?.skill || 0;
   const bondDelta = option.effects?.bond || 0;
+  const fatigueGain = outcome === 'success' ? rnd(2, 4) : outcome === 'neutral' ? rnd(3, 5) : rnd(4, 7);
+  horse.fatigue = clamp((horse.fatigue || 0) + fatigueGain, 0, 100);
+  horse.focus = clamp((horse.focus || 50) + (outcome === 'success' ? 3 : outcome === 'neutral' ? 0 : -4), 0, 100);
+  let confidenceDelta = outcome === 'success' ? 2 : outcome === 'neutral' ? 0 : -1;
+
+  if (session.pendingEvent) {
+    confidenceDelta += session.pendingEvent.confidenceBonus || 0;
+    horse.bond = clamp((horse.bond || 0) + (session.pendingEvent.bondBonus || 0), horse.isRescue ? -50 : 0, 100);
+  }
+
+  horse[confidenceField] = clamp((horse[confidenceField] ?? 50) + confidenceDelta, 0, 100);
+
   if (outcome === 'success') {
     horse.bond = clamp((horse.bond || 0) + Math.max(0, bondDelta), horse.isRescue ? -50 : 0, 100);
   } else if (outcome === 'fail') {
     horse.bond = clamp((horse.bond || 0) + Math.min(0, bondDelta), horse.isRescue ? -50 : 0, 100);
   }
-  return { outcome, successChance, neutralChance, failChance, skillBase };
+  return { outcome, successChance, neutralChance, failChance, skillBase, confidenceDelta, fatigueGain, bondDelta: outcome === 'success' ? Math.max(0, bondDelta) : outcome === 'fail' ? Math.min(0, bondDelta) : 0 };
 }
 
 function normalizeMarkingForBreed(marking, breed) {
@@ -1622,6 +1744,7 @@ function hydrateFromSave(data) {
   app.trainingRpgConfig = normalizeTrainingRpgConfig(data.trainingRpgConfig);
   app.trainingRpg = typeof data.trainingRpg === 'object' && data.trainingRpg ? data.trainingRpg : null;
   app.trainingRpgFeedback = typeof data.trainingRpgFeedback === 'string' ? data.trainingRpgFeedback : '';
+  app.trainingRpgSummary = typeof data.trainingRpgSummary === 'object' && data.trainingRpgSummary ? data.trainingRpgSummary : null;
   app.showSelections = typeof data.showSelections === 'object' && data.showSelections ? data.showSelections : {};
   app.vetSelection = typeof data.vetSelection === 'object' && data.vetSelection ? data.vetSelection : { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
@@ -1672,6 +1795,10 @@ function hydrateFromSave(data) {
     h.farrierThisMonth = h.farrierThisMonth || false;
     h.turnoutHours = Number.isFinite(h.turnoutHours) ? h.turnoutHours : 0;
     h.controlability = Number.isFinite(h.controlability) ? h.controlability : 50;
+    h.confidenceJump = Number.isFinite(h.confidenceJump) ? h.confidenceJump : 50;
+    h.confidenceFlat = Number.isFinite(h.confidenceFlat) ? h.confidenceFlat : 50;
+    h.fatigue = Number.isFinite(h.fatigue) ? h.fatigue : 0;
+    h.focus = Number.isFinite(h.focus) ? h.focus : 50;
     h.tack = typeof h.tack === 'object' && h.tack ? h.tack : {};
     h.tack.bridle = h.tack.bridle || 'Snaffle Bridle';
     h.tack.bit = h.tack.bit || 'Loose Ring Snaffle';
@@ -1791,6 +1918,7 @@ function resetGame() {
   app.trainingRpgConfig = defaultTrainingRpgConfig();
   app.trainingRpg = null;
   app.trainingRpgFeedback = '';
+  app.trainingRpgSummary = null;
   app.selectedHorseId = '';
   app.showSelections = {};
   app.vetSelection = { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
@@ -2332,6 +2460,10 @@ function baseHorse(type = 'trained', origin = 'player') {
     personality: pick(PERSONALITIES),
     behavior: 0,
     controlability: 50,
+    confidenceJump: 50,
+    confidenceFlat: 50,
+    fatigue: 0,
+    focus: 50,
     extraPotential: false,
     healthGenetics: pick(['Low', 'Medium', 'High']),
     injuryProtection: {},
@@ -3942,12 +4074,16 @@ function renderTraining() {
       return renderTraining();
     }
     const variant = session.variant;
+    const env = session.environment || generateTrainingEnvironment();
+    const sceneText = buildRpgNarrative(horse, session);
     panel.innerHTML = `
       <h2>Interactive Training</h2>
       <div class='box'>
         <h3>STEP: ${actionLabel(session.action)} (${(session.stepIndex || 0) + 1}/${(session.steps || []).length || 1})</h3><p class='small'><strong>Discipline:</strong> ${cap(session.discipline)}</p>
         <p><strong>Horse Name:</strong> ${horse.name}</p>
-        <p><strong>Training:</strong> ${variant.text}</p>
+        <p><strong>Environment:</strong> Wind ${env.wind}; Noise ${env.noise}; Footing ${env.footing}; Nearby ${env.nearby}; Visual trigger ${env.visual}.</p>
+        <p><strong>ACTION:</strong> ${actionLabel(session.action)} — Variant ${variant.id || '?'}</p>
+        <p><strong>Scene:</strong> ${sceneText}</p>
         ${app.trainingRpgFeedback ? `<p><strong>Last choice result:</strong> ${app.trainingRpgFeedback}</p>` : ''}
         <p class='small'><strong>GLOBAL CODING NOTE:</strong> Each option uses base outcome %, mood modifier, personality modifier, and can affect bond, skills, penalties/refusals and future mood.</p>
         <div id='rpg-options'></div>
@@ -3960,7 +4096,8 @@ function renderTraining() {
       line.className = 'box';
       line.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        <p class='small'>→ [Success ${opt.success}% | Fail ${opt.fail}%]</p>
+        <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
+        <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-rpg='${idx}'>Choose</button>
       `;
       wrap.append(line);
@@ -3968,7 +4105,13 @@ function renderTraining() {
     panel.querySelectorAll('[data-rpg]').forEach((btn) => {
       btn.onclick = () => {
         const opt = variant.options[Number(btn.dataset.rpg)];
-        const result = resolveRpgOption(opt, horse);
+        session.actionsSinceEvent = (session.actionsSinceEvent || 0) + 1;
+        if (!session.pendingEvent && session.actionsSinceEvent >= (session.nextEventAt || 3)) {
+          session.pendingEvent = randomTrainingEvent();
+          session.actionsSinceEvent = 0;
+          session.nextEventAt = rnd(2, 4);
+        }
+        const result = resolveRpgOption(opt, horse, session);
         const d = session.discipline;
         let gain = result.outcome === 'success' ? rnd(Math.max(1, result.skillBase), Math.max(2, result.skillBase + 2)) : result.outcome === 'neutral' ? Math.max(0, result.skillBase - 1) : 0;
         if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
@@ -3985,10 +4128,31 @@ function renderTraining() {
           }
         }
         horse.managed.trained = true;
-        const outcomeLabel = result.outcome === 'success' ? 'Success' : 'Fail';
-        app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel}`;
+        const outcomeLabel = result.outcome === 'success' ? 'Success' : result.outcome === 'neutral' ? 'Partial' : 'Fail';
+        const summary = session.summary || { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '' };
+        summary.skill += gain;
+        summary.confidence += result.confidenceDelta;
+        summary.bond += result.bondDelta + (session.pendingEvent?.bondBonus || 0);
+        summary.fatigue += result.fatigueGain;
+        if (session.pendingEvent) summary.notableEvent = session.pendingEvent.text;
+        session.summary = summary;
+
+        app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel} (roll chances S${result.successChance}/P${result.neutralChance}/F${result.failChance})`;
         pushReport(`${horse.name} interactive ${actionLabel(session.action)}: ${outcomeLabel}.`);
         app.trainingRpg = advanceTrainingRpgSession(session);
+        if (!app.trainingRpg) {
+          app.trainingRpgSummary = {
+            horseName: horse.name,
+            discipline: d,
+            skill: summary.skill,
+            confidence: summary.confidence,
+            bond: summary.bond,
+            fatigue: summary.fatigue,
+            notableEvent: summary.notableEvent || 'Steady session with no standout event.',
+            reflection: `${horse.name} finished the session feeling ${horse.mood.toLowerCase()} with ${horse.fatigue || 0}% fatigue. Progress was earned through repetition rather than automatic success.`
+          };
+          pushReport(`${horse.name} session summary — Skill ${summary.skill >= 0 ? '+' : ''}${summary.skill}, Confidence ${summary.confidence >= 0 ? '+' : ''}${summary.confidence}, Bond ${summary.bond >= 0 ? '+' : ''}${summary.bond}.`);
+        }
         renderTraining();
       };
     });
@@ -4007,6 +4171,12 @@ function renderTraining() {
   const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   panel.innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
+    ${app.trainingRpgSummary ? `<div class='box'><h3>Session Summary</h3>
+      <p><strong>${app.trainingRpgSummary.horseName}</strong> — ${cap(app.trainingRpgSummary.discipline)}</p>
+      <p>Skill change: ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
+      <p>Notable event: ${app.trainingRpgSummary.notableEvent}</p>
+      <p class='small'>${app.trainingRpgSummary.reflection}</p>
+    </div>` : ''}
     <div class='grid two'>
       <div class='box'>
         <label>Horse</label><select id='train-horse'>${opts}</select>
