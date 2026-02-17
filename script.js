@@ -4436,17 +4436,38 @@ function normalizeCompetitionRpgSession(session) {
   return normalized;
 }
 
+function competitionChanceModifiers(session, horse, step) {
+  const personality = personalityOutcomeModifier(horse.personality);
+  const mood = moodOutcomeModifier(horse.mood);
+  const bond = Math.round(clamp((horse.bond || 0) / 25, -4, 4));
+  let warmup = 0;
+  if (step?.stage === 'main_round') {
+    const ws = session.warmupState || { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 };
+    const positive = (ws.focus - 50) * 0.08 + (ws.confidence - 50) * 0.08 + (ws.energy - 50) * 0.05 + (ws.timing - 50) * 0.08;
+    const negative = (ws.tension - 50) * 0.1;
+    warmup = Math.round(clamp(positive - negative, -10, 10));
+  }
+  return { personality, mood, warmup, bond };
+}
+
+function competitionOptionChances(session, horse, option, step) {
+  const mods = competitionChanceModifiers(session, horse, step);
+  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.2);
+  const successChance = clamp(option.success + skillMod + mods.personality + mods.mood + mods.warmup + mods.bond, 10, 95);
+  const neutralChance = clamp(option.neutral, 3, 70);
+  const failChance = Math.max(1, 100 - successChance - neutralChance);
+  return { successChance, neutralChance, failChance, skillMod, mods };
+}
+
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const step = session.steps[session.stepIndex];
   const variant = competitionPromptForStep(session);
   if (!step || !variant) return;
   const option = variant.options[choiceIndex];
-  const moodMod = moodOutcomeModifier(horse.mood);
-  const personalityMod = personalityOutcomeModifier(horse.personality);
-  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.2);
+  const computed = competitionOptionChances(session, horse, option, step);
   const prepMod = step.stage === 'main_round' ? session.readinessBonus : 0;
-  const successChance = clamp(option.success + moodMod + personalityMod + skillMod + prepMod, 10, 95);
-  const neutralChance = clamp(option.neutral, 3, 70);
+  const successChance = clamp(computed.successChance + prepMod, 10, 95);
+  const neutralChance = computed.neutralChance;
   const failChance = Math.max(1, 100 - successChance - neutralChance);
   const roll = rnd(1, 100);
   const outcome = roll <= successChance ? 'success' : roll <= successChance + neutralChance ? 'partial' : 'fail';
@@ -4777,10 +4798,15 @@ function renderShows() {
     const wrap = document.getElementById('comp-rpg-options');
     variant.options.forEach((opt, idx) => {
       const box = document.createElement('div');
+      const computed = competitionOptionChances(activeSession, horse, opt, step);
+      const finalSuccess = clamp(computed.successChance + (step.stage === 'main_round' ? activeSession.readinessBonus : 0), 10, 95);
+      const finalFail = Math.max(1, 100 - finalSuccess - computed.neutralChance);
       box.className = 'box';
       box.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
         <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
+        <p class='small'>Influenced chance: success ${finalSuccess} / partial ${computed.neutralChance} / fail ${finalFail}</p>
+        <p class='small'>Modifiers → Personality ${computed.mods.personality >= 0 ? '+' : ''}${computed.mods.personality}, Mood ${computed.mods.mood >= 0 ? '+' : ''}${computed.mods.mood}, Warm-Up ${computed.mods.warmup >= 0 ? '+' : ''}${computed.mods.warmup}, Bond ${computed.mods.bond >= 0 ? '+' : ''}${computed.mods.bond}${step.stage === 'main_round' ? `, Readiness ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}` : ''}</p>
         <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
