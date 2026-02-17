@@ -156,7 +156,9 @@ const app = {
   vetSelection: { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' },
   trainingClinicSelection: { discipline: 'jumping' },
   calendarReminders: [],
-  closedReminderIds: []
+  closedReminderIds: [],
+  lessonHorsesByBarn: {},
+  barnLessonSelectionId: ''
 };
 
 const options = {};
@@ -218,6 +220,7 @@ function ensureBarnState() {
   if (!Array.isArray(app.barnShows) || !app.barnShows.length) {
     refreshBarnShows();
   }
+  ensureLessonRosterForBarn(app.currentBarn);
 }
 
 function refreshBarnCatalog(force = false) {
@@ -261,20 +264,97 @@ function barnFacilityTurnoutRange(stars) {
   return [8, 14];
 }
 
+
+function lessonAvailabilityBase(lessonStars) {
+  const stars = clamp(Number(lessonStars) || 1, 1, 5);
+  if (stars === 1) return 35;
+  if (stars === 2) return 45;
+  if (stars === 3) return 55;
+  if (stars === 4) return 65;
+  return 75;
+}
+
+function lessonHorseTargetCount(facilityStars) {
+  const stars = clamp(Number(facilityStars) || 1, 1, 5);
+  if (stars === 1) return 3;
+  if (stars === 2) return 7;
+  if (stars === 3) return 11;
+  if (stars === 4) return 15;
+  return 20;
+}
+
+function createLessonHorse(barn) {
+  const horse = baseHorse('trained', 'npc');
+  horse.owner = 'Lesson Program';
+  horse.isLessonHorse = true;
+  horse.lessonBarnId = barn?.id || '';
+  horse.barnAvailabilityPercent = clamp(lessonAvailabilityBase(barn?.lessonsStars || 3) + rnd(-5, 10), 35, 85);
+  horse.barnAvailable = rnd(1, 100) <= horse.barnAvailabilityPercent;
+  horse.leaseLocked = true;
+  horse.feedPlan = [];
+  horse.turnoutAssignmentHours = 0;
+  return horse;
+}
+
+function ensureLessonRosterForBarn(barn, refreshAvailability = false) {
+  if (!barn?.id) return [];
+  app.lessonHorsesByBarn = typeof app.lessonHorsesByBarn === 'object' && app.lessonHorsesByBarn ? app.lessonHorsesByBarn : {};
+  let roster = Array.isArray(app.lessonHorsesByBarn[barn.id]) ? app.lessonHorsesByBarn[barn.id] : [];
+  const target = clamp(lessonHorseTargetCount(barn.facilityStars), 1, 20);
+  while (roster.length < target) roster.push(createLessonHorse(barn));
+  if (roster.length > target) roster = roster.slice(0, target);
+  const base = lessonAvailabilityBase(barn.lessonsStars);
+  roster.forEach((h) => {
+    h.owner = 'Lesson Program';
+    h.isLessonHorse = true;
+    h.lessonBarnId = barn.id;
+    h.leaseLocked = true;
+    if (refreshAvailability || !Number.isFinite(h.barnAvailabilityPercent)) {
+      h.barnAvailabilityPercent = clamp(base + rnd(-5, 10), 35, 85);
+      h.barnAvailable = rnd(1, 100) <= h.barnAvailabilityPercent;
+    } else if (typeof h.barnAvailable !== 'boolean') {
+      h.barnAvailable = rnd(1, 100) <= h.barnAvailabilityPercent;
+    }
+  });
+  app.lessonHorsesByBarn[barn.id] = roster;
+  return roster;
+}
+
+
+function currentBarnLessonHorses() {
+  return ensureLessonRosterForBarn(app.currentBarn);
+}
+
+function horsesIncludingLessons() {
+  return [...app.horses, ...currentBarnLessonHorses()];
+}
+
+function showTransportFee(show) {
+  if (!show) return 0;
+  if (Number.isFinite(show.transportFee)) return show.transportFee;
+  if (show.barnId && app.currentBarn?.id && show.barnId === app.currentBarn.id) return 0;
+  if (show.country && app.currentBarn?.country && show.country === app.currentBarn.country) return 800;
+  return 12000;
+}
+
 function refreshBarnShows() {
   if (!app.currentBarn) return;
   const eventsStars = app.currentBarn?.eventsStars || 1;
   const showCount = eventsStars === 1 ? 1 : eventsStars === 2 ? rnd(1, 2) : eventsStars === 3 ? rnd(2, 3) : eventsStars === 4 ? rnd(3, 4) : rnd(4, 6);
   const maxSkill = eventsStars === 1 ? 20 : eventsStars === 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
+  const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)];
   app.barnShows = Array.from({ length: showCount }, () => {
     const discipline = pick(DISCIPLINES);
+    const venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
+    const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
     return {
       id: uid(),
-      barnId: app.currentBarn.id,
-      barnName: app.currentBarn.name,
-      country: app.currentBarn.country,
-      city: app.currentBarn.city,
-      fee: rnd(20, 1000),
+      barnId: venue.id,
+      barnName: venue.name,
+      country: venue.country,
+      city: venue.city,
+      fee: rnd(120, 1800),
+      transportFee,
       discipline,
       maxSkill,
       level: pick(SHOW_LEVELS[discipline] || []),
@@ -2497,6 +2577,8 @@ function hydrateFromSave(data) {
   app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
+  app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
+  app.barnLessonSelectionId = data.barnLessonSelectionId || '';
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -2689,6 +2771,8 @@ function resetGame() {
   app.trainingClinicSelection = { discipline: 'jumping' };
   app.calendarReminders = [];
   app.closedReminderIds = [];
+  app.lessonHorsesByBarn = {};
+  app.barnLessonSelectionId = '';
   seed();
   saveGame(false);
 }
@@ -2744,6 +2828,7 @@ function canRideUnderSaddle(horse) {
 }
 
 function canCompeteUnderSaddle(horse) {
+  if (horse?.isLessonHorse && !horse?.barnAvailable) return false;
   return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever;
 }
 
@@ -3764,6 +3849,7 @@ function createHorseCard(horse) {
   const illnessLineWithHidden = !revealAll && hiddenCount > 0 ? `${illnessLine} (+${hiddenCount} hidden)` : illnessLine;
   const titleLabel = formattedHorseTitles(horse);
   const autoOptions = autoTrainingOptionsForHorse(horse);
+  const canAutoCare = horse.owner === 'Your Stable' && (app.currentBarn?.careStars || 3) > 3;
   const autoFocusOptions = [
     { value: '', label: 'None' },
     ...autoOptions
@@ -3857,6 +3943,7 @@ function createHorseCard(horse) {
     <select class='auto-focus'>${autoFocusOptions}</select>
     <p class='small'>Auto training uses the preferred training amount (${horse.preferredTrainingSessions} sessions).</p>
     <button data-action='save-auto-focus'>Save Auto Training</button>
+    ${canAutoCare ? `<button data-action='toggle-auto-stall'>Auto Stall Cleaning: ${horse.autoStallCleaning ? 'On' : 'Off'}</button><button data-action='toggle-auto-groom'>Auto Grooming: ${horse.autoGrooming ? 'On' : 'Off'}</button>` : ''}
     ${horse.autoTrainingFocus ? `<p class='small'>Auto training set to: ${horse.autoTrainingFocus}</p>` : '<p class="small">No auto training assigned.</p>'}
     ${horse.autoExerciseHours ? `<p class='small'>Exercise (retired/maxed): ${horse.autoExerciseHours} hour(s) on lunging/hot-walker.</p>` : ''}
     <button data-action='vet-notes'>${horse.showVetNotes ? 'Hide Vet Notes' : 'Show Vet Notes'}</button>
@@ -3989,6 +4076,8 @@ function createHorseCard(horse) {
       if (action === 'save-auto-focus') {
         horse.autoTrainingFocus = node.querySelector('.auto-focus')?.value || '';
       }
+      if (action === 'toggle-auto-stall') horse.autoStallCleaning = !horse.autoStallCleaning;
+      if (action === 'toggle-auto-groom') horse.autoGrooming = !horse.autoGrooming;
       if (action === 'vet-notes') horse.showVetNotes = !horse.showVetNotes;
       if (action === 'inspection-details') horse.showInspectionDetails = !horse.showInspectionDetails;
       if (action === 'offspring-summary') horse.showOffspringSummary = !horse.showOffspringSummary;
@@ -4039,10 +4128,11 @@ function horseProfileMarkup(horse) {
 
 function renderHorses() {
   const el = document.getElementById('horses');
-  const foals = app.horses.filter((h) => h.age < 3);
-  const retiredBreeding = app.horses.filter((h) => h.retiredToBreeding && !h.retiredForever);
-  const retired = app.horses.filter((h) => h.retiredForever);
-  const active = app.horses.filter((h) => h.age >= 3 && !h.retiredToBreeding && !h.retiredForever);
+  const playerHorses = app.horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
+  const foals = playerHorses.filter((h) => h.age < 3);
+  const retiredBreeding = playerHorses.filter((h) => h.retiredToBreeding && !h.retiredForever);
+  const retired = playerHorses.filter((h) => h.retiredForever);
+  const active = playerHorses.filter((h) => h.age >= 3 && !h.retiredToBreeding && !h.retiredForever);
 
   const allHorses = [...active, ...retiredBreeding, ...retired, ...foals];
   if (!app.selectedHorseId && allHorses.length) {
@@ -4090,7 +4180,7 @@ function renderHorses() {
     <div id='horse-profile' class='horse-profile'></div>
   `;
 
-  const selectedHorse = app.horses.find((h) => h.id === app.selectedHorseId);
+  const selectedHorse = playerHorses.find((h) => h.id === app.selectedHorseId);
   const profileEl = el.querySelector('#horse-profile');
   if (!profileEl) return;
   profileEl.innerHTML = '';
@@ -4976,6 +5066,10 @@ function registerShowEntry(horse, discipline, level) {
     else pushReport(`${horse.name} cannot enter under-saddle shows until age 3.`);
     return;
   }
+  if (horse.isLessonHorse && !horse.barnAvailable) {
+    pushReport(`${horse.name} is unavailable this month and cannot train/compete.`);
+    return;
+  }
   if ((horse.illnesses || []).some((i) => i.active)) {
     pushReport(`${horse.name} cannot show while recovering from an injury/illness.`);
     return;
@@ -5161,7 +5255,7 @@ function renderShows() {
         ${s.names.map((n) => `<p>${n} (0/250) — Oxer To Oxer Showgrounds</p>`).join('')}
         <label>Horse</label>
         <select id='show-horse-${s.key}'>
-          ${app.horses.filter((h) => !h.retiredForever && h.age >= 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+          ${horsesIncludingLessons().filter((h) => !h.retiredForever && h.age >= 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
         </select>
         <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
@@ -5193,7 +5287,7 @@ function renderShows() {
       const id = document.getElementById(`show-horse-${d}`).value;
       const level = document.getElementById(`show-level-${d}`).value;
       app.showSelections[d] = { horseId: id, level };
-      const horse = app.horses.find((h) => h.id === id);
+      const horse = horsesIncludingLessons().find((h) => h.id === id);
       if (!horse) return alert('No eligible horse selected.');
       if (!canCompeteUnderSaddle(horse)) {
         if (horse.unridable) return alert('This horse is unridable.');
@@ -5597,7 +5691,8 @@ function renderTraining() {
     return;
   }
 
-  const opts = app.horses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
+  const trainingPool = horsesIncludingLessons();
+  const opts = trainingPool.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   panel.innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
@@ -5661,7 +5756,7 @@ function renderTraining() {
   };
   const applyTrainingSelection = () => {
     const selection = app.trainingSelection || { horseId: '', discipline: 'jumping', exercise: '' };
-    if (!selection.horseId && app.horses.length) selection.horseId = app.horses[0].id;
+    if (!selection.horseId && trainingPool.length) selection.horseId = trainingPool[0].id;
     if (!EXERCISES[selection.discipline]) selection.discipline = 'jumping';
     horseSelect.value = selection.horseId || horseSelect.value;
     disciplineSelect.value = selection.discipline || disciplineSelect.value;
@@ -5717,12 +5812,13 @@ function renderTraining() {
   }
 
   document.getElementById('do-train').onclick = () => {
-    const h = app.horses.find((x) => x.id === horseSelect.value);
+    const h = trainingPool.find((x) => x.id === horseSelect.value);
     const d = disciplineSelect.value;
     if (!h) return;
     if (h.age < 3) return alert('Foals and young horses should use Foal Handling until age 3.');
     if (h.unridable) return alert('This horse is unridable.');
     if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle training.');
+    if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     h.managed.trained = true;
     h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
@@ -5737,9 +5833,10 @@ function renderTraining() {
   };
 
   document.getElementById('do-control-train').onclick = () => {
-    const h = app.horses.find((x) => x.id === horseSelect.value);
+    const h = trainingPool.find((x) => x.id === horseSelect.value);
     const focus = document.getElementById('train-control').value;
     if (!h) return;
+    if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     trainingControlabilitySession(h, focus);
     h.managed.trained = true;
@@ -5749,7 +5846,7 @@ function renderTraining() {
   };
 
   document.getElementById('clinic').onclick = () => {
-    const h = app.horses.find((x) => x.id === horseSelect.value);
+    const h = trainingPool.find((x) => x.id === horseSelect.value);
     const disc = document.getElementById('clinic-disc').value;
     app.trainingClinicSelection.discipline = disc;
     if (!h) return;
@@ -5827,14 +5924,14 @@ function renderBarn() {
   const panel = document.getElementById('barn');
   if (!panel) return;
   const horses = app.horses.filter((h) => !h.retiredForever);
-  const lesson = horses.filter((h) => h.owner !== 'Your Stable' && !h.isLeased);
-  const privateHorses = horses.filter((h) => h.owner === 'Your Stable');
   const currentBarn = app.currentBarn;
+  const lesson = ensureLessonRosterForBarn(currentBarn);
+  const privateHorses = horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
   const careStars = currentBarn?.careStars || 3;
   const facilityStars = currentBarn?.facilityStars || 3;
   const eventStars = currentBarn?.eventsStars || 3;
   const lessonStars = currentBarn?.lessonsStars || 3;
-  const lessonAvailBase = lessonStars === 1 ? 35 : lessonStars === 2 ? 45 : lessonStars === 3 ? 55 : lessonStars === 4 ? 65 : 75;
+  const lessonAvailBase = lessonAvailabilityBase(lessonStars);
   const currentCountry = currentBarn?.country || 'USA';
   const filterDefault = currentCountry;
   panel.innerHTML = `
@@ -5851,9 +5948,9 @@ function renderBarn() {
     </div>
     <div class='grid two'>
       <div class='box'>
-        <h3>Lesson Horses</h3>
-        ${lesson.length ? lesson.map((h) => `<p>${horseDisplayName(h)} — Available ${h.barnAvailabilityPercent || 0}% (${h.barnAvailable ? 'Available' : 'Not available'})</p>`).join('') : '<p class="small">No lesson horses currently listed.</p>'}
-        ${lessonStars >= 3 && lesson.length ? `<label>Lease Lesson Horse</label><select id='barn-lease-horse'>${lesson.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select><button id='barn-lease-btn'>Lease Selected Horse</button>` : ''}
+        <h3>Lesson Horses (${lesson.length})</h3>
+        ${lesson.length ? lesson.map((h) => `<p>${horseDisplayName(h)} — Available ${h.barnAvailabilityPercent || 0}% (${h.barnAvailable ? 'Available' : 'Not available'}) <button data-lesson-profile='${h.id}'>Profile</button></p>`).join('') : '<p class="small">No lesson horses currently listed.</p>'}
+        <p class='small'>Pool size depends on facility stars (1-20 horses).</p>
       </div>
       <div class='box'>
         <h3>Private Horses</h3>
@@ -5868,6 +5965,7 @@ function renderBarn() {
         </div>
       </div>
     </div>
+    <div id='barn-lesson-profile'></div>
     <details class='box'>
       <summary>Switch / Board Barns (Open/Close)</summary>
       <p class='small'>Refresh barn list manually every 4 months.</p>
@@ -5883,32 +5981,50 @@ function renderBarn() {
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
       const horseId = document.getElementById('barn-horse')?.value;
-      const horse = app.horses.find((h) => h.id === horseId);
+      const horse = horsesIncludingLessons().find((h) => h.id === horseId);
       if (!horse) return;
       applyBarnActivity(horse, btn.dataset.barn);
       renderBarn();
     };
   });
 
-  const leaseBtn = document.getElementById('barn-lease-btn');
-  if (leaseBtn) {
-    leaseBtn.onclick = () => {
-      const lessonId = document.getElementById('barn-lease-horse')?.value;
-      const source = app.horses.find((h) => h.id === lessonId);
-      if (!source) return;
+  panel.querySelectorAll('[data-lesson-profile]').forEach((btn) => {
+    btn.onclick = () => {
+      app.barnLessonSelectionId = btn.dataset.lessonProfile;
+      renderBarn();
+    };
+  });
+
+  const selectedLessonHorse = lesson.find((h) => h.id === app.barnLessonSelectionId) || lesson[0];
+  const lessonWrap = document.getElementById('barn-lesson-profile');
+  if (selectedLessonHorse && lessonWrap) {
+    lessonWrap.className = 'box';
+    const leaseVisible = (app.currentBarn?.lessonsStars || 3) <= 3;
+    lessonWrap.innerHTML = `<h3>Lesson Horse Profile</h3>${horseProfileMarkup(selectedLessonHorse)}
+      <div class='inline'>
+        <button id='lesson-train-btn' ${selectedLessonHorse.barnAvailable ? '' : 'disabled'}>Train</button>
+        ${leaseVisible ? `<button id='lesson-lease-btn' ${selectedLessonHorse.barnAvailable ? '' : 'disabled'}>Lease</button>` : ''}
+      </div>
+      <p class='small'>${selectedLessonHorse.barnAvailable ? 'Available for this month.' : 'Visible but unavailable this month (cannot train or compete).'}</p>`;
+    const trainBtn = document.getElementById('lesson-train-btn');
+    if (trainBtn) trainBtn.onclick = () => {
+      app.trainingSelection = app.trainingSelection || { horseId: '', discipline: 'jumping', exercise: '' };
+      app.trainingSelection.horseId = selectedLessonHorse.id;
+      changeTab('training');
+    };
+    const leaseBtn = document.getElementById('lesson-lease-btn');
+    if (leaseBtn) leaseBtn.onclick = () => {
       const leasedHorse = {
-        ...JSON.parse(JSON.stringify(source)),
+        ...JSON.parse(JSON.stringify(selectedLessonHorse)),
         id: uid(),
         owner: 'Your Stable',
         isLeased: true,
-        leaseSourceId: source.id,
-        leaseLocked: true,
-        feedPlan: source.feedPlan || [],
-        turnoutAssignmentHours: source.turnoutAssignmentHours || 0
+        leaseSourceId: selectedLessonHorse.id,
+        leaseLocked: true
       };
       app.horses.push(leasedHorse);
-      pushReport(`Leased ${source.name}. Leased horses can train/show but feed/tack/turnout are locked.`);
-      renderBarn();
+      pushReport(`Leased ${selectedLessonHorse.name}. Leased horses can train/show but feed/tack/turnout are locked.`);
+      render();
     };
   }
 
@@ -5939,12 +6055,13 @@ function renderBarn() {
         const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardOne);
         if (!barn) return;
         const horseId = wrap.querySelector(`[data-board-horse='${barn.id}']`)?.value;
-        const horse = app.horses.find((h) => h.id === horseId);
+        const horse = horsesIncludingLessons().find((h) => h.id === horseId);
         if (!horse) return;
         const moveCost = transportCost(currentCountry, barn.country);
         if (!tryCharge(moveCost + barn.boardPerHorse)) return;
         app.currentBarn = { ...barn };
         horse.boardingBarnId = barn.id;
+        ensureLessonRosterForBarn(app.currentBarn, true);
         pushReport(`${horse.name} boarded at ${barn.name}. Fees paid: ${money(moveCost + barn.boardPerHorse)}.`);
         refreshBarnShows();
         renderBarn();
@@ -5960,6 +6077,7 @@ function renderBarn() {
         if (!tryCharge(total)) return;
         app.currentBarn = { ...barn };
         privateHorses.forEach((h) => { h.boardingBarnId = barn.id; });
+        ensureLessonRosterForBarn(app.currentBarn, true);
         pushReport(`All horses boarded at ${barn.name}. Fees paid: ${money(total)}.`);
         refreshBarnShows();
         renderBarn();
@@ -5967,496 +6085,15 @@ function renderBarn() {
     });
   };
 
-  const refreshBtn = document.getElementById('barn-refresh-list');
-  if (refreshBtn) {
-    refreshBtn.onclick = () => {
-      const refreshed = refreshBarnCatalog(false);
-      if (!refreshed) {
-        alert('Barn list can be refreshed once every 4 months.');
-      }
-      renderCatalogList();
-    };
-  }
-  document.getElementById('barn-filter-country')?.addEventListener('change', renderCatalogList);
+  document.getElementById('barn-filter-country').onchange = renderCatalogList;
+  document.getElementById('barn-refresh-list').onclick = () => {
+    const refreshed = refreshBarnCatalog(true);
+    if (refreshed) pushReport('Barn catalog refreshed manually.');
+    renderCatalogList();
+  };
   renderCatalogList();
 }
 
-function renderBreeding() {
-  const broodmares = app.horses.filter((h) => h.gender === 'Mare' && h.retiredToBreeding && !h.retiredForever);
-  const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
-
-  document.getElementById('breeding').innerHTML = `
-    <h2>Breeding Barn</h2>
-    <div class='grid two'>
-      <div class='box'>
-        <h3>Breeding Status</h3>
-        ${broodmares.length ? broodmares.map((m) => `<p>${m.name}: Pregnant ${m.pregnantBy || m.pregnantEmbryo ? 'Y' : 'N'}${m.pregnantBy || m.pregnantEmbryo ? ` (${m.gestation || 0} month(s))` : ''}</p>`).join('') : '<p class="small">No mares retired to breeding.</p>'}
-        <p class='small'>Only retired-to-breeding mares can carry pregnancies.</p>
-      </div>
-      <div class='box'>
-        <h3>Offspring Records</h3>
-        <button id='toggle-offspring'>${app.showOffspringWindow ? 'Close Window' : 'Open Window'}</button>
-        ${app.showOffspringWindow ? (() => {
-          const unique = new Map();
-          app.horses.forEach((h) => {
-            h.offspring.forEach((o) => {
-              const key = o.foalId || `${o.name}-${o.otherParentName}`;
-              if (!unique.has(key)) unique.set(key, o);
-            });
-          });
-          const rows = Array.from(unique.values()).map((o) => `<p>${o.name} — ${o.otherParentRole}: ${o.otherParentName} • Age ${o.age}</p>`).join('');
-          return rows || '<p class="small">No offspring records yet.</p>';
-        })() : '<p class="small">Offspring window closed.</p>'}
-      </div>
-    </div>
-  `;
-
-  document.getElementById('toggle-offspring').onclick = () => {
-    app.showOffspringWindow = !app.showOffspringWindow;
-    renderBreeding();
-  };
-}
-
-function registryInspectionScore(horse) {
-  const conformationMap = {
-    'Very Bad': 2,
-    Bad: 4,
-    Acceptable: 6,
-    Good: 7.5,
-    'Very Good': 8.5,
-    Excellent: 9.5
-  };
-  const conditionMap = {
-    'Very Underweight': 2,
-    Underweight: 4,
-    Moderate: 9.5,
-    Fleshy: 6.5,
-    Overweight: 3
-  };
-  const purityScore = Math.max(1, Math.min(10, breedPurityPercent(horse.breed) / 10));
-  const potentialAvg = Object.values(horse.potential || {}).reduce((a, b) => a + b, 0) / 4;
-  const potentialScore = Math.max(1, Math.min(10, potentialAvg / 10));
-  const conformationScore = conformationMap[horse.conformation] || 4;
-  const conditionScore = conditionMap[horse.weightStatus] || 5;
-  const isSportCross = isSportCrossHorse(horse);
-  const scoreParts = isSportCross
-    ? [conformationScore, conditionScore, potentialScore]
-    : [conformationScore, conditionScore, purityScore, potentialScore];
-  const totalScore = scoreParts.reduce((a, b) => a + b, 0) / scoreParts.length;
-  return { conformationScore, conditionScore, pedigreeScore: isSportCross ? null : purityScore, potentialScore, totalScore, isSportCross };
-}
-
-function runRegistryInspection(horse, registryKey = '') {
-  if (!horse) return null;
-  if (!['Mare', 'Stallion'].includes(horse.gender)) {
-    alert('Only mares and stallions can participate in inspections.');
-    return null;
-  }
-  if (horse.registryInspection) {
-    alert('This horse already completed an inspection.');
-    return null;
-  }
-  const scores = registryInspectionScore(horse);
-  let result = 'Fail';
-  let title = '';
-  if (scores.totalScore >= 9.5) {
-    result = 'Elite';
-    title = 'Elite';
-  } else if (scores.totalScore >= 8) {
-    result = 'Golden';
-    title = 'Golden';
-  } else if (scores.totalScore >= 5) {
-    result = 'Pass';
-  }
-  const registryName = registryKey || horse.breed;
-  const branding = result === 'Pass' || result === 'Golden' || result === 'Elite' ? BREED_BRANDINGS[registryName] : '';
-  let placement = '';
-  if (branding) {
-    const placementInput = prompt(`Congratulations, ${horse.name} has received branding. Please choose its placing (Beginning/End).`, 'Beginning');
-    placement = placementInput && placementInput.toLowerCase().includes('end') ? 'End' : 'Beginning';
-  }
-  horse.registryInspection = {
-    date: dateLabel(),
-    conformation: scores.conformationScore,
-    condition: scores.conditionScore,
-    pedigree: scores.pedigreeScore,
-    potential: scores.potentialScore,
-    totalScore: scores.totalScore,
-    result,
-    title,
-    branding,
-    placement,
-    registry: registryName
-  };
-  updateHorseTitles(horse);
-  horse.showInspectionDetails = true;
-  if (branding) {
-    alert(`Congratulations, ${horse.name} has received branding ${branding}.`);
-  } else {
-    alert(`${horse.name} did not receive branding.`);
-  }
-  pushReport(`${horse.name} registry inspection result: ${result} (${scores.totalScore.toFixed(2)}).`);
-  return horse.registryInspection;
-}
-
-function renderRegistries() {
-  const registryList = [...BREEDS, 'Sport Cross'];
-  const groups = registryList.map((breed) => {
-    const horses = breed === 'Sport Cross'
-      ? app.horses.filter((h) => h && isSportCrossHorse(h))
-      : app.horses.filter((h) => h && h.breed === breed);
-    const prefix = BREED_BRANDINGS[breed] || breed.split(' ').map((w) => w[0]).join('');
-    const norms = breedNorms(breed);
-    return { breed, prefix, horses, norms };
-  });
-
-  document.getElementById('registries').innerHTML = `
-    <h2>Studbooks & Registries</h2>
-    <div class='cards'>
-      ${groups.map((g) => `
-        <div class='box'>
-          <h3>${g.breed} Registry (${g.prefix})</h3>
-          <p>Registered Horses: ${g.horses.length}</p>
-          ${g.norms ? `<p class='small'>Norms: ${g.norms.minHeight.toFixed(1)}-${g.norms.maxHeight.toFixed(1)} hh • Main Potential: ${g.norms.mainPotential}</p>` : ''}
-          <label>Horse</label>
-          <select data-reg='${g.breed}' data-role='horse'>
-            ${g.horses.filter((h) => ['Mare', 'Stallion'].includes(h.gender) && !h.retiredForever).map((h) => `
-              <option value='${h.id}' ${h.registryInspection ? 'disabled' : ''}>${horseDisplayName(h)}${h.registryInspection ? ' (inspected)' : ''}</option>
-            `).join('') || '<option disabled>No eligible horses</option>'}
-          </select>
-          <button data-reg='${g.breed}' data-action='inspect'>Join Inspection</button>
-          <button data-reg='${g.breed}' data-action='riding'>Join Riding Test</button>
-          <button data-reg='${g.breed}' data-action='expo'>Join Breed Expo</button>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  document.querySelectorAll('#registries button[data-reg]').forEach((btn) => {
-    btn.onclick = () => {
-      const breed = btn.dataset.reg;
-      const horses = breed === 'Sport Cross'
-        ? app.horses.filter((h) => h && isSportCrossHorse(h) && !h.retiredForever)
-        : app.horses.filter((h) => h && h.breed === breed && !h.retiredForever);
-      if (!horses.length) return alert(`No eligible ${breed} horses.`);
-      const select = document.querySelector(`#registries select[data-reg='${breed}']`);
-      const selectedId = select?.value;
-      const selectedHorse = app.horses.find((h) => h.id === selectedId);
-      const winner = horses.sort((a, b) => horseWorth(b) - horseWorth(a))[0];
-      const action = btn.dataset.action;
-      if (action === 'inspect') {
-        if (!selectedHorse) return alert('No eligible horse selected.');
-        runRegistryInspection(selectedHorse, breed);
-      }
-      if (action === 'riding') {
-        if (!canCompeteUnderSaddle(winner)) {
-          pushReport(`${winner.name} is under age 3 and can only do in-hand registry events right now.`);
-        } else {
-          pushReport(`${winner.name} completed ${breed} riding test and gained registry points.`);
-        }
-      }
-      if (action === 'expo') pushReport(`${winner.name} represented your stable at the ${breed} breed expo.`);
-      render();
-    };
-  });
-}
-
-function renderBreeders() {
-  document.getElementById('breeders').innerHTML = `
-    <h2>Breeders' Show</h2>
-    <div class='box'>
-      <label>Horse</label>
-      <select id='breed-horse'>${app.horses.filter((h) => !h.retiredForever).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
-      <button id='enter-breeder'>Enter Horse ($100)</button>
-      <p class='small'>Foals/youngsters under 3 enter in-hand classes only. At 3+, they may continue here and also compete under saddle. Each horse may enter 4 times per month.</p>
-    </div>
-  `;
-
-  document.getElementById('enter-breeder').onclick = () => {
-    const horse = app.horses.find((h) => h.id === document.getElementById('breed-horse').value);
-    if (!horse || !tryCharge(100)) return;
-    if ((horse.breedersEntries || 0) >= 4) {
-      alert('Horse already entered 4 times this month.');
-      app.money += 100;
-      return;
-    }
-    horse.breedersEntries = (horse.breedersEntries || 0) + 1;
-    const conf = CONFORMATION_MULT[horse.conformation] * 32;
-    const worthInfluence = horseWorth(horse) / 1400;
-    const talentBoost = horse.extraPotential ? 4 : 0;
-    const score = Math.round(conf + worthInfluence + talentBoost + rnd(20, 40));
-    const placing = score > 93 ? 1 : score > 88 ? 2 : score > 82 ? 3 : rnd(4, 20);
-    const payout = placing === 1 ? 1500 : placing === 2 ? 900 : placing === 3 ? 500 : 120;
-    app.money += payout;
-    horse.earnings += payout;
-    if (placing <= 3) horse.topWins.breed += 1;
-    if (placing === 1) horse.topWins.overall += 1;
-    const showType = canCompeteUnderSaddle(horse) ? 'under-saddle or in-hand' : 'in-hand';
-    pushReport(`Breeders' Show (${showType}): ${horse.name} scored ${score}, placed #${placing}, won ${money(payout)}.`);
-    render();
-  };
-}
-
-function renderFreezer() {
-  document.getElementById('freezer').innerHTML = `
-    <h2>Freezer</h2>
-    <div class='grid two'>
-      <div class='box'>
-        <h3>Semen Straws</h3>
-        ${app.semenStraws.map((s) => `<p class='small'>${s.stallionName} • Straw #${s.id}</p>`).join('') || '<p class="small">No straws stored.</p>'}
-      </div>
-      <div class='box'>
-        <h3>Embryos</h3>
-        ${app.embryos.map((e) => `<p class='small'>${e.donor} x ${e.sire} • Embryo #${e.id}</p>`).join('') || '<p class="small">No embryos stored.</p>'}
-      </div>
-    </div>
-  `;
-}
-
-function renderRescue() {
-  const cards = app.rescueHorses.map((h) => `
-    <div class='box'>
-      <h3>${h.name}</h3>
-      <p>Age Range: ${h.ageLabel}</p>
-      <p>Breed: ${h.breed}</p>
-      <p>Gender: ${h.gender}</p>
-      <p>Health: ${h.issues.length ? `${h.issues.length} issue(s)` : 'No known injury'}</p>
-      <p>${h.isGreen ? 'Green horse (needs behavior 500 before riding).' : 'Already started under saddle.'}</p>
-      <p>Months Left: ${Math.max(1, h.deadlineMonthIndex - currentMonthIndex())}</p>
-      <p>Price: ${money(h.price)}</p>
-      <p class='small'>Note: ${h.note}</p>
-      <button data-rescue='${h.id}'>Adopt Rescue</button>
-    </div>
-  `).join('') || '<p class="small">No rescue horses available.</p>';
-
-  document.getElementById('rescue').innerHTML = `
-    <p class='small'>Rescue horses are in poor condition and take longer to recover. Bonding will be tougher at first.</p>
-    <div class='cards'>${cards}</div>
-  `;
-
-  document.querySelectorAll('#rescue button[data-rescue]').forEach((btn) => {
-    btn.onclick = () => {
-      const rescue = app.rescueHorses.find((h) => h.id === btn.dataset.rescue);
-      if (!rescue || !tryCharge(rescue.price)) return;
-      const horse = baseHorse('untrained');
-      horse.name = rescue.name;
-      horse.age = rescue.age;
-      horse.breed = rescue.breed;
-      horse.gender = rescue.gender;
-      horse.weightStatus = rescue.weightStatus;
-      horse.mood = rnd(1, 100) <= 95 ? pick(['Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy']) : horse.mood;
-      horse.isRescue = true;
-      horse.bond = rnd(-50, -1);
-      horse.rescueWeightDelay = rescue.rescueWeightDelay;
-      horse.rescueWeightCooldown = rescue.rescueWeightDelay;
-      horse.hiddenIllnesses = rescue.issues || [];
-      horse.requiresBreakingIn = rescue.isGreen || false;
-      if (horse.requiresBreakingIn) horse.behavior = rnd(0, 220);
-      if ((rescue.issues || []).some((issue) => issue.name === 'Kissing Spines')) horse.unridable = true;
-      app.horses.push(horse);
-      app.rescueHorses = app.rescueHorses.filter((r) => r.id !== rescue.id);
-      refreshRescueHorses();
-      pushReport(`Adopted rescue horse ${horse.name} for ${money(rescue.price)}.`);
-      render();
-    };
-  });
-}
-
-function injuryChanceByGenetics(horse) {
-  if (horse.healthGenetics === 'Low') return 8;
-  if (horse.healthGenetics === 'High') return 3;
-  return 5;
-}
-
-function pickIllnessWithModifiers(horse) {
-  const wrongFeedMonths = horse.wrongFeedMonthsYear || 0;
-  const baseWeights = SICKNESS_TYPES.map((entry) => ({ entry, weight: 1 }));
-  if (wrongFeedMonths > 5) {
-    baseWeights.forEach((item) => {
-      if (item.entry.name === 'Colic') item.weight *= 1.5;
-      if (item.entry.name === 'Metabolic Flare') item.weight *= 1.75;
-    });
-  }
-  const total = baseWeights.reduce((sum, item) => sum + item.weight, 0);
-  let roll = Math.random() * total;
-  for (const item of baseWeights) {
-    roll -= item.weight;
-    if (roll <= 0) return item.entry;
-  }
-  return SICKNESS_TYPES[0];
-}
-
-function addIllness(horse, illness) {
-  if (!illness) return;
-  const remaining = injuryRecoveryMonths(illness.severity);
-  const isSevere = ['Severe', 'Very Severe'].includes(illness.severity) || remaining > 2;
-  const lastSevere = horse.injuryProtection?.[illness.name];
-  if (isSevere && lastSevere && currentMonthIndex() - lastSevere <= 24) {
-    if (rnd(1, 100) <= 90) return;
-  }
-  const surgeryRoll = illness.surgeryRisk ? rnd(1, 100) : 0;
-  if (illness.surgeryRisk && surgeryRoll <= illness.surgeryRisk) {
-    const died = rnd(1, 100) <= Math.min(90, illness.surgeryRisk + 10);
-    if (died) {
-      horse.deceased = true;
-      pushReport(`${horse.name} suffered ${illness.name} and did not survive surgery.`);
-      return;
-    }
-  }
-  horse.illnesses.push({
-    name: illness.name,
-    impact: illness.impact,
-    remaining,
-    active: true,
-    severity: illness.severity,
-    retirementRisk: illness.retirementRisk || 0
-  });
-  applySoundnessLoss(horse, illness.severity);
-  const controlLoss = illness.severity === 'Easy' ? rnd(5, 10)
-    : illness.severity === 'Medium' ? rnd(10, 15)
-      : illness.severity === 'More Than Medium' ? rnd(15, 25)
-        : rnd(25, 45);
-  horse.controlability = clamp((horse.controlability || 0) - controlLoss, 0, 100);
-  if (isSevere) {
-    horse.injuryProtection[illness.name] = currentMonthIndex();
-  }
-  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
-  pushReport(`${horse.name} developed ${illness.name} (${illness.severity}). Recovery ${remaining} month(s).`);
-}
-
-function maybeAddOvertrainingInjury(horse) {
-  if (horse.illnesses.some((i) => i.active)) return;
-  const count = horse.overTrainingCountYear || 0;
-  if (!horse.pendingOvertrainingInjury || count < 4) return;
-  if (count >= 8) {
-    addIllness(horse, { name: 'Broken Leg', impact: 28, severity: pick(['More Than Medium', 'Severe']), surgeryRisk: 25, retirementRisk: 25 });
-    horse.pendingOvertrainingInjury = false;
-    return;
-  }
-  addIllness(horse, { name: 'Lameness', impact: 10, severity: pick(['Easy', 'Medium']), surgeryRisk: 0, retirementRisk: 0 });
-  horse.pendingOvertrainingInjury = false;
-}
-
-function maybeAddRandomIllness(horse) {
-  if (horse.illnesses.some((i) => i.active)) return;
-  const jointSupportBonus = horse.hasJointSupport ? 0.6 : 1;
-  if (rnd(1, 100) <= injuryChanceByGenetics(horse) * jointSupportBonus) {
-    const picked = pickIllnessWithModifiers(horse);
-    addIllness(horse, picked);
-  }
-}
-
-function applySoundnessWear(horse) {
-  if (horse.retiredForever || horse.retiredToBreeding) return;
-  if (horse.soundnessYears > 0) {
-    horse.soundnessExpiredMonths = 0;
-    return;
-  }
-  horse.soundnessExpiredMonths = (horse.soundnessExpiredMonths || 0) + 1;
-  if (horse.unridable) return;
-  if (horse.soundnessExpiredMonths >= 24) {
-    horse.unridable = true;
-    horse.retiredForever = true;
-    horse.illnesses.push({
-      name: 'Kissing Spines',
-      impact: 45,
-      remaining: 999,
-      active: true,
-      severity: 'Very Severe',
-      retirementRisk: 100
-    });
-    pushReport(`${horse.name} developed kissing spines after extended competition and is now unridable.`);
-    return;
-  }
-  if (horse.illnesses.some((i) => i.active)) return;
-  const monthsSinceIssue = currentMonthIndex() - (horse.lastSoundnessIssueMonth || 0);
-  if (monthsSinceIssue < 6) return;
-  const isLongTerm = horse.soundnessExpiredMonths >= 12;
-  const remaining = isLongTerm ? rnd(3, 6) : 1;
-  horse.illnesses.push({
-    name: isLongTerm ? 'Soundness Breakdown' : 'Soundness Strain',
-    impact: isLongTerm ? 18 : 6,
-    remaining,
-    active: true,
-    severity: isLongTerm ? 'Severe' : 'Easy',
-    retirementRisk: isLongTerm ? 12 : 0
-  });
-  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
-  horse.lastSoundnessIssueMonth = currentMonthIndex();
-  pushReport(`${horse.name} developed ${isLongTerm ? 'a soundness breakdown' : 'a soundness strain'} (${remaining} month recovery).`);
-}
-
-function processPregnancy(horse, newborns) {
-  if (!(horse.pregnantBy || horse.pregnantEmbryo)) return;
-  horse.gestation = (horse.gestation || 0) + 1;
-  const due = horse.foalDue || 11;
-  if (horse.gestation >= due) {
-    const foal = baseHorse('untrained');
-    foal.age = 0;
-    const embryo = horse.pregnantEmbryo;
-    const damHorse = embryo?.donorId ? app.horses.find((x) => x.id === embryo.donorId) : horse;
-    const damName = damHorse?.name || horse.name;
-    const sireName = horse.pregnantBy || embryo?.sire || 'Unknown Sire';
-    const sireHorse = embryo?.sireId
-      ? app.horses.find((x) => x.id === embryo.sireId)
-      : app.horses.find((x) => x.name === sireName && x.gender === 'Stallion');
-    foal.breed = sireHorse && damHorse && sireHorse.breed !== damHorse.breed
-      ? `${damHorse.breed} 50% x ${sireHorse.breed} 50%`
-      : (damHorse?.breed || horse.breed);
-    foal.height = heightFromBreed(foal.breed);
-    applyBreedTraits(foal);
-    const rawFoalName = `Foal of ${damName}`;
-    const code = (app.settings?.breedingCode || '').trim();
-    if (code) {
-      foal.name = app.settings?.breedingCodePosition === 'end' ? `${rawFoalName} ${code}` : `${code} ${rawFoalName}`;
-    } else {
-      foal.name = rawFoalName;
-    }
-    foal.bredBy = 'Your Stable';
-    foal.owner = 'Your Stable';
-    foal.requiresBreakingIn = true;
-    foal.behavior = Math.min(foal.behavior || 0, 120);
-    foal.gender = pick(['Mare', 'Stallion']);
-    foal.potential = foalPotential(damHorse, sireHorse);
-    foal.extraPotential = inheritExtraPotential(damHorse, sireHorse);
-    if (foal.extraPotential) {
-      Object.keys(foal.potential).forEach((k) => {
-        foal.potential[k] = Math.min(100, foal.potential[k] + rnd(3, 8));
-      });
-    }
-    const damTrait = damHorse?.personality || pick(PERSONALITIES);
-    const sireTrait = sireHorse?.personality || pick(PERSONALITIES);
-    foal.personality = rnd(1, 100) <= 45 ? damTrait : rnd(1, 100) <= 60 ? sireTrait : pick(PERSONALITIES);
-    foal.socks = pick(SOCKS);
-    foal.faceMarking = pick(FACE_MARKINGS);
-    foal.marking = randomMarking(foal.breed);
-    foal.pedigree = {
-      sire: sireHorse ? { id: sireHorse.id, name: sireHorse.name, breed: sireHorse.breed, coat: sireHorse.coat } : { name: sireName, breed: sireHorse?.breed || 'Unknown', coat: sireHorse?.coat || 'Unknown' },
-      dam: damHorse ? { id: damHorse.id, name: damHorse.name, breed: damHorse.breed, coat: damHorse.coat } : { name: damName, breed: damHorse?.breed || 'Unknown', coat: damHorse?.coat || 'Unknown' },
-      sireSire: sireHorse?.pedigree?.sire || null,
-      sireDam: sireHorse?.pedigree?.dam || null,
-      damSire: damHorse?.pedigree?.sire || null,
-      damDam: damHorse?.pedigree?.dam || null
-    };
-    ensurePedigreeBase(foal);
-    foal.stats.dressage = { Collection: 0, Balance: 0, Connection: 0, Gaits: 0, Rhythm: 0, Flowiness: 0 };
-    foal.stats.jumping = { Striding: 0, Confidence: 0, Balance: 0, Power: 0, Speed: 0, Structure: 0 };
-    if (damHorse) {
-      damHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Sire', otherParentName: sireName, age: foal.age });
-      updateHorseTitles(damHorse);
-    }
-    if (sireHorse) {
-      sireHorse.offspring.push({ foalId: foal.id, name: foal.name, otherParentRole: 'Dam', otherParentName: damName, age: foal.age });
-      updateHorseTitles(sireHorse);
-    }
-    newborns.push(foal);
-    delete horse.pregnantBy;
-    delete horse.pregnantEmbryo;
-    horse.gestation = 0;
-    horse.foalDue = 0;
-    pushReport(`${horse.name} foaled successfully: ${foal.name}.`);
-  }
-}
 
 function processAgingAndMortality(horse) {
   if (horse.age < 25) return false;
@@ -6513,27 +6150,27 @@ function monthlyProgress() {
     h.managed = { fed: false, vet: false, farrier: !h.due.farrier, showEntry: false, breedersEntry: false, trained: false };
     h.breedersEntries = 0;
     h.offspring.forEach((o) => { if (app.month === 1) o.age += 1; });
+    if ((app.currentBarn?.careStars || 3) > 3) {
+      if (h.autoStallCleaning) h.stallCleanliness = clamp((h.stallCleanliness || 65) + 8, 0, 100);
+      if (h.autoGrooming) h.dailyGrooming = clamp((h.dailyGrooming || 65) + 8, 0, 100);
+    }
     updateMonthlyCare(h);
     updateBondMonthly(h);
     h.barnActivityQuality = 0;
-    const lessonStars = app.currentBarn?.lessonsStars || 3;
-    const lessonAvailBase = lessonStars === 1 ? 35 : lessonStars === 2 ? 45 : lessonStars === 3 ? 55 : lessonStars === 4 ? 65 : 75;
-    h.barnAvailabilityPercent = h.owner === 'Your Stable' ? 100 : clamp(lessonAvailBase + rnd(-5, 10), 35, 85);
-    h.barnAvailable = rnd(1, 100) <= h.barnAvailabilityPercent;
-    const replaceChance = h.lessonReplacedYear === app.year ? 6 : 15;
-    if (h.owner !== 'Your Stable' && !h.isLeased && rnd(1, 100) <= replaceChance) {
-      const replacement = baseHorse('trained', 'npc');
-      replacement.owner = h.owner;
-      replacement.lessonReplacedYear = app.year;
-      replacement.barnAvailabilityPercent = h.barnAvailabilityPercent;
-      replacement.barnAvailable = h.barnAvailable;
-      Object.assign(h, replacement);
-    }
     maybeAddOvertrainingInjury(h);
     resolvePendingCompetitions(h);
     if (!processAgingAndMortality(h)) survivors.push(h);
   });
   app.horses = survivors.concat(newborns);
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    roster.forEach((h) => {
+      resolvePendingCompetitions(h);
+      h.trainingSessionsThisMonth = 0;
+      h.handTrainingSessionsThisMonth = 0;
+      h.showEntriesThisMonth = 0;
+    });
+  });
   const boardedHorses = app.horses.filter((h) => !h.retiredForever).length;
   const monthlyBoard = (app.currentBarn?.boardPerHorse || 0) * boardedHorses;
   if (monthlyBoard > 0) {
@@ -6541,12 +6178,11 @@ function monthlyProgress() {
     pushReport(`Monthly board paid at ${app.currentBarn.name}: ${money(monthlyBoard)} (${boardedHorses} horse(s)).`);
   }
   refreshBarnShows();
+  ensureLessonRosterForBarn(app.currentBarn, true);
   app.closedReminderIds = [];
   refreshNpcAds();
   refreshRescueHorses();
 }
-
-
 
 
 function reminderDueThisMonth(reminder) {
@@ -6596,14 +6232,14 @@ function renderCalendar() {
     <div class='box'>
       <h3>Upcoming Horse Shows</h3>
       ${shows.map((show) => {
-        const tCost = transportCost(app.currentBarn?.country, show.country);
+        const tCost = showTransportFee(show);
         return `<div class='box'>
           <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
           <p class='small'><strong>Show Fee:</strong> ${money(show.fee)} | <strong>Transport Fee:</strong> ${money(tCost)}</p>
           <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
           <label>Horse</label>
           <select data-show-horse='${show.id}'>
-            ${app.horses.filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+            ${horsesIncludingLessons().filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
           </select>
           <button data-show-signup='${show.id}'>Sign Up</button>
         </div>`;
@@ -6645,14 +6281,19 @@ function renderCalendar() {
       const show = shows.find((s) => s.id === btn.dataset.showSignup);
       if (!show) return;
       const horseId = document.querySelector(`[data-show-horse='${show.id}']`)?.value;
-      const horse = app.horses.find((h) => h.id === horseId);
+      const horse = horsesIncludingLessons().find((h) => h.id === horseId);
       if (!horse) return alert('Select a horse first.');
-      const tCost = transportCost(app.currentBarn?.country, show.country);
+      const tCost = showTransportFee(show);
       const total = show.fee + tCost;
       if (!tryCharge(total)) return;
       registerShowEntry(horse, show.discipline, show.level);
       pushReport(`${horse.name} signed up for ${cap(show.discipline)} at ${show.barnName}. Fees paid: ${money(total)}.`);
-      renderCalendar();
+      if (app.settings?.competitionMode === 'rpg' && app.competitionRpg) {
+        changeTab('shows');
+        renderShows();
+      } else {
+        renderCalendar();
+      }
     };
   });
 }
