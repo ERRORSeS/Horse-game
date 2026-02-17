@@ -135,12 +135,15 @@ const app = {
   settings: {
     barnName: 'Oxer to Oxer Stable Manager',
     breedingCode: '',
-    breedingCodePosition: 'front'
+    breedingCodePosition: 'front',
+    trainingMode: 'rpg',
+    competitionMode: 'rpg'
   },
   showOffspringWindow: true,
   trainingSelection: { horseId: '', discipline: 'jumping', exercise: '' },
   trainingRpgConfig: { walk: 1, trot: 1, canter: 1, discipline: 1, coolDown: 2 },
   trainingRpg: null,
+  competitionRpg: null,
   trainingRpgFeedback: '',
   trainingRpgSummary: null,
   selectedHorseId: '',
@@ -192,6 +195,107 @@ const COMPETITION_RANDOM_EVENTS = [
   { key: 'funny', text: 'A funny snort-and-headshake moment boosts morale.', mod: 6 },
   { key: 'breakthrough', text: 'A rare breakthrough: perfect rider-horse sync.', mod: 14 }
 ];
+
+const COMPETITION_RPG_VARIANTS = {
+  jumping: [
+    {
+      title: 'Approach (Balanced)',
+      scene: 'You turn toward the first fence. The horse feels focused and slightly forward to a vertical.',
+      options: [
+        { label: 'Maintain rhythm and keep soft contact.', success: 85, neutral: 10, fail: 5 },
+        { label: 'Half-halt to shorten stride slightly.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Ride forward and trust the pace.', success: 70, neutral: 20, fail: 10 },
+        { label: 'Circle and re-approach.', success: 80, neutral: 15, fail: 5 }
+      ]
+    },
+    {
+      title: 'Stride Count Decision',
+      scene: 'Distance to the next fence appears as a classic line. The horse starts to lengthen.',
+      options: [
+        { label: 'Collect to fit balanced strides.', success: 80, neutral: 15, fail: 5 },
+        { label: 'Allow forward pace and jump out of stride.', success: 65, neutral: 25, fail: 10 },
+        { label: 'Add a calming half-halt early.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Hesitate and adjust late.', success: 55, neutral: 25, fail: 20 }
+      ]
+    },
+    {
+      title: 'High Risk Moment',
+      scene: 'After landing, the horse surges and balance gets fragile for the next line.',
+      options: [
+        { label: 'Deep seat + strong half-halt.', success: 65, neutral: 20, fail: 15 },
+        { label: 'Circle away and reset line.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Commit and jump from a forward stride.', success: 50, neutral: 25, fail: 25 },
+        { label: 'Pull hard to stop.', success: 55, neutral: 20, fail: 25 }
+      ]
+    }
+  ],
+  dressage: [
+    {
+      title: 'Centerline Entry',
+      scene: 'You enter and the horse is attentive but alert to the crowd.',
+      options: [
+        { label: 'Maintain steady rhythm and straight line.', success: 85, neutral: 10, fail: 5 },
+        { label: 'Half-halt to settle nerves.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Allow forward energy for confidence.', success: 70, neutral: 20, fail: 10 },
+        { label: 'Reset mentally before committing.', success: 80, neutral: 15, fail: 5 }
+      ]
+    },
+    {
+      title: 'Advanced Movement',
+      scene: 'You ask for a difficult movement and tension starts to rise.',
+      options: [
+        { label: 'Support softly and keep rhythm.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Simplify then re-ask.', success: 80, neutral: 15, fail: 5 },
+        { label: 'Continue despite minor errors.', success: 65, neutral: 20, fail: 15 },
+        { label: 'Strategically skip to protect score.', success: 90, neutral: 10, fail: 0 }
+      ]
+    }
+  ],
+  eventing: [
+    {
+      title: 'Dressage Start',
+      scene: 'You enter phase one; the horse is willing but watchful of atmosphere.',
+      options: [
+        { label: 'Prioritize straightness and rhythm.', success: 85, neutral: 10, fail: 5 },
+        { label: 'Half-halt and settle.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Allow expression and forward energy.', success: 70, neutral: 20, fail: 10 },
+        { label: 'Reset and re-approach the movement.', success: 80, neutral: 15, fail: 5 }
+      ]
+    },
+    {
+      title: 'Cross-country Question',
+      scene: 'A water complex comes up and the horse raises the head, unsure.',
+      options: [
+        { label: 'Ride forward with consistent rhythm.', success: 70, neutral: 20, fail: 10 },
+        { label: 'Slow slightly and reassure.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Circle and retry.', success: 85, neutral: 10, fail: 5 },
+        { label: 'Take safer route and accept penalties.', success: 90, neutral: 10, fail: 0 }
+      ]
+    }
+  ],
+  hunter: [
+    {
+      title: 'First Approach',
+      scene: 'The first line rides flowing, but the horse is curious about the ring.',
+      options: [
+        { label: 'Maintain steady hunter rhythm.', success: 85, neutral: 10, fail: 5 },
+        { label: 'Half-halt lightly for balance.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Allow slight forward pace.', success: 70, neutral: 20, fail: 10 },
+        { label: 'Circle once and re-approach.', success: 80, neutral: 15, fail: 5 }
+      ]
+    },
+    {
+      title: 'Stride Line',
+      scene: 'Distance reads as a hunter six-stride, but the horse feels strong after landing.',
+      options: [
+        { label: 'Maintain rhythm for natural six.', success: 80, neutral: 15, fail: 5 },
+        { label: 'Collect slightly and add one.', success: 75, neutral: 15, fail: 10 },
+        { label: 'Ride forward and leave one out.', success: 65, neutral: 20, fail: 15 },
+        { label: 'Adjust late near the fence.', success: 55, neutral: 25, fail: 20 }
+      ]
+    }
+  ]
+};
 
 const TRAINING_OPTION_LIBRARY = {
   walk: [
@@ -1806,8 +1910,10 @@ function hydrateFromSave(data) {
   app.settings = typeof data.settings === 'object' && data.settings ? {
     barnName: data.settings.barnName || 'Oxer to Oxer Stable Manager',
     breedingCode: data.settings.breedingCode || '',
-    breedingCodePosition: data.settings.breedingCodePosition === 'end' ? 'end' : 'front'
-  } : { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
+    breedingCodePosition: data.settings.breedingCodePosition === 'end' ? 'end' : 'front',
+    trainingMode: data.settings.trainingMode === 'normal' ? 'normal' : 'rpg',
+    competitionMode: data.settings.competitionMode === 'normal' ? 'normal' : 'rpg'
+  } : { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
   app.showOffspringWindow = data.showOffspringWindow !== false;
   app.selectedHorseId = data.selectedHorseId || '';
   app.trainingSelection = typeof data.trainingSelection === 'object' && data.trainingSelection
@@ -1819,6 +1925,7 @@ function hydrateFromSave(data) {
     : { horseId: '', discipline: 'jumping', exercise: '' };
   app.trainingRpgConfig = normalizeTrainingRpgConfig(data.trainingRpgConfig);
   app.trainingRpg = typeof data.trainingRpg === 'object' && data.trainingRpg ? data.trainingRpg : null;
+  app.competitionRpg = typeof data.competitionRpg === 'object' && data.competitionRpg ? data.competitionRpg : null;
   app.trainingRpgFeedback = typeof data.trainingRpgFeedback === 'string' ? data.trainingRpgFeedback : '';
   app.trainingRpgSummary = typeof data.trainingRpgSummary === 'object' && data.trainingRpgSummary ? data.trainingRpgSummary : null;
   app.showSelections = typeof data.showSelections === 'object' && data.showSelections ? data.showSelections : {};
@@ -1988,11 +2095,12 @@ function resetGame() {
   app.reports = [];
   app.competitionReports = [];
   app.rescueHorses = [];
-  app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
+  app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
   app.trainingRpgConfig = defaultTrainingRpgConfig();
   app.trainingRpg = null;
+  app.competitionRpg = null;
   app.trainingRpgFeedback = '';
   app.trainingRpgSummary = null;
   app.selectedHorseId = '';
@@ -3775,6 +3883,102 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   };
 }
 
+
+function trainingModeLabel() {
+  return app.settings?.trainingMode === 'normal' ? 'Normal (spam click)' : 'RPG';
+}
+
+function competitionModeLabel() {
+  return app.settings?.competitionMode === 'normal' ? 'Normal (spam click)' : 'RPG';
+}
+
+function applyNormalTrainingSession(horse, discipline, exercise) {
+  const gain = rnd(1, 4);
+  const confidenceGain = rnd(0, 2);
+  if (discipline === 'dressage') {
+    horse.stats.dressage[exercise] = clampSkill(horse, discipline, (horse.stats.dressage[exercise] || 0) + gain);
+  } else if (discipline === 'jumping' || discipline === 'hunter') {
+    horse.stats.jumping[exercise] = clampSkill(horse, discipline, (horse.stats.jumping[exercise] || 0) + gain);
+  } else {
+    if (horse.stats.dressage[exercise] != null) horse.stats.dressage[exercise] = clampSkill(horse, discipline, horse.stats.dressage[exercise] + gain);
+    if (horse.stats.jumping[exercise] != null) horse.stats.jumping[exercise] = clampSkill(horse, discipline, horse.stats.jumping[exercise] + gain);
+  }
+  const confidenceField = discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
+  horse[confidenceField] = clamp((horse[confidenceField] || 50) + confidenceGain, 0, 100);
+  pushReport(`${horse.name} completed normal training in ${cap(discipline)} (${exercise}) and gained +${gain} skill.`);
+}
+
+function buildCompetitionRpgSession(horse, discipline, level) {
+  const phases = competitionInteractionPhases(discipline);
+  return {
+    horseId: horse.id,
+    discipline,
+    level,
+    stepIndex: 0,
+    phases,
+    outcomes: [],
+    modifier: 0,
+    refusalCount: 0,
+    eliminated: false,
+    selectedOption: null,
+    awaitingAdvance: false,
+    feedback: '',
+    courseLength: discipline === 'jumping' ? rnd(6, 12) : rnd(6, 10)
+  };
+}
+
+function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
+  const set = COMPETITION_RPG_VARIANTS[session.discipline] || COMPETITION_RPG_VARIANTS.jumping;
+  const variant = set[session.stepIndex % set.length];
+  const option = variant.options[choiceIndex];
+  const moodMod = moodOutcomeModifier(horse.mood);
+  const personalityMod = personalityOutcomeModifier(horse.personality);
+  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.2);
+  const successChance = clamp(option.success + moodMod + personalityMod + skillMod, 10, 95);
+  const neutralChance = clamp(option.neutral, 3, 70);
+  const failChance = Math.max(1, 100 - successChance - neutralChance);
+  const roll = rnd(1, 100);
+  const outcome = roll <= successChance ? 'success' : roll <= successChance + neutralChance ? 'partial' : 'fail';
+  const stepPhase = session.phases[session.stepIndex % session.phases.length];
+  const mod = outcome === 'success' ? rnd(2, 5) : outcome === 'partial' ? rnd(-1, 2) : rnd(-8, -3);
+  session.modifier += mod;
+  if (outcome === 'fail' && rnd(1, 100) <= 35) session.refusalCount += 1;
+  if (outcome === 'fail' && (session.refusalCount >= 3 || rnd(1, 100) <= 15)) session.eliminated = true;
+  session.outcomes.push({
+    phase: stepPhase,
+    outcome,
+    eventText: variant.title,
+    chances: { success: successChance, partial: neutralChance, fail: failChance }
+  });
+  session.feedback = `${variant.title}: ${outcome.toUpperCase()} (S${successChance}/P${neutralChance}/F${failChance})`;
+  session.awaitingAdvance = true;
+}
+
+function finalizeCompetitionRpgEntry(horse, session) {
+  const interaction = {
+    controls: COMPETITION_CONTROLS,
+    modifier: clamp(session.modifier, -20, 16),
+    phases: session.outcomes,
+    memoryPenalty: competitionMemoryPenalty(horse, session.discipline)
+  };
+  const entry = {
+    id: uid(),
+    discipline: session.discipline,
+    level: session.level,
+    date: dateLabel(),
+    monthIndex: currentMonthIndex(),
+    interaction
+  };
+  horse.pendingCompetitions = horse.pendingCompetitions || [];
+  horse.pendingCompetitions.push(entry);
+  horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
+  const opener = interaction.phases[0] || { phase: 'round start', outcome: 'partial', eventText: 'steady opening' };
+  pushReport(`${horse.name} registered for ${cap(session.discipline)} ${session.level} in ${competitionModeLabel()} mode.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive next month.`);
+  app.competitionRpg = null;
+  saveGame(false);
+}
+
 function registerShowEntry(horse, discipline, level) {
   if (!canCompeteUnderSaddle(horse)) {
     if (horse.unridable) pushReport('This horse is unridable.');
@@ -3791,6 +3995,12 @@ function registerShowEntry(horse, discipline, level) {
   const maxIdx = highestAllowedLevelIndex(horse, discipline);
   if (idx > maxIdx) {
     pushReport(`${horse.name} is not trained enough for ${discipline} ${level}. Max allowed right now: ${SHOW_LEVELS[discipline][maxIdx]}.`);
+    return;
+  }
+  if (app.settings?.competitionMode === 'rpg') {
+    app.competitionRpg = buildCompetitionRpgSession(horse, discipline, level);
+    pushReport(`${horse.name} entered ${cap(discipline)} ${level} in RPG competition mode. Open the Shows tab and press Enter to progress scenes.`);
+    saveGame(false);
     return;
   }
   const interaction = simulateCompetitionRide(horse, discipline, level);
@@ -3856,6 +4066,72 @@ function resolvePendingCompetitions(horse) {
 }
 
 function renderShows() {
+  app.showSelections = app.showSelections || {};
+  const panel = document.getElementById('shows');
+  const activeSession = app.competitionRpg;
+  if (activeSession) {
+    const horse = app.horses.find((h) => h.id === activeSession.horseId);
+    if (!horse) {
+      app.competitionRpg = null;
+      return renderShows();
+    }
+    const variantSet = COMPETITION_RPG_VARIANTS[activeSession.discipline] || COMPETITION_RPG_VARIANTS.jumping;
+    const variant = variantSet[activeSession.stepIndex % variantSet.length];
+    const phase = activeSession.phases[activeSession.stepIndex % activeSession.phases.length] || 'next phase';
+    panel.innerHTML = `
+      <h2>🏆 Competition RPG — ${cap(activeSession.discipline)} (${activeSession.level})</h2>
+      <div class='box'>
+        <p><strong>Horse:</strong> ${horse.name}</p>
+        <p><strong>Mode:</strong> ${competitionModeLabel()}</p>
+        <p><strong>Course:</strong> ${activeSession.courseLength} questions • Difficulty based on selected level.</p>
+        <p><strong>Phase:</strong> ${cap(phase)} (${activeSession.stepIndex + 1}/${activeSession.courseLength})</p>
+        <p><strong>Scene:</strong> ${variant.title} — ${variant.scene}</p>
+        ${activeSession.feedback ? `<p><strong>Last result:</strong> ${activeSession.feedback}</p>` : ''}
+        <p class='small'>Press Enter after each choice to move through approach → stride count → takeoff/landing style scenes.</p>
+        <div id='comp-rpg-options'></div>
+        <div class='inline'>
+          <button id='comp-enter'>Enter</button>
+          <button id='comp-retire'>Retire Round</button>
+        </div>
+      </div>
+    `;
+    const wrap = document.getElementById('comp-rpg-options');
+    variant.options.forEach((opt, idx) => {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.innerHTML = `
+        <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
+        <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
+        <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
+      `;
+      wrap.append(box);
+    });
+    panel.querySelectorAll('[data-comp-opt]').forEach((btn) => {
+      btn.onclick = () => {
+        resolveCompetitionRpgChoice(activeSession, horse, Number(btn.dataset.compOpt));
+        renderShows();
+      };
+    });
+    document.getElementById('comp-enter').onclick = () => {
+      if (!activeSession.awaitingAdvance) {
+        alert('Choose an option first.');
+        return;
+      }
+      activeSession.awaitingAdvance = false;
+      activeSession.stepIndex += 1;
+      if (activeSession.eliminated || activeSession.stepIndex >= activeSession.courseLength) {
+        finalizeCompetitionRpgEntry(horse, activeSession);
+      }
+      renderShows();
+    };
+    document.getElementById('comp-retire').onclick = () => {
+      app.competitionRpg = null;
+      pushReport(`${horse.name} retired before completing the RPG competition round.`);
+      renderShows();
+    };
+    return;
+  }
+
   const shows = [
     { key: 'dressage', names: ['OTO Dressage Show', 'OTO Pony Dressage Show', 'OTO Young Horse Dressage Show'] },
     { key: 'jumping', names: ['OTO Jumping Show', 'OTO Pony Jumping Classic', 'OTO Young Horse Jumping Show'] },
@@ -3863,9 +4139,9 @@ function renderShows() {
     { key: 'hunter', names: ['OTO Hunter Show', 'OTO Pony Hunter Classic', 'OTO Young Horse Hunter Show'] }
   ];
 
-  app.showSelections = app.showSelections || {};
-  document.getElementById('shows').innerHTML = `
+  panel.innerHTML = `
     <h2>Enter Shows</h2>
+    <p class='small'>Competition Mode: <strong>${competitionModeLabel()}</strong>. Change this in Settings.</p>
     ${shows.map((s) => `
       <div class='box'>
         <h3>${cap(s.key)}</h3>
@@ -4311,6 +4587,7 @@ function renderTraining() {
   const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   panel.innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
+    <p class='small'>Training Mode: <strong>${trainingModeLabel()}</strong>. Change this in Settings.</p>
     ${app.trainingRpgSummary ? `<div class='box'><h3>Session Summary</h3>
       <p><strong>${app.trainingRpgSummary.horseName}</strong> — ${cap(app.trainingRpgSummary.discipline)}</p>
       <p>Skill change: ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
@@ -4330,7 +4607,7 @@ function renderTraining() {
         <label>Controlability Work</label><select id='train-control'>
           <option>Flat Work</option><option>Hand Work</option><option>Sensitivity</option><option>Controlability</option><option>Manners</option>
         </select>
-        <button id='do-train'>Train (Interactive)</button>
+        <button id='do-train'>Train (${app.settings?.trainingMode === 'normal' ? 'Normal' : 'Interactive RPG'})</button>
         <button id='do-control-train'>Controlability Session</button>
       </div>
       <div class='box'>
@@ -4436,6 +4713,11 @@ function renderTraining() {
     h.managed.trained = true;
     h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
     h.manualTrainingThisMonth = true;
+    if (app.settings?.trainingMode === 'normal') {
+      applyNormalTrainingSession(h, d, exerciseSelect.value);
+      render();
+      return;
+    }
     app.trainingRpg = buildTrainingRpgSession(h, d, app.trainingRpgConfig);
     renderTraining();
   };
@@ -5105,7 +5387,7 @@ function renderCalendar() {
 }
 
 function renderSettings() {
-  const current = app.settings || { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front' };
+  const current = app.settings || { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
   document.getElementById('settings').innerHTML = `
     <h2>Settings</h2>
     <div class='box'>
@@ -5118,8 +5400,18 @@ function renderSettings() {
         <option value='front' ${current.breedingCodePosition === 'front' ? 'selected' : ''}>Front (Code FoalName)</option>
         <option value='end' ${current.breedingCodePosition === 'end' ? 'selected' : ''}>End (FoalName Code)</option>
       </select>
+      <label>Training System</label>
+      <select id='settings-training-mode'>
+        <option value='rpg' ${current.trainingMode !== 'normal' ? 'selected' : ''}>RPG (prompt-based)</option>
+        <option value='normal' ${current.trainingMode === 'normal' ? 'selected' : ''}>Normal (spam clicking)</option>
+      </select>
+      <label>Competition System</label>
+      <select id='settings-competition-mode'>
+        <option value='rpg' ${current.competitionMode !== 'normal' ? 'selected' : ''}>RPG (press Enter through scenes)</option>
+        <option value='normal' ${current.competitionMode === 'normal' ? 'selected' : ''}>Normal (spam clicking)</option>
+      </select>
       <button id='settings-save'>Save Settings</button>
-      <p class='small'>Barn name updates the top header. Breeding code is auto-applied to newborn foal names.</p>
+      <p class='small'>Barn name updates the top header. Breeding code is auto-applied to newborn foal names. Training/competition mode controls RPG prompts vs normal fast-click sessions.</p>
     </div>
   `;
   const saveBtn = document.getElementById('settings-save');
@@ -5128,7 +5420,9 @@ function renderSettings() {
       app.settings = {
         barnName: (document.getElementById('settings-barn-name').value || '').trim() || 'Oxer to Oxer Stable Manager',
         breedingCode: (document.getElementById('settings-breeding-code').value || '').trim(),
-        breedingCodePosition: document.getElementById('settings-code-position').value === 'end' ? 'end' : 'front'
+        breedingCodePosition: document.getElementById('settings-code-position').value === 'end' ? 'end' : 'front',
+        trainingMode: document.getElementById('settings-training-mode').value === 'normal' ? 'normal' : 'rpg',
+        competitionMode: document.getElementById('settings-competition-mode').value === 'normal' ? 'normal' : 'rpg'
       };
       pushReport('Settings updated.');
       render();
