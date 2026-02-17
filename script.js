@@ -6752,22 +6752,34 @@ window.addEventListener('unhandledrejection', (event) => {
   showFatal(`Unhandled promise rejection: ${reason}`);
 });
 
-try {
-  seed();
-  loadGame(false);
-  ensurePanels();
-  buildTabs();
-  render();
-} catch (error) {
-  console.error('Startup failed', error);
+let didBootstrap = false;
+
+function bootstrap() {
+  if (didBootstrap) return;
+  didBootstrap = true;
   try {
-    resetGame();
+    seed();
+    loadGame(false);
     ensurePanels();
     buildTabs();
     render();
-    pushReport('Startup recovered by resetting invalid state.');
-  } catch (fallbackError) {
-    console.error('Startup fallback failed', fallbackError);
-    showFatal(`${error.message} (fallback failed: ${fallbackError.message})`);
+  } catch (error) {
+    console.error('Startup failed', error);
+    try {
+      resetGame();
+      ensurePanels();
+      buildTabs();
+      render();
+      pushReport('Startup recovered by resetting invalid state.');
+    } catch (fallbackError) {
+      console.error('Startup fallback failed', fallbackError);
+      showFatal(`${error.message} (fallback failed: ${fallbackError.message})`);
+    }
   }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+} else {
+  bootstrap();
 }
