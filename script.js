@@ -156,6 +156,7 @@ const app = {
   vetSelection: { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' },
   trainingClinicSelection: { discipline: 'jumping' },
   trainingHorseScope: 'both',
+  competitionHorseScope: 'both',
   calendarReminders: [],
   closedReminderIds: [],
   lessonHorsesByBarn: {},
@@ -328,6 +329,15 @@ function currentBarnLessonHorses() {
 
 function horsesIncludingLessons() {
   return [...app.horses, ...currentBarnLessonHorses()];
+}
+
+function competitionEligibleHorses() {
+  const scope = ['private', 'lesson', 'both'].includes(app.competitionHorseScope) ? app.competitionHorseScope : 'both';
+  const privateHorses = app.horses.filter((h) => !h.retiredForever);
+  const lessonHorses = currentBarnLessonHorses();
+  if (scope === 'private') return privateHorses;
+  if (scope === 'lesson') return lessonHorses;
+  return [...privateHorses, ...lessonHorses];
 }
 
 function showTransportFee(show) {
@@ -2577,6 +2587,7 @@ function hydrateFromSave(data) {
   app.vetSelection = typeof data.vetSelection === 'object' && data.vetSelection ? data.vetSelection : { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
   app.trainingHorseScope = ['private', 'lesson', 'both'].includes(data.trainingHorseScope) ? data.trainingHorseScope : 'both';
+  app.competitionHorseScope = ['private', 'lesson', 'both'].includes(data.competitionHorseScope) ? data.competitionHorseScope : 'both';
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
@@ -2774,6 +2785,7 @@ function resetGame() {
   app.vetSelection = { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   app.trainingClinicSelection = { discipline: 'jumping' };
   app.trainingHorseScope = 'both';
+  app.competitionHorseScope = 'both';
   app.calendarReminders = [];
   app.closedReminderIds = [];
   app.lessonHorsesByBarn = {};
@@ -3513,6 +3525,58 @@ function foalPotential(dam, sire) {
     output[d] = rnd(Math.min(low, high), Math.max(low, high));
   });
   return output;
+}
+
+function processPregnancy(mare, newborns) {
+  if (!mare || !(mare.pregnantBy || mare.pregnantEmbryo)) return;
+  mare.gestation = Number.isFinite(mare.gestation) ? mare.gestation + 1 : 1;
+  const dueIn = Number.isFinite(mare.foalDue) ? mare.foalDue : 11;
+  if (mare.gestation < dueIn) return;
+
+  const embryo = mare.pregnantEmbryo || null;
+  const sire = embryo?.sireId
+    ? app.horses.find((h) => h.id === embryo.sireId)
+    : app.horses.find((h) => h.name === (mare.pregnantBy || embryo?.sire));
+  const sireName = sire?.name || mare.pregnantBy || embryo?.sire || 'Unknown Stallion';
+
+  const foal = baseHorse('untrained', 'player');
+  foal.age = 0;
+  foal.owner = 'Your Stable';
+  foal.gender = pick(['Mare', 'Stallion']);
+  foal.breed = mare.breed || sire?.breed || pick(BREEDS);
+  foal.height = heightFromBreed(foal.breed);
+  foal.marking = randomMarking(foal.breed);
+  foal.potential = foalPotential(mare, sire || {});
+  foal.extraPotential = inheritExtraPotential(mare, sire || {});
+  if (foal.extraPotential) {
+    Object.keys(foal.potential).forEach((k) => {
+      foal.potential[k] = Math.min(100, foal.potential[k] + rnd(4, 10));
+    });
+  }
+  const code = (app.settings?.breedingCode || '').trim();
+  if (code) {
+    foal.name = app.settings?.breedingCodePosition === 'end' ? `${foal.name} ${code}` : `${code} ${foal.name}`;
+  }
+
+  foal.pedigree = foal.pedigree || {};
+  foal.pedigree.dam = { name: mare.name, breed: mare.breed, coat: mare.coat };
+  foal.pedigree.sire = { name: sireName, breed: sire?.breed || embryo?.sireBreed || 'Unknown', coat: sire?.coat || 'Unknown' };
+  ensurePedigreeBase(foal);
+
+  mare.offspring = Array.isArray(mare.offspring) ? mare.offspring : [];
+  mare.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
+  if (sire) {
+    sire.offspring = Array.isArray(sire.offspring) ? sire.offspring : [];
+    sire.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
+  }
+
+  newborns.push(foal);
+  pushReport(`${mare.name} foaled ${foal.name} (${foal.gender}) by ${sireName}.`);
+
+  delete mare.pregnantBy;
+  delete mare.pregnantEmbryo;
+  mare.gestation = 0;
+  mare.foalDue = 0;
 }
 
 
@@ -5255,25 +5319,44 @@ function renderShows() {
     { key: 'hunter', names: ['OTO Hunter Show', 'OTO Pony Hunter Classic', 'OTO Young Horse Hunter Show'] }
   ];
 
+  const showHorsePool = competitionEligibleHorses().filter((h) => !h.retiredForever && h.age >= 3);
   panel.innerHTML = `
     <h2>Enter Shows</h2>
     <p class='small'>Competition Mode: <strong>${competitionModeLabel()}</strong>. Change this in Settings.</p>
+    <div class='box'>
+      <label>Show Horse Source</label>
+      <select id='show-horse-scope'>
+        <option value='both' ${app.competitionHorseScope === 'both' ? 'selected' : ''}>Both private + lesson horses</option>
+        <option value='private' ${app.competitionHorseScope === 'private' ? 'selected' : ''}>Private horses only</option>
+        <option value='lesson' ${app.competitionHorseScope === 'lesson' ? 'selected' : ''}>Lesson horses only</option>
+      </select>
+      <p class='small'>Choose which horses appear in show registration lists.</p>
+    </div>
     ${shows.map((s) => `
       <div class='box'>
         <h3>${cap(s.key)}</h3>
         ${s.names.map((n) => `<p>${n} (0/250) — Oxer To Oxer Showgrounds</p>`).join('')}
         <label>Horse</label>
         <select id='show-horse-${s.key}'>
-          ${horsesIncludingLessons().filter((h) => !h.retiredForever && h.age >= 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+          ${showHorsePool.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
         </select>
         <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
         <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
-        <button id='enter-${s.key}'>Register Show Entry</button>
+        ${showHorsePool.length ? '' : '<p class="small">No eligible horses for this filter.</p>'}
+        <button id='enter-${s.key}' ${showHorsePool.length ? '' : 'disabled'}>Register Show Entry</button>
         <p class='small'>Results are delivered after the next month skip.</p>
       </div>
     `).join('')}
   `;
+
+  const showScopeSelect = document.getElementById('show-horse-scope');
+  if (showScopeSelect) {
+    showScopeSelect.onchange = () => {
+      app.competitionHorseScope = ['private', 'lesson', 'both'].includes(showScopeSelect.value) ? showScopeSelect.value : 'both';
+      renderShows();
+    };
+  }
 
   Object.keys(SHOW_LEVELS).forEach((d) => {
     const horseSelect = document.getElementById(`show-horse-${d}`);
@@ -5296,7 +5379,7 @@ function renderShows() {
       const id = document.getElementById(`show-horse-${d}`).value;
       const level = document.getElementById(`show-level-${d}`).value;
       app.showSelections[d] = { horseId: id, level };
-      const horse = horsesIncludingLessons().find((h) => h.id === id);
+      const horse = competitionEligibleHorses().find((h) => h.id === id);
       if (!horse) return alert('No eligible horse selected.');
       if (!canCompeteUnderSaddle(horse)) {
         if (horse.unridable) return alert('This horse is unridable.');
@@ -6290,7 +6373,7 @@ function renderCalendar() {
           <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
           <label>Horse</label>
           <select data-show-horse='${show.id}'>
-            ${horsesIncludingLessons().filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+            ${competitionEligibleHorses().filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
           </select>
           <button data-show-signup='${show.id}'>Sign Up</button>
         </div>`;
@@ -6332,7 +6415,7 @@ function renderCalendar() {
       const show = shows.find((s) => s.id === btn.dataset.showSignup);
       if (!show) return;
       const horseId = document.querySelector(`[data-show-horse='${show.id}']`)?.value;
-      const horse = horsesIncludingLessons().find((h) => h.id === horseId);
+      const horse = competitionEligibleHorses().find((h) => h.id === horseId);
       if (!horse) return alert('Select a horse first.');
       const tCost = showTransportFee(show);
       const total = show.fee + tCost;
