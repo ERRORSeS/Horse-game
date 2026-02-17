@@ -155,6 +155,8 @@ const app = {
   showSelections: {},
   vetSelection: { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' },
   trainingClinicSelection: { discipline: 'jumping' },
+  trainingHorseScope: 'both',
+  competitionHorseScope: 'both',
   calendarReminders: [],
   closedReminderIds: [],
   lessonHorsesByBarn: {},
@@ -327,6 +329,15 @@ function currentBarnLessonHorses() {
 
 function horsesIncludingLessons() {
   return [...app.horses, ...currentBarnLessonHorses()];
+}
+
+function competitionEligibleHorses() {
+  const scope = ['private', 'lesson', 'both'].includes(app.competitionHorseScope) ? app.competitionHorseScope : 'both';
+  const privateHorses = app.horses.filter((h) => !h.retiredForever);
+  const lessonHorses = currentBarnLessonHorses();
+  if (scope === 'private') return privateHorses;
+  if (scope === 'lesson') return lessonHorses;
+  return [...privateHorses, ...lessonHorses];
 }
 
 function showTransportFee(show) {
@@ -1958,6 +1969,80 @@ function soundnessForecastLine(years) {
   return 'Should retire from competing... (less then 1 year left)';
 }
 
+function addIllness(horse, illnessTemplate) {
+  if (!horse || !illnessTemplate) return null;
+  horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
+  const existingActive = horse.illnesses.find((i) => i.active && i.name === illnessTemplate.name);
+  if (existingActive) return existingActive;
+  const severity = illnessTemplate.severity || pick(['Easy', 'Medium', 'More Than Medium']);
+  const illness = {
+    name: illnessTemplate.name || 'Condition',
+    impact: Number.isFinite(illnessTemplate.impact) ? illnessTemplate.impact : 8,
+    severity,
+    surgeryRisk: Number.isFinite(illnessTemplate.surgeryRisk) ? illnessTemplate.surgeryRisk : 0,
+    retirementRisk: Number.isFinite(illnessTemplate.retirementRisk) ? illnessTemplate.retirementRisk : 0,
+    remaining: Number.isFinite(illnessTemplate.remaining) ? illnessTemplate.remaining : injuryRecoveryMonths(severity),
+    active: true,
+    hidden: Boolean(illnessTemplate.hidden)
+  };
+  horse.illnesses.push(illness);
+  applySoundnessLoss(horse, severity);
+  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
+  return illness;
+}
+
+function maybeAddRandomIllness(horse) {
+  if (!horse || horse.retiredForever || horse.deceased) return;
+  horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
+  const activeCount = horse.illnesses.filter((i) => i.active).length;
+  if (activeCount > 0) return;
+  let chance = 4;
+  if ((horse.qualityOfLife || 65) < 45) chance += 3;
+  if ((horse.stallCleanliness || 65) < 45) chance += 2;
+  if ((horse.dailyGrooming || 65) < 45) chance += 1;
+  if (horse.healthGenetics === 'High') chance += 2;
+  if (horse.healthGenetics === 'Low') chance -= 1;
+  chance = clamp(chance, 1, 14);
+  if (rnd(1, 100) > chance) return;
+  const picked = pick(SICKNESS_TYPES);
+  const issue = addIllness(horse, picked);
+  if (!issue) return;
+  const severityLine = issue.severity ? ` (${issue.severity})` : '';
+  pushReport(`${horse.name} developed ${issue.name}${severityLine}. Estimated recovery ${issue.remaining} month(s).`);
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (!horse || horse.retiredForever || horse.deceased) return;
+  if (horse.pendingOvertrainingInjury) {
+    horse.pendingOvertrainingInjury = false;
+    const issue = addIllness(horse, { name: 'Overtraining Strain', impact: 12, severity: 'More Than Medium', surgeryRisk: 2, retirementRisk: 4 });
+    if (issue) pushReport(`${horse.name} picked up an overtraining strain. Reduce sessions and monitor recovery.`);
+    return;
+  }
+  const sessions = horse.trainingSessionsThisMonth || 0;
+  const pref = horse.preferredTrainingSessions || trainingSessionBounds(horse.trainingPreference || 'Medium')[1];
+  if (sessions > pref + 3 && rnd(1, 100) <= 8) {
+    const issue = addIllness(horse, { name: 'Muscle Soreness', impact: 6, severity: 'Easy', surgeryRisk: 0, retirementRisk: 0 });
+    if (issue) pushReport(`${horse.name} is sore from heavy training volume.`);
+  }
+}
+
+function applySoundnessWear(horse) {
+  if (!horse || horse.retiredForever || horse.deceased || horse.age < 3) return;
+  const sessions = horse.trainingSessionsThisMonth || 0;
+  const shows = horse.showEntriesThisMonth || 0;
+  const workLoad = sessions + (shows * 2);
+  if (workLoad <= 0) return;
+  const baseWear = Math.min(0.6, 0.06 * workLoad);
+  const mult = soundnessLossMultiplier(horse);
+  horse.soundnessYears = Math.max(0, Number((horse.soundnessYears - (baseWear * mult)).toFixed(1)));
+  if (horse.soundnessYears <= 0.4 && !horse.unridable && rnd(1, 100) <= 20) {
+    horse.unridable = true;
+    horse.retiredToBreeding = true;
+    pushReport(`${horse.name} can no longer compete due to long-term soundness decline and was retired to breeding.`);
+  }
+}
+
 function trainingSessionBounds(level) {
   if (level === 'Low') return [1, 3];
   if (level === 'High') return [6, 10];
@@ -2575,6 +2660,8 @@ function hydrateFromSave(data) {
   app.showSelections = typeof data.showSelections === 'object' && data.showSelections ? data.showSelections : {};
   app.vetSelection = typeof data.vetSelection === 'object' && data.vetSelection ? data.vetSelection : { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
+  app.trainingHorseScope = ['private', 'lesson', 'both'].includes(data.trainingHorseScope) ? data.trainingHorseScope : 'both';
+  app.competitionHorseScope = ['private', 'lesson', 'both'].includes(data.competitionHorseScope) ? data.competitionHorseScope : 'both';
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
@@ -2734,6 +2821,8 @@ function hydrateFromSave(data) {
       ? h.lastFarrierMonth
       : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
     h.hiddenIllnesses = Array.isArray(h.hiddenIllnesses) ? h.hiddenIllnesses : [];
+    h.leaseMonthsRemaining = Number.isFinite(h.leaseMonthsRemaining) ? Math.max(0, Math.floor(h.leaseMonthsRemaining)) : 0;
+    h.leaseDurationMonths = Number.isFinite(h.leaseDurationMonths) ? Math.max(0, Math.floor(h.leaseDurationMonths)) : h.leaseMonthsRemaining;
   });
   refreshRescueHorses();
 }
@@ -2769,6 +2858,8 @@ function resetGame() {
   app.showSelections = {};
   app.vetSelection = { horseId: '', mareId: '', stallionId: '', strawId: '', embryoId: '' };
   app.trainingClinicSelection = { discipline: 'jumping' };
+  app.trainingHorseScope = 'both';
+  app.competitionHorseScope = 'both';
   app.calendarReminders = [];
   app.closedReminderIds = [];
   app.lessonHorsesByBarn = {};
@@ -3510,6 +3601,58 @@ function foalPotential(dam, sire) {
   return output;
 }
 
+function processPregnancy(mare, newborns) {
+  if (!mare || !(mare.pregnantBy || mare.pregnantEmbryo)) return;
+  mare.gestation = Number.isFinite(mare.gestation) ? mare.gestation + 1 : 1;
+  const dueIn = Number.isFinite(mare.foalDue) ? mare.foalDue : 11;
+  if (mare.gestation < dueIn) return;
+
+  const embryo = mare.pregnantEmbryo || null;
+  const sire = embryo?.sireId
+    ? app.horses.find((h) => h.id === embryo.sireId)
+    : app.horses.find((h) => h.name === (mare.pregnantBy || embryo?.sire));
+  const sireName = sire?.name || mare.pregnantBy || embryo?.sire || 'Unknown Stallion';
+
+  const foal = baseHorse('untrained', 'player');
+  foal.age = 0;
+  foal.owner = 'Your Stable';
+  foal.gender = pick(['Mare', 'Stallion']);
+  foal.breed = mare.breed || sire?.breed || pick(BREEDS);
+  foal.height = heightFromBreed(foal.breed);
+  foal.marking = randomMarking(foal.breed);
+  foal.potential = foalPotential(mare, sire || {});
+  foal.extraPotential = inheritExtraPotential(mare, sire || {});
+  if (foal.extraPotential) {
+    Object.keys(foal.potential).forEach((k) => {
+      foal.potential[k] = Math.min(100, foal.potential[k] + rnd(4, 10));
+    });
+  }
+  const code = (app.settings?.breedingCode || '').trim();
+  if (code) {
+    foal.name = app.settings?.breedingCodePosition === 'end' ? `${foal.name} ${code}` : `${code} ${foal.name}`;
+  }
+
+  foal.pedigree = foal.pedigree || {};
+  foal.pedigree.dam = { name: mare.name, breed: mare.breed, coat: mare.coat };
+  foal.pedigree.sire = { name: sireName, breed: sire?.breed || embryo?.sireBreed || 'Unknown', coat: sire?.coat || 'Unknown' };
+  ensurePedigreeBase(foal);
+
+  mare.offspring = Array.isArray(mare.offspring) ? mare.offspring : [];
+  mare.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
+  if (sire) {
+    sire.offspring = Array.isArray(sire.offspring) ? sire.offspring : [];
+    sire.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
+  }
+
+  newborns.push(foal);
+  pushReport(`${mare.name} foaled ${foal.name} (${foal.gender}) by ${sireName}.`);
+
+  delete mare.pregnantBy;
+  delete mare.pregnantEmbryo;
+  mare.gestation = 0;
+  mare.foalDue = 0;
+}
+
 
 function seed() {
   app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
@@ -4101,6 +4244,9 @@ function horseProfileMarkup(horse) {
   const inspection = horse.registryInspection
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'} • Condition: ${horse.registryInspection.condition.toFixed(1)} • Pedigree: ${horse.registryInspection.pedigree == null ? 'N/A' : horse.registryInspection.pedigree.toFixed(1)}</p>`
     : '';
+  const leaseLine = horse.isLeased && Number.isFinite(horse.leaseMonthsRemaining)
+    ? `<p class='small'>Lease Time Remaining: ${horse.leaseMonthsRemaining} month(s)</p>`
+    : '';
   const titles = formattedHorseTitles(horse);
   const titlesLine = titles ? `<p class='small'>Titles: ${titles}</p>` : '';
   const record = showRecordSummary(horse);
@@ -4120,6 +4266,7 @@ function horseProfileMarkup(horse) {
       <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
     </div>
     <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Top Breed ${horse.topWins?.breed || 0}.</p>
+    ${leaseLine}
     ${showRecordLine}
     ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — #${latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
     ${inspection}
@@ -5246,25 +5393,44 @@ function renderShows() {
     { key: 'hunter', names: ['OTO Hunter Show', 'OTO Pony Hunter Classic', 'OTO Young Horse Hunter Show'] }
   ];
 
+  const showHorsePool = competitionEligibleHorses().filter((h) => !h.retiredForever && h.age >= 3);
   panel.innerHTML = `
     <h2>Enter Shows</h2>
     <p class='small'>Competition Mode: <strong>${competitionModeLabel()}</strong>. Change this in Settings.</p>
+    <div class='box'>
+      <label>Show Horse Source</label>
+      <select id='show-horse-scope'>
+        <option value='both' ${app.competitionHorseScope === 'both' ? 'selected' : ''}>Both private + lesson horses</option>
+        <option value='private' ${app.competitionHorseScope === 'private' ? 'selected' : ''}>Private horses only</option>
+        <option value='lesson' ${app.competitionHorseScope === 'lesson' ? 'selected' : ''}>Lesson horses only</option>
+      </select>
+      <p class='small'>Choose which horses appear in show registration lists.</p>
+    </div>
     ${shows.map((s) => `
       <div class='box'>
         <h3>${cap(s.key)}</h3>
         ${s.names.map((n) => `<p>${n} (0/250) — Oxer To Oxer Showgrounds</p>`).join('')}
         <label>Horse</label>
         <select id='show-horse-${s.key}'>
-          ${horsesIncludingLessons().filter((h) => !h.retiredForever && h.age >= 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+          ${showHorsePool.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
         </select>
         <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
         <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
-        <button id='enter-${s.key}'>Register Show Entry</button>
+        ${showHorsePool.length ? '' : '<p class="small">No eligible horses for this filter.</p>'}
+        <button id='enter-${s.key}' ${showHorsePool.length ? '' : 'disabled'}>Register Show Entry</button>
         <p class='small'>Results are delivered after the next month skip.</p>
       </div>
     `).join('')}
   `;
+
+  const showScopeSelect = document.getElementById('show-horse-scope');
+  if (showScopeSelect) {
+    showScopeSelect.onchange = () => {
+      app.competitionHorseScope = ['private', 'lesson', 'both'].includes(showScopeSelect.value) ? showScopeSelect.value : 'both';
+      renderShows();
+    };
+  }
 
   Object.keys(SHOW_LEVELS).forEach((d) => {
     const horseSelect = document.getElementById(`show-horse-${d}`);
@@ -5287,7 +5453,7 @@ function renderShows() {
       const id = document.getElementById(`show-horse-${d}`).value;
       const level = document.getElementById(`show-level-${d}`).value;
       app.showSelections[d] = { horseId: id, level };
-      const horse = horsesIncludingLessons().find((h) => h.id === id);
+      const horse = competitionEligibleHorses().find((h) => h.id === id);
       if (!horse) return alert('No eligible horse selected.');
       if (!canCompeteUnderSaddle(horse)) {
         if (horse.unridable) return alert('This horse is unridable.');
@@ -5691,12 +5857,28 @@ function renderTraining() {
     return;
   }
 
-  const trainingPool = horsesIncludingLessons();
+  const trainingScope = ['private', 'lesson', 'both'].includes(app.trainingHorseScope) ? app.trainingHorseScope : 'both';
+  const privateTrainingHorses = app.horses.filter((h) => !h.retiredForever);
+  const lessonTrainingHorses = currentBarnLessonHorses();
+  const trainingPool = trainingScope === 'private'
+    ? privateTrainingHorses
+    : trainingScope === 'lesson'
+      ? lessonTrainingHorses
+      : [...privateTrainingHorses, ...lessonTrainingHorses];
   const opts = trainingPool.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   const foalOpts = app.horses.filter((h) => h.age < 3).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
   panel.innerHTML = `
     <h2>Training Grounds + Clinic (free)</h2>
     <p class='small'>Training Mode: <strong>${trainingModeLabel()}</strong>. Change this in Settings.</p>
+    <div class='box'>
+      <label>Horse Source</label>
+      <select id='train-horse-scope'>
+        <option value='both' ${trainingScope === 'both' ? 'selected' : ''}>Both private + lesson horses</option>
+        <option value='private' ${trainingScope === 'private' ? 'selected' : ''}>Private horses only</option>
+        <option value='lesson' ${trainingScope === 'lesson' ? 'selected' : ''}>Lesson horses only</option>
+      </select>
+      <p class='small'>Choose whether training includes your stable horses, lesson horses, or both.</p>
+    </div>
     ${app.trainingRpgSummary ? `<div class='box'><h3>Session Summary</h3>
       <p><strong>${app.trainingRpgSummary.horseName}</strong> — ${cap(app.trainingRpgSummary.discipline)}</p>
       <p>Skill change: ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
@@ -5705,7 +5887,7 @@ function renderTraining() {
     </div>` : ''}
     <div class='grid two'>
       <div class='box'>
-        <label>Horse</label><select id='train-horse'>${opts}</select>
+        <label>Horse</label><select id='train-horse'>${opts}</select>${opts ? '' : '<p class="small">No horses available for this filter.</p>'}
         <label>Discipline</label><select id='train-disc'>${Object.keys(SHOW_LEVELS).map((d) => `<option>${d}</option>`).join('')}</select>
         <label>Exercise</label><select id='train-ex'></select>
         <label>Longer Walk (repeats)</label><select id='train-rpg-walk'><option value='1'>1</option><option value='2'>2</option><option value='3'>3</option><option value='4'>4</option></select>
@@ -5716,7 +5898,7 @@ function renderTraining() {
         <label>Controlability Work</label><select id='train-control'>
           <option>Flat Work</option><option>Hand Work</option><option>Sensitivity</option><option>Controlability</option><option>Manners</option>
         </select>
-        <button id='do-train'>Train (${app.settings?.trainingMode === 'normal' ? 'Normal' : 'Interactive RPG'})</button>
+        <button id='do-train' ${trainingPool.length ? '' : 'disabled'}>Train (${app.settings?.trainingMode === 'normal' ? 'Normal' : 'Interactive RPG'})</button>
         <button id='do-control-train'>Controlability Session</button>
       </div>
       <div class='box'>
@@ -5802,6 +5984,13 @@ function renderTraining() {
     const node = document.getElementById(id);
     if (node) node.onchange = updateRpgConfig;
   });
+  const horseScopeSelect = document.getElementById('train-horse-scope');
+  if (horseScopeSelect) {
+    horseScopeSelect.onchange = () => {
+      app.trainingHorseScope = ['private', 'lesson', 'both'].includes(horseScopeSelect.value) ? horseScopeSelect.value : 'both';
+      renderTraining();
+    };
+  }
   applyTrainingSelection();
   applyRpgConfigSelection();
   app.trainingClinicSelection = app.trainingClinicSelection || { discipline: 'jumping' };
@@ -6000,7 +6189,7 @@ function renderBarn() {
   if (selectedLessonHorse && lessonWrap) {
     lessonWrap.className = 'box';
     const leaseVisible = (app.currentBarn?.lessonsStars || 3) <= 3;
-    lessonWrap.innerHTML = `<h3>Lesson Horse Profile</h3>${horseProfileMarkup(selectedLessonHorse)}
+    lessonWrap.innerHTML = `<h3>${selectedLessonHorse.name} — Lesson Horse Profile</h3>${horseProfileMarkup(selectedLessonHorse)}
       <div class='inline'>
         <button id='lesson-train-btn' ${selectedLessonHorse.barnAvailable ? '' : 'disabled'}>Train</button>
         ${leaseVisible ? `<button id='lesson-lease-btn' ${selectedLessonHorse.barnAvailable ? '' : 'disabled'}>Lease</button>` : ''}
@@ -6014,16 +6203,21 @@ function renderBarn() {
     };
     const leaseBtn = document.getElementById('lesson-lease-btn');
     if (leaseBtn) leaseBtn.onclick = () => {
+      const alreadyLeased = app.horses.some((h) => h.isLeased && h.leaseSourceId === selectedLessonHorse.id && !h.retiredForever);
+      if (alreadyLeased) return alert('You already have an active lease for this lesson horse.');
+      const leaseDuration = rnd(1, 12);
       const leasedHorse = {
         ...JSON.parse(JSON.stringify(selectedLessonHorse)),
         id: uid(),
         owner: 'Your Stable',
         isLeased: true,
         leaseSourceId: selectedLessonHorse.id,
-        leaseLocked: true
+        leaseLocked: true,
+        leaseDurationMonths: leaseDuration,
+        leaseMonthsRemaining: leaseDuration
       };
       app.horses.push(leasedHorse);
-      pushReport(`Leased ${selectedLessonHorse.name}. Leased horses can train/show but feed/tack/turnout are locked.`);
+      pushReport(`Leased ${selectedLessonHorse.name} for ${leaseDuration} month(s). Leased horses can train/show but feed/tack/turnout are locked.`);
       render();
     };
   }
@@ -6159,7 +6353,21 @@ function monthlyProgress() {
     h.barnActivityQuality = 0;
     maybeAddOvertrainingInjury(h);
     resolvePendingCompetitions(h);
-    if (!processAgingAndMortality(h)) survivors.push(h);
+    if (!processAgingAndMortality(h)) {
+      if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
+        h.leaseMonthsRemaining = Math.max(0, h.leaseMonthsRemaining - 1);
+        if (h.leaseMonthsRemaining <= 0) {
+          Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+            if (!Array.isArray(roster)) return;
+            const sourceLessonHorse = roster.find((x) => x.id === h.leaseSourceId);
+            if (sourceLessonHorse) sourceLessonHorse.barnAvailable = true;
+          });
+          pushReport(`${h.name}'s lease ended and the horse returned to the lesson program.`);
+          return;
+        }
+      }
+      survivors.push(h);
+    }
   });
   app.horses = survivors.concat(newborns);
   Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
@@ -6205,6 +6413,96 @@ function activeRemindersForCurrentMonth() {
   return (app.calendarReminders || []).filter((r) => reminderDueThisMonth(r) && !closed.has(r.id));
 }
 
+
+function renderRegistries() {
+  const panel = document.getElementById('registries');
+  if (!panel) return;
+  const horses = app.horses.filter((h) => !h.retiredForever);
+  panel.innerHTML = `
+    <h2>Registries</h2>
+    <div class='box'>
+      <p class='small'>Registry records for your active horses.</p>
+      ${horses.length ? horses.map((h) => {
+        const reg = h.registryInspection;
+        return `<p>${horseDisplayName(h)} — ${reg ? `${reg.registry || h.breed}: ${reg.result} (${reg.totalScore?.toFixed?.(2) ?? reg.totalScore})` : 'Not inspected yet'}</p>`;
+      }).join('') : '<p class="small">No horses in your stable.</p>'}
+    </div>
+  `;
+}
+
+function renderBreeders() {
+  const panel = document.getElementById('breeders');
+  if (!panel) return;
+  const mares = app.horses.filter((h) => h.gender === 'Mare' && !h.retiredForever);
+  const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
+  panel.innerHTML = `
+    <h2>Breeders Board</h2>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Mares</h3>
+        ${mares.length ? mares.map((h) => `<p>${horseDisplayName(h)} — Potential J:${h.potential?.jumping || 0}% D:${h.potential?.dressage || 0}%</p>`).join('') : '<p class="small">No mares available.</p>'}
+      </div>
+      <div class='box'>
+        <h3>Stallions</h3>
+        ${stallions.length ? stallions.map((h) => `<p>${horseDisplayName(h)} — Potential J:${h.potential?.jumping || 0}% D:${h.potential?.dressage || 0}%</p>`).join('') : '<p class="small">No stallions available.</p>'}
+      </div>
+    </div>
+    <p class='small'>Use Vet and Breeding tabs to perform breeding procedures.</p>
+  `;
+}
+
+function renderFreezer() {
+  const panel = document.getElementById('freezer');
+  if (!panel) return;
+  panel.innerHTML = `
+    <h2>Freezer</h2>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Semen Straws (${app.semenStraws.length})</h3>
+        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
+      </div>
+      <div class='box'>
+        <h3>Embryos (${app.embryos.length})</h3>
+        ${app.embryos.length ? app.embryos.map((e) => `<p>${e.donor} × ${e.sire} <span class='small'>(${e.id})</span></p>`).join('') : '<p class="small">No embryos stored.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderRescue() {
+  const panel = document.getElementById('rescue');
+  if (!panel) return;
+  app.rescueHorses = Array.isArray(app.rescueHorses) ? app.rescueHorses : [];
+  panel.innerHTML = `
+    <h2>Rescue</h2>
+    <div class='box'>
+      <p class='small'>Adopt rescue horses into your stable.</p>
+      ${app.rescueHorses.length ? app.rescueHorses.map((h) => `
+        <div class='box'>
+          <p><strong>${horseDisplayName(h)}</strong> — ${h.breed}, age ${h.age}</p>
+          <p class='small'>Fee: ${money(h.rescueFee || 0)} | Illnesses: ${(h.illnesses || []).filter((i) => i.active).map((i) => i.name).join(', ') || 'None listed'}</p>
+          <button data-rescue='${h.id}'>Adopt</button>
+        </div>
+      `).join('') : '<p class="small">No rescue horses currently available.</p>'}
+    </div>
+  `;
+  panel.querySelectorAll('[data-rescue]').forEach((btn) => {
+    btn.onclick = () => {
+      const horse = app.rescueHorses.find((h) => h.id === btn.dataset.rescue);
+      if (!horse) return;
+      const fee = horse.rescueFee || 0;
+      if (!tryCharge(fee)) return;
+      horse.owner = 'Your Stable';
+      horse.isRescue = true;
+      horse.rescueId = horse.rescueId || uid();
+      app.horses.push(horse);
+      app.rescueHorses = app.rescueHorses.filter((h) => h.id !== horse.id);
+      pushReport(`Adopted rescue horse ${horse.name} for ${money(fee)}.`);
+      renderRescue();
+    };
+  });
+}
+
 function renderCalendar() {
   ensureBarnState();
   const reminders = app.calendarReminders || [];
@@ -6239,7 +6537,7 @@ function renderCalendar() {
           <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
           <label>Horse</label>
           <select data-show-horse='${show.id}'>
-            ${horsesIncludingLessons().filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+            ${competitionEligibleHorses().filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
           </select>
           <button data-show-signup='${show.id}'>Sign Up</button>
         </div>`;
@@ -6281,7 +6579,7 @@ function renderCalendar() {
       const show = shows.find((s) => s.id === btn.dataset.showSignup);
       if (!show) return;
       const horseId = document.querySelector(`[data-show-horse='${show.id}']`)?.value;
-      const horse = horsesIncludingLessons().find((h) => h.id === horseId);
+      const horse = competitionEligibleHorses().find((h) => h.id === horseId);
       if (!horse) return alert('Select a horse first.');
       const tCost = showTransportFee(show);
       const total = show.fee + tCost;
@@ -6296,6 +6594,44 @@ function renderCalendar() {
       }
     };
   });
+}
+
+
+function renderBreeding() {
+  const panel = document.getElementById('breeding');
+  if (!panel) return;
+  const mares = app.horses.filter((h) => h.gender === 'Mare' && !h.retiredForever);
+  const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
+  const pregnant = mares.filter((h) => h.pregnantBy || h.pregnantEmbryo);
+  panel.innerHTML = `
+    <h2>Breeding</h2>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Breeding Overview</h3>
+        <p>Total mares: <strong>${mares.length}</strong></p>
+        <p>Total stallions: <strong>${stallions.length}</strong></p>
+        <p>Pregnant mares: <strong>${pregnant.length}</strong></p>
+        <p>Frozen semen straws: <strong>${app.semenStraws.length}</strong></p>
+        <p>Frozen embryos: <strong>${app.embryos.length}</strong></p>
+      </div>
+      <div class='box'>
+        <h3>Where to Breed</h3>
+        <p class='small'>Breeding actions are handled in the <strong>Vet</strong> tab (AI, embryo flush/transfer, ultrasound, mismate shot) and storage is in <strong>Freezer</strong>.</p>
+        <div class='inline'>
+          <button id='breeding-open-vet'>Open Vet</button>
+          <button id='breeding-open-freezer'>Open Freezer</button>
+        </div>
+      </div>
+    </div>
+    <div class='box'>
+      <h3>Pregnancy List</h3>
+      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Due in ~${Math.max(0, (mare.foalDue || 0) - (mare.gestation || 0))} month(s)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+    </div>
+  `;
+  const vetBtn = document.getElementById('breeding-open-vet');
+  if (vetBtn) vetBtn.onclick = () => changeTab('vet');
+  const freezerBtn = document.getElementById('breeding-open-freezer');
+  if (freezerBtn) freezerBtn.onclick = () => changeTab('freezer');
 }
 
 function renderSettings() {
