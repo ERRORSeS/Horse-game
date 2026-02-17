@@ -196,104 +196,399 @@ const COMPETITION_RANDOM_EVENTS = [
   { key: 'breakthrough', text: 'A rare breakthrough: perfect rider-horse sync.', mod: 14 }
 ];
 
-const COMPETITION_RPG_VARIANTS = {
+const COMPETITION_COURSE_WALK_VARIANTS = [
+  {
+    title: 'Opening Fence Inspection',
+    scene: 'You inspect the opening effort and plan how to start with confidence.',
+    options: [
+      { label: 'Plan a steady conservative approach.', success: 85, neutral: 10, fail: 5, intent: 'confidence_start' },
+      { label: 'Plan to ride forward for momentum.', success: 70, neutral: 20, fail: 10, intent: 'aggressive_start' },
+      { label: 'Add an extra balancing stride.', success: 75, neutral: 15, fail: 10, intent: 'safety_first' },
+      { label: 'Ignore details and trust instinct.', success: 60, neutral: 25, fail: 15, intent: 'improvised' }
+    ]
+  },
+  {
+    title: 'Related Distance Line',
+    scene: 'A bending related line could ride in multiple ways depending on pace.',
+    options: [
+      { label: 'Plan exact forward strides.', success: 80, neutral: 15, fail: 5, intent: 'precision' },
+      { label: 'Plan one safer added stride.', success: 75, neutral: 15, fail: 10, intent: 'control' },
+      { label: 'Plan to leave one out for speed.', success: 60, neutral: 20, fail: 20, intent: 'gamble' },
+      { label: 'Stay flexible and decide mid-round.', success: 65, neutral: 20, fail: 15, intent: 'flexible_plan' }
+    ]
+  },
+  {
+    title: 'Tight Rollback Turn',
+    scene: 'A quick rollback will test balance and line planning under pressure.',
+    options: [
+      { label: 'Plan strong rebalance after landing.', success: 80, neutral: 15, fail: 5, intent: 'preparation' },
+      { label: 'Ride flowing turn for speed.', success: 65, neutral: 20, fail: 15, intent: 'speed_focus' },
+      { label: 'Plan to circle if needed.', success: 85, neutral: 10, fail: 5, intent: 'safety_option' },
+      { label: 'Ignore turn difficulty.', success: 55, neutral: 25, fail: 20, intent: 'risk' }
+    ]
+  },
+  {
+    title: 'Combination Fence Plan',
+    scene: 'A combination rides tight enough that distance and straightness matter.',
+    options: [
+      { label: 'Plan collected entry and straight line.', success: 80, neutral: 15, fail: 5, intent: 'balance' },
+      { label: 'Plan forward approach.', success: 65, neutral: 20, fail: 15, intent: 'momentum' },
+      { label: 'Prepare defensive riding.', success: 75, neutral: 15, fail: 10, intent: 'caution' },
+      { label: 'Skip detailed planning.', success: 55, neutral: 25, fail: 20, intent: 'improvised' }
+    ]
+  },
+  {
+    title: 'Final Strategy Decision',
+    scene: 'Course walk complete. You decide your overall strategy for the round.',
+    options: [
+      { label: 'Conservative plan.', success: 85, neutral: 10, fail: 5, intent: 'safety_strategy' },
+      { label: 'Balanced plan.', success: 75, neutral: 15, fail: 10, intent: 'balanced_strategy' },
+      { label: 'Aggressive speed plan.', success: 60, neutral: 20, fail: 20, intent: 'aggressive_strategy' },
+      { label: 'Adapt entirely by feel.', success: 65, neutral: 20, fail: 15, intent: 'flexible_strategy' }
+    ]
+  }
+];
+
+const COMPETITION_WARMUP_UNIVERSAL = [
+  {
+    title: 'Entering Warm-Up Ring',
+    scene: 'Other horses are moving around and your horse is alert to the environment.',
+    options: [
+      { label: 'Walk quietly on a long rein.', success: 90, neutral: 10, fail: 0, intent: 'reduce_tension' },
+      { label: 'Start working immediately.', success: 70, neutral: 20, fail: 10, intent: 'quick_focus' },
+      { label: 'Circle away from busy areas.', success: 80, neutral: 15, fail: 5, intent: 'safety_focus' },
+      { label: 'Halt and let horse observe.', success: 85, neutral: 10, fail: 5, intent: 'confidence_building' }
+    ]
+  },
+  {
+    title: 'Warm-Up Arena Crowd',
+    scene: 'Another rider passes very close and tension increases slightly.',
+    options: [
+      { label: 'Keep leg on and maintain rhythm.', success: 75, neutral: 15, fail: 10, intent: 'maintain_focus' },
+      { label: 'Move to a quieter corner.', success: 85, neutral: 10, fail: 5, intent: 'reduce_pressure' },
+      { label: 'Halt briefly and reset.', success: 80, neutral: 15, fail: 5, intent: 'regroup' },
+      { label: 'Ignore distraction and continue.', success: 65, neutral: 20, fail: 15, intent: 'compromise' }
+    ]
+  },
+  {
+    title: 'Early Tension Signs',
+    scene: 'The horse feels tight through the back and needs careful preparation.',
+    options: [
+      { label: 'Stretch on a long rein.', success: 85, neutral: 10, fail: 5, intent: 'relaxation' },
+      { label: 'Push forward into trot.', success: 70, neutral: 20, fail: 10, intent: 'loosen_up' },
+      { label: 'Collect early and hold.', success: 55, neutral: 20, fail: 25, intent: 'early_collection' },
+      { label: 'Stop and reassess.', success: 80, neutral: 15, fail: 5, intent: 'welfare' }
+    ]
+  }
+];
+
+const COMPETITION_WARMUP_VARIANTS = {
   jumping: [
-    {
-      title: 'Approach (Balanced)',
-      scene: 'You turn toward the first fence. The horse feels focused and slightly forward to a vertical.',
-      options: [
-        { label: 'Maintain rhythm and keep soft contact.', success: 85, neutral: 10, fail: 5 },
-        { label: 'Half-halt to shorten stride slightly.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Ride forward and trust the pace.', success: 70, neutral: 20, fail: 10 },
-        { label: 'Circle and re-approach.', success: 80, neutral: 15, fail: 5 }
-      ]
-    },
-    {
-      title: 'Stride Count Decision',
-      scene: 'Distance to the next fence appears as a classic line. The horse starts to lengthen.',
-      options: [
-        { label: 'Collect to fit balanced strides.', success: 80, neutral: 15, fail: 5 },
-        { label: 'Allow forward pace and jump out of stride.', success: 65, neutral: 25, fail: 10 },
-        { label: 'Add a calming half-halt early.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Hesitate and adjust late.', success: 55, neutral: 25, fail: 20 }
-      ]
-    },
-    {
-      title: 'High Risk Moment',
-      scene: 'After landing, the horse surges and balance gets fragile for the next line.',
-      options: [
-        { label: 'Deep seat + strong half-halt.', success: 65, neutral: 20, fail: 15 },
-        { label: 'Circle away and reset line.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Commit and jump from a forward stride.', success: 50, neutral: 25, fail: 25 },
-        { label: 'Pull hard to stop.', success: 55, neutral: 20, fail: 25 }
-      ]
-    }
-  ],
-  dressage: [
-    {
-      title: 'Centerline Entry',
-      scene: 'You enter and the horse is attentive but alert to the crowd.',
-      options: [
-        { label: 'Maintain steady rhythm and straight line.', success: 85, neutral: 10, fail: 5 },
-        { label: 'Half-halt to settle nerves.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Allow forward energy for confidence.', success: 70, neutral: 20, fail: 10 },
-        { label: 'Reset mentally before committing.', success: 80, neutral: 15, fail: 5 }
-      ]
-    },
-    {
-      title: 'Advanced Movement',
-      scene: 'You ask for a difficult movement and tension starts to rise.',
-      options: [
-        { label: 'Support softly and keep rhythm.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Simplify then re-ask.', success: 80, neutral: 15, fail: 5 },
-        { label: 'Continue despite minor errors.', success: 65, neutral: 20, fail: 15 },
-        { label: 'Strategically skip to protect score.', success: 90, neutral: 10, fail: 0 }
-      ]
-    }
-  ],
-  eventing: [
-    {
-      title: 'Dressage Start',
-      scene: 'You enter phase one; the horse is willing but watchful of atmosphere.',
-      options: [
-        { label: 'Prioritize straightness and rhythm.', success: 85, neutral: 10, fail: 5 },
-        { label: 'Half-halt and settle.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Allow expression and forward energy.', success: 70, neutral: 20, fail: 10 },
-        { label: 'Reset and re-approach the movement.', success: 80, neutral: 15, fail: 5 }
-      ]
-    },
-    {
-      title: 'Cross-country Question',
-      scene: 'A water complex comes up and the horse raises the head, unsure.',
-      options: [
-        { label: 'Ride forward with consistent rhythm.', success: 70, neutral: 20, fail: 10 },
-        { label: 'Slow slightly and reassure.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Circle and retry.', success: 85, neutral: 10, fail: 5 },
-        { label: 'Take safer route and accept penalties.', success: 90, neutral: 10, fail: 0 }
-      ]
-    }
+    { title: 'First Practice Fence', scene: 'Small vertical ahead in warm-up.', options: [
+      { label: 'Approach quietly and balanced.', success: 85, neutral: 10, fail: 5, intent: 'confidence_jump' },
+      { label: 'Push forward strongly.', success: 70, neutral: 20, fail: 10, intent: 'energy' },
+      { label: 'Circle before jump.', success: 80, neutral: 15, fail: 5, intent: 'preparation' },
+      { label: 'Skip first jump.', success: 75, neutral: 15, fail: 10, intent: 'caution' }
+    ]},
+    { title: 'Horse Rushes Warm-Up Fence', scene: 'Horse quickens before takeoff.', options: [
+      { label: 'Half-halt and rebalance.', success: 75, neutral: 15, fail: 10, intent: 'regulate' },
+      { label: 'Let horse jump forward.', success: 65, neutral: 20, fail: 15, intent: 'compromise' },
+      { label: 'Circle and retry.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Lower jump height.', success: 85, neutral: 10, fail: 5, intent: 'confidence' }
+    ]}
   ],
   hunter: [
-    {
-      title: 'First Approach',
-      scene: 'The first line rides flowing, but the horse is curious about the ring.',
-      options: [
-        { label: 'Maintain steady hunter rhythm.', success: 85, neutral: 10, fail: 5 },
-        { label: 'Half-halt lightly for balance.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Allow slight forward pace.', success: 70, neutral: 20, fail: 10 },
-        { label: 'Circle once and re-approach.', success: 80, neutral: 15, fail: 5 }
-      ]
-    },
-    {
-      title: 'Stride Line',
-      scene: 'Distance reads as a hunter six-stride, but the horse feels strong after landing.',
-      options: [
-        { label: 'Maintain rhythm for natural six.', success: 80, neutral: 15, fail: 5 },
-        { label: 'Collect slightly and add one.', success: 75, neutral: 15, fail: 10 },
-        { label: 'Ride forward and leave one out.', success: 65, neutral: 20, fail: 15 },
-        { label: 'Adjust late near the fence.', success: 55, neutral: 25, fail: 20 }
-      ]
-    }
+    { title: 'Establish Hunter Pace', scene: 'You seek smooth hunter rhythm before entering.', options: [
+      { label: 'Maintain quiet canter rhythm.', success: 85, neutral: 10, fail: 5, intent: 'establish_flow' },
+      { label: 'Push for bigger step.', success: 70, neutral: 20, fail: 10, intent: 'expression' },
+      { label: 'Circle quietly.', success: 80, neutral: 15, fail: 5, intent: 'balance' },
+      { label: 'Slow to reorganize.', success: 75, neutral: 15, fail: 10, intent: 'control' }
+    ]},
+    { title: 'Practice Line', scene: 'A hunter line asks for precise stride control.', options: [
+      { label: 'Ride exact rhythm.', success: 80, neutral: 15, fail: 5, intent: 'precision' },
+      { label: 'Add one stride intentionally.', success: 75, neutral: 15, fail: 10, intent: 'adjustment' },
+      { label: 'Leave one out.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
+      { label: 'Repeat the line.', success: 85, neutral: 10, fail: 5, intent: 'refinement' }
+    ]}
+  ],
+  dressage: [
+    { title: 'Trot Stretch', scene: 'Warm-up begins with frame and suppleness check.', options: [
+      { label: 'Allow long and low frame.', success: 85, neutral: 10, fail: 5, intent: 'relaxation' },
+      { label: 'Start collection early.', success: 60, neutral: 20, fail: 20, intent: 'risk' },
+      { label: 'Ride transitions for focus.', success: 75, neutral: 15, fail: 10, intent: 'engagement' },
+      { label: 'Halt and reset.', success: 80, neutral: 15, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Rushing in Warm-Up', scene: 'Tempo starts to rush before test entry.', options: [
+      { label: 'Half-halt repeatedly.', success: 75, neutral: 15, fail: 10, intent: 'regulate' },
+      { label: 'Circle and slow tempo.', success: 80, neutral: 15, fail: 5, intent: 'balance' },
+      { label: 'Allow forward energy.', success: 65, neutral: 20, fail: 15, intent: 'compromise' },
+      { label: 'Transition down to walk.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]}
+  ],
+  eventing: [
+    { title: 'XC Warm-Up Fence', scene: 'Mixed phase prep starts with confidence over a fence.', options: [
+      { label: 'Ride forward confidently.', success: 80, neutral: 15, fail: 5, intent: 'bravery' },
+      { label: 'Approach cautiously.', success: 70, neutral: 20, fail: 10, intent: 'caution' },
+      { label: 'Circle and represent.', success: 85, neutral: 10, fail: 5, intent: 'reset' },
+      { label: 'Skip jump.', success: 80, neutral: 15, fail: 5, intent: 'safety' }
+    ]},
+    { title: 'Gallop Preparation', scene: 'You tune pace between control and forwardness.', options: [
+      { label: 'Maintain controlled forward canter.', success: 80, neutral: 15, fail: 5, intent: 'rhythm' },
+      { label: 'Push faster early.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
+      { label: 'Slow and rebalance.', success: 75, neutral: 15, fail: 10, intent: 'control' },
+      { label: 'Take a walk break.', success: 85, neutral: 10, fail: 5, intent: 'recovery' }
+    ]}
+  ]
+};
+
+const COMPETITION_RPG_VARIANTS = {
+  jumping: [
+    { title: 'Tight Rollback Turn', scene: 'After landing, the next fence comes quickly on a tight rollback turn.', options: [
+      { label: 'Sit deep and rebalance before turning.', success: 75, neutral: 15, fail: 10, intent: 'rebalance' },
+      { label: 'Turn early and keep pace flowing.', success: 70, neutral: 20, fail: 10, intent: 'maintain_flow' },
+      { label: 'Pull back hard to slow down.', success: 55, neutral: 20, fail: 25, intent: 'emergency_control' },
+      { label: 'Circle and re-approach.', success: 85, neutral: 10, fail: 5, intent: 'safety_reset' }
+    ]},
+    { title: 'Long Related Distance', scene: 'A seven-stride line appears and the horse feels behind the leg.', options: [
+      { label: 'Add leg and keep rhythm.', success: 80, neutral: 15, fail: 5, intent: 'restore_impulsion' },
+      { label: 'Ride quietly and accept extra stride.', success: 70, neutral: 20, fail: 10, intent: 'compromise' },
+      { label: 'Push for six strides.', success: 60, neutral: 25, fail: 15, intent: 'gamble' },
+      { label: 'Rebalance midway.', success: 75, neutral: 15, fail: 10, intent: 'adjust_line' }
+    ]},
+    { title: 'Liverpool Fence', scene: 'A reflective liverpool raises tension in the approach.', options: [
+      { label: 'Keep leg on and ride forward.', success: 70, neutral: 20, fail: 10, intent: 'confidence' },
+      { label: 'Soften contact and reassure.', success: 75, neutral: 15, fail: 10, intent: 'reassurance' },
+      { label: 'Slow and approach cautiously.', success: 60, neutral: 25, fail: 15, intent: 'caution' },
+      { label: 'Circle and represent.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Horse Leaves a Stride Out', scene: 'Two strides out, the horse lengthens unexpectedly.', options: [
+      { label: 'Support with leg and stay balanced.', success: 70, neutral: 20, fail: 10, intent: 'recovery' },
+      { label: 'Pull slightly to shorten.', success: 55, neutral: 25, fail: 20, intent: 'emergency_adjust' },
+      { label: 'Stay still and trust the jump.', success: 65, neutral: 25, fail: 10, intent: 'trust_horse' },
+      { label: 'Abort and circle away.', success: 80, neutral: 15, fail: 5, intent: 'safety_reset' }
+    ]},
+    { title: 'Rider Off Balance on Landing', scene: 'You land ahead of the motion and need quick recovery.', options: [
+      { label: 'Sit back and regain rhythm.', success: 75, neutral: 15, fail: 10, intent: 'recovery' },
+      { label: 'Circle to reset balance.', success: 80, neutral: 15, fail: 5, intent: 'regroup' },
+      { label: 'Keep going to save time.', success: 60, neutral: 25, fail: 15, intent: 'risk' },
+      { label: 'Slow to trot briefly.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Combination Fence', scene: 'A one-stride combination arrives quickly.', options: [
+      { label: 'Hold straight line and steady rhythm.', success: 80, neutral: 15, fail: 5, intent: 'precision' },
+      { label: 'Collect before entering combo.', success: 75, neutral: 15, fail: 10, intent: 'adjustment' },
+      { label: 'Ride forward boldly.', success: 65, neutral: 20, fail: 15, intent: 'power' },
+      { label: 'Circle and retry.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
+    ]},
+    { title: 'Sudden Spook on Approach', scene: 'A shadow near the rail makes the horse drift.', options: [
+      { label: 'Leg on and ride straight.', success: 75, neutral: 15, fail: 10, intent: 'confidence' },
+      { label: 'Circle to regain focus.', success: 80, neutral: 15, fail: 5, intent: 'regroup' },
+      { label: 'Pull to stop.', success: 55, neutral: 20, fail: 25, intent: 'emergency' },
+      { label: 'End round early.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Overjump Moment', scene: 'The horse jumps too big and lands strong.', options: [
+      { label: 'Half-halt and stabilize.', success: 75, neutral: 15, fail: 10, intent: 'regulate' },
+      { label: 'Continue forward naturally.', success: 65, neutral: 20, fail: 15, intent: 'flow' },
+      { label: 'Circle to rebalance.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Slow pace before next fence.', success: 85, neutral: 10, fail: 5, intent: 'control' }
+    ]},
+    { title: 'Last Fence Pressure', scene: 'Crowd noise rises as you approach the final fence.', options: [
+      { label: 'Keep same rhythm and straightness.', success: 80, neutral: 15, fail: 5, intent: 'consistency' },
+      { label: 'Push slightly forward to finish.', success: 70, neutral: 20, fail: 10, intent: 'commitment' },
+      { label: 'Overthink and adjust late.', success: 55, neutral: 25, fail: 20, intent: 'late_adjustment' },
+      { label: 'Circle and reset with time penalty.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
+    ]},
+    { title: 'Rare Perfect Round Energy', scene: 'Everything feels easy, connected, and in sync.', options: [
+      { label: 'Maintain exact same ride.', success: 95, neutral: 5, fail: 0, intent: 'flow_state' },
+      { label: 'Soften aids and trust horse.', success: 90, neutral: 10, fail: 0, intent: 'harmony' },
+      { label: 'Push for extra speed.', success: 75, neutral: 15, fail: 10, intent: 'risk' },
+      { label: 'Finish conservatively.', success: 90, neutral: 10, fail: 0, intent: 'consistency' }
+    ]}
+  ],
+  hunter: [
+    { title: 'Flowing Hunter Line', scene: 'Long diagonal line with expected six strides.', options: [
+      { label: 'Maintain steady hunter rhythm.', success: 85, neutral: 10, fail: 5, intent: 'style_flow' },
+      { label: 'Collect slightly before line.', success: 75, neutral: 15, fail: 10, intent: 'balance' },
+      { label: 'Ride forward for expression.', success: 70, neutral: 20, fail: 10, intent: 'expression' },
+      { label: 'Adjust late near fence.', success: 55, neutral: 25, fail: 20, intent: 'late_adjustment' }
+    ]},
+    { title: 'Horse Drifts Off Line', scene: 'The horse starts drifting off your intended track.', options: [
+      { label: 'Correct quietly with leg.', success: 80, neutral: 15, fail: 5, intent: 'straighten' },
+      { label: 'Circle and re-approach.', success: 85, neutral: 10, fail: 5, intent: 'reset' },
+      { label: 'Ignore and continue.', success: 60, neutral: 25, fail: 15, intent: 'compromise' },
+      { label: 'Slow and reorganize.', success: 75, neutral: 15, fail: 10, intent: 'control' }
+    ]},
+    { title: 'Soft Hunter Jump', scene: 'A smooth jump invites maintaining style and flow.', options: [
+      { label: 'Keep rhythm unchanged.', success: 90, neutral: 10, fail: 0, intent: 'consistency' },
+      { label: 'Praise subtly and continue.', success: 95, neutral: 5, fail: 0, intent: 'positive_reinforcement' },
+      { label: 'Push for bigger effort.', success: 70, neutral: 20, fail: 10, intent: 'expression' },
+      { label: 'Slow after landing.', success: 80, neutral: 15, fail: 5, intent: 'control' }
+    ]},
+    { title: 'Added Stride', scene: 'An extra stride appears in the line unexpectedly.', options: [
+      { label: 'Stay quiet and support.', success: 75, neutral: 15, fail: 10, intent: 'balance' },
+      { label: 'Push forward late.', success: 55, neutral: 25, fail: 20, intent: 'risk' },
+      { label: 'Circle and retry.', success: 85, neutral: 10, fail: 5, intent: 'reset' },
+      { label: 'Accept lower style score.', success: 70, neutral: 20, fail: 10, intent: 'compromise' }
+    ]},
+    { title: 'Slight Rush Between Fences', scene: 'Pace quickens and style quality is at risk.', options: [
+      { label: 'Half-halt and settle.', success: 75, neutral: 15, fail: 10, intent: 'regulate' },
+      { label: 'Continue and hope rhythm returns.', success: 60, neutral: 25, fail: 15, intent: 'compromise' },
+      { label: 'Circle for balance.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Transition briefly down.', success: 85, neutral: 10, fail: 5, intent: 'regroup' }
+    ]},
+    { title: 'Cute Distraction', scene: 'The horse pricks ears and stares at flowers.', options: [
+      { label: 'Keep leg on and continue.', success: 80, neutral: 15, fail: 5, intent: 'focus' },
+      { label: 'Allow brief look and continue.', success: 75, neutral: 15, fail: 10, intent: 'compromise' },
+      { label: 'Circle for focus.', success: 85, neutral: 10, fail: 5, intent: 'reset' },
+      { label: 'Halt and regroup.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Slight Knockdown Risk', scene: 'Distance feels flat and style may break down.', options: [
+      { label: 'Stay balanced and ride forward.', success: 75, neutral: 15, fail: 10, intent: 'maintain_style' },
+      { label: 'Collect before jump.', success: 70, neutral: 20, fail: 10, intent: 'balance' },
+      { label: 'Push forward strongly.', success: 60, neutral: 25, fail: 15, intent: 'risk' },
+      { label: 'Circle away.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Smooth Bending Line', scene: 'A bending line rewards arc and rhythm.', options: [
+      { label: 'Maintain arc and rhythm.', success: 85, neutral: 10, fail: 5, intent: 'flow' },
+      { label: 'Straighten early.', success: 70, neutral: 20, fail: 10, intent: 'caution' },
+      { label: 'Ride forward through turn.', success: 65, neutral: 25, fail: 10, intent: 'risk' },
+      { label: 'Circle and retry.', success: 80, neutral: 15, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Rider Overadjusts', scene: 'Too much adjustment interrupts hunter smoothness.', options: [
+      { label: 'Relax and return rhythm.', success: 75, neutral: 15, fail: 10, intent: 'recovery' },
+      { label: 'Continue without correction.', success: 60, neutral: 25, fail: 15, intent: 'compromise' },
+      { label: 'Circle to rebalance.', success: 80, neutral: 15, fail: 5, intent: 'regroup' },
+      { label: 'Slow and reset.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Perfect Hunter Flow', scene: 'Round quality peaks with effortless style.', options: [
+      { label: 'Maintain flow to finish.', success: 95, neutral: 5, fail: 0, intent: 'flow_state' },
+      { label: 'Soften aids and cruise.', success: 90, neutral: 10, fail: 0, intent: 'harmony' },
+      { label: 'Push for extra brilliance.', success: 75, neutral: 15, fail: 10, intent: 'expression' },
+      { label: 'Finish conservatively.', success: 90, neutral: 10, fail: 0, intent: 'consistency' }
+    ]}
+  ],
+  dressage: [
+    { title: 'Transition Too Quick', scene: 'The transition runs ahead of your aids.', options: [
+      { label: 'Half-halt to rebalance.', success: 75, neutral: 15, fail: 10, intent: 'regulate_rhythm' },
+      { label: 'Continue forward and soften contact.', success: 65, neutral: 20, fail: 15, intent: 'compromise' },
+      { label: 'Redo transition.', success: 85, neutral: 10, fail: 5, intent: 'correction' },
+      { label: 'Halt and reset.', success: 80, neutral: 15, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Slowing Mid Movement', scene: 'Impulsion fades midway through the movement.', options: [
+      { label: 'Add leg gently.', success: 75, neutral: 15, fail: 10, intent: 'restore_impulsion' },
+      { label: 'Accept slower rhythm.', success: 60, neutral: 25, fail: 15, intent: 'compromise' },
+      { label: 'Transition down and rebuild.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'End movement early.', success: 85, neutral: 10, fail: 5, intent: 'welfare_priority' }
+    ]},
+    { title: 'Crooked Centerline', scene: 'The centerline drifts off true straightness.', options: [
+      { label: 'Correct with outside aids.', success: 80, neutral: 15, fail: 5, intent: 'straighten' },
+      { label: 'Continue and accept lower score.', success: 65, neutral: 20, fail: 15, intent: 'compromise' },
+      { label: 'Halt and re-enter line.', success: 85, neutral: 10, fail: 5, intent: 'correction' },
+      { label: 'Overcorrect sharply.', success: 55, neutral: 25, fail: 20, intent: 'risk' }
+    ]},
+    { title: 'Canter Transition Rush', scene: 'Canter departure becomes hurried.', options: [
+      { label: 'Half-halt immediately.', success: 75, neutral: 15, fail: 10, intent: 'regulate' },
+      { label: 'Circle to settle.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Allow forward canter.', success: 60, neutral: 25, fail: 15, intent: 'compromise' },
+      { label: 'Return to trot.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Lateral Misunderstanding', scene: 'The horse misreads a lateral aid moment.', options: [
+      { label: 'Clarify aids calmly.', success: 75, neutral: 15, fail: 10, intent: 'communication' },
+      { label: 'Simplify movement.', success: 80, neutral: 15, fail: 5, intent: 'simplify' },
+      { label: 'Continue imperfectly.', success: 65, neutral: 20, fail: 15, intent: 'compromise' },
+      { label: 'Return to straight line.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Tension Builds', scene: 'Tension increases and frame tightens.', options: [
+      { label: 'Soften contact and ride forward.', success: 75, neutral: 15, fail: 10, intent: 'relaxation' },
+      { label: 'Halt briefly.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Push through tension.', success: 60, neutral: 25, fail: 15, intent: 'challenge' },
+      { label: 'End test early.', success: 90, neutral: 10, fail: 0, intent: 'welfare_priority' }
+    ]},
+    { title: 'Sudden Harmony', scene: 'A rare harmony moment appears in self-carriage.', options: [
+      { label: 'Maintain exactly as is.', success: 95, neutral: 5, fail: 0, intent: 'harmony' },
+      { label: 'Reward subtly.', success: 95, neutral: 5, fail: 0, intent: 'positive_reinforcement' },
+      { label: 'Increase difficulty slightly.', success: 75, neutral: 15, fail: 10, intent: 'progression' },
+      { label: 'Finish movement early.', success: 90, neutral: 10, fail: 0, intent: 'consistency' }
+    ]},
+    { title: 'Judge Pressure', scene: 'Crowd and judge presence increase rider pressure.', options: [
+      { label: 'Focus on rhythm only.', success: 80, neutral: 15, fail: 5, intent: 'focus' },
+      { label: 'Ride bigger for impression.', success: 70, neutral: 20, fail: 10, intent: 'expression' },
+      { label: 'Overcorrect due to nerves.', success: 55, neutral: 25, fail: 20, intent: 'pressure_error' },
+      { label: 'Simplify movement.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
+    ]},
+    { title: 'Slight Trip', scene: 'A small trip breaks rhythm momentarily.', options: [
+      { label: 'Support and continue.', success: 75, neutral: 15, fail: 10, intent: 'recovery' },
+      { label: 'Circle and regroup.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Halt and restart.', success: 85, neutral: 10, fail: 5, intent: 'correction' },
+      { label: 'Accept lower score.', success: 70, neutral: 20, fail: 10, intent: 'compromise' }
+    ]},
+    { title: 'Final Halt Pressure', scene: 'The final halt decides polish and impression.', options: [
+      { label: 'Halt straight and confident.', success: 85, neutral: 10, fail: 5, intent: 'finish' },
+      { label: 'Overprepare and lose flow.', success: 60, neutral: 25, fail: 15, intent: 'overthinking' },
+      { label: 'Maintain forward then halt late.', success: 70, neutral: 20, fail: 10, intent: 'compromise' },
+      { label: 'Mentally reset and retry.', success: 80, neutral: 15, fail: 5, intent: 'correction' }
+    ]}
+  ],
+  eventing: [
+    { title: 'XC Narrow Fence', scene: 'A skinny fence demands commitment and straightness.', options: [
+      { label: 'Ride confidently forward.', success: 75, neutral: 15, fail: 10, intent: 'commitment' },
+      { label: 'Slow and aim carefully.', success: 70, neutral: 20, fail: 10, intent: 'precision' },
+      { label: 'Circle and re-approach.', success: 85, neutral: 10, fail: 5, intent: 'reset' },
+      { label: 'Skip question (penalty).', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Water Splash Hesitation', scene: 'The horse backs off slightly at water.', options: [
+      { label: 'Keep leg on and ride through.', success: 75, neutral: 15, fail: 10, intent: 'confidence' },
+      { label: 'Slow and reassure.', success: 70, neutral: 20, fail: 10, intent: 'reassurance' },
+      { label: 'Circle and retry.', success: 80, neutral: 15, fail: 5, intent: 'reset' },
+      { label: 'Avoid route.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Bank Jump', scene: 'The bank question tests rider balance and line.', options: [
+      { label: 'Stay centered and straight.', success: 75, neutral: 15, fail: 10, intent: 'balance' },
+      { label: 'Slow before drop.', success: 70, neutral: 20, fail: 10, intent: 'caution' },
+      { label: 'Ride forward boldly.', success: 65, neutral: 20, fail: 15, intent: 'commitment' },
+      { label: 'Circle away.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
+    ]},
+    { title: 'Cross-Country Gallop', scene: 'Gallop section pressure challenges time management.', options: [
+      { label: 'Maintain pace for time.', success: 80, neutral: 15, fail: 5, intent: 'time_management' },
+      { label: 'Slow for control.', success: 75, neutral: 15, fail: 10, intent: 'balance' },
+      { label: 'Push faster.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
+      { label: 'Regroup before next fence.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Horse Spooks at Crowd', scene: 'Atmosphere causes a sharp loss of focus.', options: [
+      { label: 'Ride forward confidently.', success: 75, neutral: 15, fail: 10, intent: 'confidence' },
+      { label: 'Circle and calm.', success: 80, neutral: 15, fail: 5, intent: 'regroup' },
+      { label: 'Pull back strongly.', success: 55, neutral: 25, fail: 20, intent: 'emergency' },
+      { label: 'Retire from round.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Rider Tired Near End', scene: 'Fatigue appears as control and timing get harder.', options: [
+      { label: 'Maintain rhythm and focus.', success: 75, neutral: 15, fail: 10, intent: 'endurance' },
+      { label: 'Slow slightly to recover.', success: 80, neutral: 15, fail: 5, intent: 'manage_energy' },
+      { label: 'Push through fatigue.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
+      { label: 'Retire early.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Triple Combination', scene: 'A demanding combination asks for precision and straightness.', options: [
+      { label: 'Stay straight and balanced.', success: 75, neutral: 15, fail: 10, intent: 'precision' },
+      { label: 'Collect before entering.', success: 70, neutral: 20, fail: 10, intent: 'balance' },
+      { label: 'Ride forward strongly.', success: 65, neutral: 20, fail: 15, intent: 'commitment' },
+      { label: 'Circle and retry.', success: 80, neutral: 15, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Sudden Buck on Landing', scene: 'A buck after landing threatens rider position.', options: [
+      { label: 'Sit deep and continue.', success: 70, neutral: 20, fail: 10, intent: 'recovery' },
+      { label: 'Circle to regain control.', success: 80, neutral: 15, fail: 5, intent: 'stabilize' },
+      { label: 'Pull abruptly.', success: 55, neutral: 25, fail: 20, intent: 'emergency' },
+      { label: 'Retire.', success: 90, neutral: 10, fail: 0, intent: 'safety' }
+    ]},
+    { title: 'Time Pressure Final Fence', scene: 'Clock pressure builds on the final effort.', options: [
+      { label: 'Keep current rhythm.', success: 80, neutral: 15, fail: 5, intent: 'consistency' },
+      { label: 'Push forward for time.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
+      { label: 'Slow for clean jump.', success: 75, neutral: 15, fail: 10, intent: 'safety' },
+      { label: 'Circle (time penalty).', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+    ]},
+    { title: 'Perfect XC Flow', scene: 'Everything aligns across terrain and questions.', options: [
+      { label: 'Maintain rhythm to finish.', success: 95, neutral: 5, fail: 0, intent: 'flow_state' },
+      { label: 'Relax aids and trust horse.', success: 90, neutral: 10, fail: 0, intent: 'harmony' },
+      { label: 'Push for faster finish.', success: 75, neutral: 15, fail: 10, intent: 'risk' },
+      { label: 'Finish conservatively.', success: 90, neutral: 10, fail: 0, intent: 'consistency' }
+    ]}
   ]
 };
 
@@ -3626,7 +3921,7 @@ function competitionMemoryPenalty(horse, discipline) {
 
 function competitionInteractionPhases(discipline) {
   if (discipline === 'dressage') return ['center line', 'transition sequence', 'lateral work', 'final halt'];
-  if (discipline === 'eventing') return ['dressage phase', 'showjumping phase', 'cross-country phase'];
+  if (discipline === 'eventing') return ['dressage phase', 'cross-country phase', 'showjumping phase'];
   if (discipline === 'hunter') return ['first line', 'bending line', 'single fence', 'hand gallop'];
   return ['approach to fence 1', 'mid-course line', 'technical turn', 'final fence'];
 }
@@ -3908,46 +4203,98 @@ function applyNormalTrainingSession(horse, discipline, exercise) {
   pushReport(`${horse.name} completed normal training in ${cap(discipline)} (${exercise}) and gained +${gain} skill.`);
 }
 
+function competitionWarmupReadinessBonus(session) {
+  const st = session.warmupState || { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 };
+  const quality = Math.round((st.focus + st.confidence + st.energy + st.timing - st.tension) / 4);
+  if (quality >= 45) return 10;
+  if (quality <= 15) return -12;
+  return 0;
+}
+
+function competitionPromptForStep(session) {
+  const step = session.steps[session.stepIndex];
+  if (!step) return null;
+  if (step.stage === 'course_walk') return COMPETITION_COURSE_WALK_VARIANTS[step.variantIndex % COMPETITION_COURSE_WALK_VARIANTS.length];
+  if (step.stage === 'warm_up') {
+    const universalCount = COMPETITION_WARMUP_UNIVERSAL.length;
+    if (step.variantIndex < universalCount) return COMPETITION_WARMUP_UNIVERSAL[step.variantIndex];
+    const set = COMPETITION_WARMUP_VARIANTS[session.discipline] || [];
+    return set[(step.variantIndex - universalCount) % Math.max(1, set.length)] || COMPETITION_WARMUP_UNIVERSAL[0];
+  }
+  const set = COMPETITION_RPG_VARIANTS[session.discipline] || COMPETITION_RPG_VARIANTS.jumping;
+  return set[step.variantIndex % set.length];
+}
+
 function buildCompetitionRpgSession(horse, discipline, level) {
+  const mainCount = discipline === 'jumping' ? 10 : 8;
+  const warmupCount = COMPETITION_WARMUP_UNIVERSAL.length + 2;
   const phases = competitionInteractionPhases(discipline);
+  const steps = [];
+  for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk' });
+  for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up' });
+  for (let i = 0; i < mainCount; i += 1) steps.push({ stage: 'main_round', variantIndex: i, phase: phases[i % phases.length] });
   return {
     horseId: horse.id,
     discipline,
     level,
     stepIndex: 0,
-    phases,
+    steps,
     outcomes: [],
     modifier: 0,
     refusalCount: 0,
     eliminated: false,
-    selectedOption: null,
     awaitingAdvance: false,
     feedback: '',
-    courseLength: discipline === 'jumping' ? rnd(6, 12) : rnd(6, 10)
+    warmupState: { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 },
+    readinessBonus: 0,
+    currentStage: 'course_walk'
   };
 }
 
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
-  const set = COMPETITION_RPG_VARIANTS[session.discipline] || COMPETITION_RPG_VARIANTS.jumping;
-  const variant = set[session.stepIndex % set.length];
+  const step = session.steps[session.stepIndex];
+  const variant = competitionPromptForStep(session);
+  if (!step || !variant) return;
   const option = variant.options[choiceIndex];
   const moodMod = moodOutcomeModifier(horse.mood);
   const personalityMod = personalityOutcomeModifier(horse.personality);
   const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.2);
-  const successChance = clamp(option.success + moodMod + personalityMod + skillMod, 10, 95);
+  const prepMod = step.stage === 'main_round' ? session.readinessBonus : 0;
+  const successChance = clamp(option.success + moodMod + personalityMod + skillMod + prepMod, 10, 95);
   const neutralChance = clamp(option.neutral, 3, 70);
   const failChance = Math.max(1, 100 - successChance - neutralChance);
   const roll = rnd(1, 100);
   const outcome = roll <= successChance ? 'success' : roll <= successChance + neutralChance ? 'partial' : 'fail';
-  const stepPhase = session.phases[session.stepIndex % session.phases.length];
   const mod = outcome === 'success' ? rnd(2, 5) : outcome === 'partial' ? rnd(-1, 2) : rnd(-8, -3);
   session.modifier += mod;
-  if (outcome === 'fail' && rnd(1, 100) <= 35) session.refusalCount += 1;
-  if (outcome === 'fail' && (session.refusalCount >= 3 || rnd(1, 100) <= 15)) session.eliminated = true;
+
+  if (step.stage === 'warm_up') {
+    const ws = session.warmupState;
+    if (outcome === 'success') {
+      ws.tension = clamp(ws.tension - rnd(4, 8), 0, 100);
+      ws.focus = clamp(ws.focus + rnd(3, 7), 0, 100);
+      ws.confidence = clamp(ws.confidence + rnd(3, 7), 0, 100);
+      ws.energy = clamp(ws.energy + rnd(1, 4), 0, 100);
+      ws.timing = clamp(ws.timing + rnd(2, 6), 0, 100);
+    } else if (outcome === 'partial') {
+      ws.tension = clamp(ws.tension + rnd(-2, 3), 0, 100);
+      ws.focus = clamp(ws.focus + rnd(-1, 2), 0, 100);
+      ws.confidence = clamp(ws.confidence + rnd(-1, 2), 0, 100);
+    } else {
+      ws.tension = clamp(ws.tension + rnd(5, 10), 0, 100);
+      ws.focus = clamp(ws.focus - rnd(3, 7), 0, 100);
+      ws.confidence = clamp(ws.confidence - rnd(3, 7), 0, 100);
+      ws.timing = clamp(ws.timing - rnd(2, 6), 0, 100);
+    }
+  }
+
+  if (step.stage === 'main_round' && outcome === 'fail' && rnd(1, 100) <= 35) session.refusalCount += 1;
+  if (step.stage === 'main_round' && outcome === 'fail' && (session.refusalCount >= 3 || rnd(1, 100) <= 15)) session.eliminated = true;
+
   session.outcomes.push({
-    phase: stepPhase,
+    phase: step.phase,
     outcome,
-    eventText: variant.title,
+    eventText: `${cap(step.stage.replace('_', ' '))}: ${variant.title}`,
     chances: { success: successChance, partial: neutralChance, fail: failChance }
   });
   session.feedback = `${variant.title}: ${outcome.toUpperCase()} (S${successChance}/P${neutralChance}/F${failChance})`;
@@ -3957,7 +4304,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
 function finalizeCompetitionRpgEntry(horse, session) {
   const interaction = {
     controls: COMPETITION_CONTROLS,
-    modifier: clamp(session.modifier, -20, 16),
+    modifier: clamp(session.modifier + session.readinessBonus, -26, 20),
     phases: session.outcomes,
     memoryPenalty: competitionMemoryPenalty(horse, session.discipline)
   };
@@ -4075,19 +4422,30 @@ function renderShows() {
       app.competitionRpg = null;
       return renderShows();
     }
-    const variantSet = COMPETITION_RPG_VARIANTS[activeSession.discipline] || COMPETITION_RPG_VARIANTS.jumping;
-    const variant = variantSet[activeSession.stepIndex % variantSet.length];
-    const phase = activeSession.phases[activeSession.stepIndex % activeSession.phases.length] || 'next phase';
+    const step = activeSession.steps[activeSession.stepIndex];
+    const variant = competitionPromptForStep(activeSession);
+    if (!step || !variant) {
+      finalizeCompetitionRpgEntry(horse, activeSession);
+      return renderShows();
+    }
+    const stageLabel = step.stage === 'course_walk' ? 'Course Walk' : step.stage === 'warm_up' ? 'Warm-Up' : 'Main Round';
+    const stageCount = activeSession.steps.filter((x) => x.stage === step.stage).length;
+    const stageIndex = activeSession.steps.slice(0, activeSession.stepIndex + 1).filter((x) => x.stage === step.stage).length;
+    const ws = activeSession.warmupState;
+
     panel.innerHTML = `
       <h2>🏆 Competition RPG — ${cap(activeSession.discipline)} (${activeSession.level})</h2>
       <div class='box'>
+        <p><strong>Scheme:</strong> Course walk → Warm-up → Main round</p>
         <p><strong>Horse:</strong> ${horse.name}</p>
         <p><strong>Mode:</strong> ${competitionModeLabel()}</p>
-        <p><strong>Course:</strong> ${activeSession.courseLength} questions • Difficulty based on selected level.</p>
-        <p><strong>Phase:</strong> ${cap(phase)} (${activeSession.stepIndex + 1}/${activeSession.courseLength})</p>
+        <p><strong>Stage:</strong> ${stageLabel} (${stageIndex}/${stageCount})</p>
+        <p><strong>Phase:</strong> ${cap(step.phase)}</p>
         <p><strong>Scene:</strong> ${variant.title} — ${variant.scene}</p>
         ${activeSession.feedback ? `<p><strong>Last result:</strong> ${activeSession.feedback}</p>` : ''}
-        <p class='small'>Press Enter after each choice to move through approach → stride count → takeoff/landing style scenes.</p>
+        <p class='small'>Press Enter after each choice to move to the next scene.</p>
+        <p class='small'><strong>Warm-up state:</strong> Tension ${ws.tension} | Focus ${ws.focus} | Confidence ${ws.confidence} | Energy ${ws.energy} | Timing ${ws.timing}</p>
+        <p class='small'><strong>Readiness bonus:</strong> ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}</p>
         <div id='comp-rpg-options'></div>
         <div class='inline'>
           <button id='comp-enter'>Enter</button>
@@ -4102,6 +4460,7 @@ function renderShows() {
       box.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
         <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
+        <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
       wrap.append(box);
@@ -4119,7 +4478,11 @@ function renderShows() {
       }
       activeSession.awaitingAdvance = false;
       activeSession.stepIndex += 1;
-      if (activeSession.eliminated || activeSession.stepIndex >= activeSession.courseLength) {
+      const nextStep = activeSession.steps[activeSession.stepIndex];
+      if (nextStep && nextStep.stage === 'main_round' && activeSession.readinessBonus === 0) {
+        activeSession.readinessBonus = competitionWarmupReadinessBonus(activeSession);
+      }
+      if (activeSession.eliminated || activeSession.stepIndex >= activeSession.steps.length) {
         finalizeCompetitionRpgEntry(horse, activeSession);
       }
       renderShows();
