@@ -2063,6 +2063,7 @@ function tackControlabilityDelta(horse, discipline = 'flatwork') {
   if (tack.body === 'Martingal') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 6 : 1;
   if (tack.body === 'Draw Reins') {
     const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
+  const rpgRoundStats = interaction?.roundStats && typeof interaction.roundStats === 'object' ? interaction.roundStats : null;
     delta += hotBlooded ? 6 : -30;
   }
   return delta;
@@ -4072,6 +4073,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const jumpCount = competitionJumpCount(discipline, level);
   const tack = horse.tack || {};
   const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
+  const rpgRoundStats = interaction?.roundStats && typeof interaction.roundStats === 'object' ? interaction.roundStats : null;
   let tackPenaltyBias = 0;
   let tackRefusalBias = 0;
   if (tack.headwear === 'Ear-Bonnet') {
@@ -4100,7 +4102,23 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
     overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
-    if (fall || refusals >= 2) {
+    if (rpgRoundStats) {
+      rails = Math.max(0, Math.round((rpgRoundStats.faults || 0) / 4));
+      refusals = Math.max(0, rpgRoundStats.refusals || 0);
+      faults = Math.max(0, rpgRoundStats.faults || 0) + overSeconds;
+      eliminated = rpgRoundStats.eliminated === true;
+      if (eliminated) {
+        score = 0;
+        penaltiesText = 'Eliminated';
+        timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
+        resultText = penaltiesText;
+      } else {
+        score = clamp(baseScore - faults * 1.5, 0, 100);
+        penaltiesText = faults === 0 ? 'Clear Round' : `${faults} faults`;
+        timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
+        resultText = `${penaltiesText} | ${timeScoreText}`;
+      }
+    } else if (fall || refusals >= 2) {
       eliminated = true;
       score = 0;
       penaltiesText = 'Eliminated';
@@ -4109,7 +4127,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     } else {
       faults = rails * 4 + refusals * 4 + overSeconds;
       score = clamp(baseScore - faults * 1.5, 0, 100);
-      penaltiesText = `${faults} faults`;
+      penaltiesText = faults === 0 ? 'Clear Round' : `${faults} faults`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = `${penaltiesText} | ${timeScoreText}`;
     }
@@ -4126,7 +4144,23 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
     overSeconds = Math.max(0, rnd(0, 20) - Math.floor(jump.Speed / 4));
-    if (fall || refusals >= 3) {
+    if (rpgRoundStats) {
+      rails = Math.max(0, Math.round((rpgRoundStats.faults || 0) / 4));
+      refusals = Math.max(0, rpgRoundStats.refusals || 0);
+      const penalties = (rpgRoundStats.faults || 0) + refusals * 16 + overSeconds * 0.4;
+      eliminated = rpgRoundStats.eliminated === true;
+      if (eliminated) {
+        score = 0;
+        penaltiesText = 'Eliminated';
+        timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
+        resultText = penaltiesText;
+      } else {
+        score = clamp(baseScore - penalties * 0.6, 0, 100);
+        penaltiesText = penalties <= 0.01 ? 'Clear Round' : `${penalties.toFixed(1)} penalties`;
+        timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
+        resultText = penaltiesText;
+      }
+    } else if (fall || refusals >= 3) {
       eliminated = true;
       score = 0;
       penaltiesText = 'Eliminated';
@@ -4135,14 +4169,14 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     } else {
       const penalties = rails * 4 + refusals * 20 + overSeconds * 0.4;
       score = clamp(baseScore - penalties * 0.6, 0, 100);
-      penaltiesText = `${penalties.toFixed(1)} penalties`;
+      penaltiesText = penalties <= 0.01 ? 'Clear Round' : `${penalties.toFixed(1)} penalties`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     }
   } else if (discipline === 'hunter') {
-    faults = clamp(rnd(0, 5 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias)) - Math.floor((dress.Flowiness + dress.Balance + jump.Striding + jump.Structure) / 90), 0, 12);
+    faults = rpgRoundStats ? Math.max(0, rpgRoundStats.faults || 0) : clamp(rnd(0, 5 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias)) - Math.floor((dress.Flowiness + dress.Balance + jump.Striding + jump.Structure) / 90), 0, 12);
     score = clamp(baseScore - faults * 1.4, 0, 100);
-    penaltiesText = `${faults} faults`;
+    penaltiesText = faults === 0 ? 'Clear Round' : `${faults} faults`;
     timeScoreText = `Score ${score.toFixed(1)}`;
     resultText = penaltiesText;
   }
@@ -4225,14 +4259,30 @@ function competitionPromptForStep(session) {
   return set[step.variantIndex % set.length];
 }
 
+function competitionJumpTypesForDiscipline(discipline) {
+  if (discipline === 'dressage') return ['Centerline', 'Transition', 'Lateral movement', 'Final halt'];
+  if (discipline === 'hunter') return ['Hunter vertical', 'Outside line fence', 'Bending line fence', 'Final hunter fence'];
+  if (discipline === 'eventing') return ['Dressage marker', 'Cross-country question', 'Stadium vertical', 'Combination'];
+  return ['Vertical', 'Oxer', 'Liverpool', 'Triple bar', 'Combination', 'Wall', 'Plank', 'Water tray', 'Skinny fence'];
+}
+
 function buildCompetitionRpgSession(horse, discipline, level) {
   const mainCount = discipline === 'jumping' ? 10 : 8;
   const warmupCount = COMPETITION_WARMUP_UNIVERSAL.length + 2;
   const phases = competitionInteractionPhases(discipline);
+  const jumpTypes = competitionJumpTypesForDiscipline(discipline);
   const steps = [];
   for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk' });
   for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up' });
-  for (let i = 0; i < mainCount; i += 1) steps.push({ stage: 'main_round', variantIndex: i, phase: phases[i % phases.length] });
+  for (let i = 0; i < mainCount; i += 1) {
+    steps.push({
+      stage: 'main_round',
+      variantIndex: i,
+      phase: phases[i % phases.length],
+      jumpNumber: i + 1,
+      jumpType: pick(jumpTypes)
+    });
+  }
   return {
     horseId: horse.id,
     discipline,
@@ -4247,7 +4297,8 @@ function buildCompetitionRpgSession(horse, discipline, level) {
     feedback: '',
     warmupState: { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 },
     readinessBonus: 0,
-    currentStage: 'course_walk'
+    currentStage: 'course_walk',
+    roundStats: { faults: 0, refusals: 0, clearJumps: 0, eliminated: false, eliminationReason: '' }
   };
 }
 
@@ -4277,6 +4328,14 @@ function normalizeCompetitionRpgSession(session) {
     timing: clamp(Number.isFinite(ws.timing) ? ws.timing : 50, 0, 100)
   };
   normalized.readinessBonus = Number.isFinite(session.readinessBonus) ? session.readinessBonus : 0;
+  const rs = session.roundStats || {};
+  normalized.roundStats = {
+    faults: Number.isFinite(rs.faults) ? Math.max(0, rs.faults) : 0,
+    refusals: Number.isFinite(rs.refusals) ? Math.max(0, rs.refusals) : 0,
+    clearJumps: Number.isFinite(rs.clearJumps) ? Math.max(0, rs.clearJumps) : 0,
+    eliminated: rs.eliminated === true,
+    eliminationReason: typeof rs.eliminationReason === 'string' ? rs.eliminationReason : ''
+  };
   return normalized;
 }
 
@@ -4317,16 +4376,44 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     }
   }
 
-  if (step.stage === 'main_round' && outcome === 'fail' && rnd(1, 100) <= 35) session.refusalCount += 1;
-  if (step.stage === 'main_round' && outcome === 'fail' && (session.refusalCount >= 3 || rnd(1, 100) <= 15)) session.eliminated = true;
+  let displayOutcome = step.stage === 'main_round' ? 'Clear Jump' : (outcome === 'success' ? 'Prepared' : outcome === 'partial' ? 'Mixed prep' : 'Tense prep');
+  if (step.stage === 'main_round') {
+    const rs = session.roundStats || { faults: 0, refusals: 0, clearJumps: 0, eliminated: false, eliminationReason: '' };
+    if (outcome === 'success') {
+      rs.clearJumps += 1;
+      displayOutcome = 'Clear Jump';
+    } else if (outcome === 'partial') {
+      rs.faults += 4;
+      displayOutcome = 'Clear Jump';
+    } else {
+      session.refusalCount += 1;
+      rs.refusals += 1;
+      rs.faults += 4;
+      const fallTriggered = rnd(1, 100) <= 18;
+      if (fallTriggered) {
+        session.eliminated = true;
+        rs.eliminated = true;
+        rs.eliminationReason = 'fall';
+        displayOutcome = 'Elimination (fall)';
+      } else if (session.refusalCount >= 2) {
+        session.eliminated = true;
+        rs.eliminated = true;
+        rs.eliminationReason = '2 refusals';
+        displayOutcome = 'Elimination (2 refusals)';
+      } else {
+        displayOutcome = 'Refusal';
+      }
+    }
+    session.roundStats = rs;
+  }
 
   session.outcomes.push({
     phase: step.phase,
-    outcome,
+    outcome: displayOutcome,
     eventText: `${cap(step.stage.replace('_', ' '))}: ${variant.title}`,
     chances: { success: successChance, partial: neutralChance, fail: failChance }
   });
-  session.feedback = `${variant.title}: ${outcome.toUpperCase()} (S${successChance}/P${neutralChance}/F${failChance})`;
+  session.feedback = `${variant.title}: ${displayOutcome}`;
   session.awaitingAdvance = true;
 }
 
@@ -4335,7 +4422,8 @@ function finalizeCompetitionRpgEntry(horse, session) {
     controls: COMPETITION_CONTROLS,
     modifier: clamp(session.modifier + session.readinessBonus, -26, 20),
     phases: session.outcomes,
-    memoryPenalty: competitionMemoryPenalty(horse, session.discipline)
+    memoryPenalty: competitionMemoryPenalty(horse, session.discipline),
+    roundStats: session.roundStats || { faults: 0, refusals: 0, clearJumps: 0, eliminated: false, eliminationReason: '' }
   };
   const entry = {
     id: uid(),
@@ -4462,6 +4550,9 @@ function renderShows() {
     const stageCount = activeSession.steps.filter((x) => x.stage === step.stage).length;
     const stageIndex = activeSession.steps.slice(0, activeSession.stepIndex + 1).filter((x) => x.stage === step.stage).length;
     const ws = activeSession.warmupState;
+    const sceneLine = step.stage === 'main_round'
+      ? `${variant.title} (Jump ${step.jumpNumber || (stageIndex)}), ${step.jumpType || 'Course element'}, ${variant.scene}`
+      : `${variant.title}, ${variant.scene}`;
 
     panel.innerHTML = `
       <h2>🏆 Competition RPG — ${cap(activeSession.discipline)} (${activeSession.level})</h2>
@@ -4471,9 +4562,9 @@ function renderShows() {
         <p><strong>Mode:</strong> ${competitionModeLabel()}</p>
         <p><strong>Stage:</strong> ${stageLabel} (${stageIndex}/${stageCount})</p>
         <p><strong>Phase:</strong> ${cap(step.phase)}</p>
-        <p><strong>Scene:</strong> ${variant.title} — ${variant.scene}</p>
-        ${activeSession.feedback ? `<p><strong>Last result:</strong> ${activeSession.feedback}</p>` : ''}
+        <p><strong>Scene:</strong> ${sceneLine}</p>
         <p class='small'>Press Enter after each choice to move to the next scene.</p>
+        ${activeSession.feedback ? `<p><strong>Last Result:</strong> ${activeSession.feedback}</p>` : ''}
         <p class='small'><strong>Warm-up state:</strong> Tension ${ws.tension} | Focus ${ws.focus} | Confidence ${ws.confidence} | Energy ${ws.energy} | Timing ${ws.timing}</p>
         <p class='small'><strong>Readiness bonus:</strong> ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}</p>
         <div id='comp-rpg-options'></div>
