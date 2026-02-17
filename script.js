@@ -297,6 +297,9 @@ const BARN_SUFFIXES = ['Raven', 'Hoof', 'Flying', 'Winged', 'Apollo', 'Myth', 'B
 const BARN_ENDINGS = ['Acres', 'Ranch', 'Equine Facility', 'Stables', 'Farms'];
 const DISCIPLINES = ['dressage', 'eventing', 'jumping', 'hunter'];
 
+const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
+const NEGATIVE_MOODS = ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Overly-Active', 'Uncomfortable'];
+
 const ENVIRONMENT_OPTIONS = {
   wind: ['Calm', 'Light breeze', 'Steady wind', 'Gusty'],
   noise: ['Quiet', 'Mild arena chatter', 'Busy and noisy', 'Unexpected loud sounds'],
