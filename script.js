@@ -2220,7 +2220,7 @@ function hydrateFromSave(data) {
     : { horseId: '', discipline: 'jumping', exercise: '' };
   app.trainingRpgConfig = normalizeTrainingRpgConfig(data.trainingRpgConfig);
   app.trainingRpg = typeof data.trainingRpg === 'object' && data.trainingRpg ? data.trainingRpg : null;
-  app.competitionRpg = typeof data.competitionRpg === 'object' && data.competitionRpg ? data.competitionRpg : null;
+  app.competitionRpg = normalizeCompetitionRpgSession(data.competitionRpg);
   app.trainingRpgFeedback = typeof data.trainingRpgFeedback === 'string' ? data.trainingRpgFeedback : '';
   app.trainingRpgSummary = typeof data.trainingRpgSummary === 'object' && data.trainingRpgSummary ? data.trainingRpgSummary : null;
   app.showSelections = typeof data.showSelections === 'object' && data.showSelections ? data.showSelections : {};
@@ -4251,6 +4251,35 @@ function buildCompetitionRpgSession(horse, discipline, level) {
   };
 }
 
+function normalizeCompetitionRpgSession(session) {
+  if (!session || typeof session !== 'object') return null;
+  const discipline = typeof session.discipline === 'string' && SHOW_LEVELS[session.discipline] ? session.discipline : 'jumping';
+  const level = typeof session.level === 'string' ? session.level : SHOW_LEVELS[discipline][0];
+  const base = buildCompetitionRpgSession({ id: session.horseId || '' }, discipline, level);
+  const normalized = { ...base, ...session };
+  normalized.discipline = discipline;
+  normalized.level = level;
+  normalized.horseId = session.horseId || '';
+  normalized.stepIndex = Number.isFinite(session.stepIndex) ? Math.max(0, session.stepIndex) : 0;
+  normalized.steps = Array.isArray(session.steps) && session.steps.length ? session.steps : base.steps;
+  normalized.outcomes = Array.isArray(session.outcomes) ? session.outcomes : [];
+  normalized.modifier = Number.isFinite(session.modifier) ? session.modifier : 0;
+  normalized.refusalCount = Number.isFinite(session.refusalCount) ? session.refusalCount : 0;
+  normalized.eliminated = session.eliminated === true;
+  normalized.awaitingAdvance = session.awaitingAdvance === true;
+  normalized.feedback = typeof session.feedback === 'string' ? session.feedback : '';
+  const ws = session.warmupState || {};
+  normalized.warmupState = {
+    tension: clamp(Number.isFinite(ws.tension) ? ws.tension : 50, 0, 100),
+    focus: clamp(Number.isFinite(ws.focus) ? ws.focus : 50, 0, 100),
+    confidence: clamp(Number.isFinite(ws.confidence) ? ws.confidence : 50, 0, 100),
+    energy: clamp(Number.isFinite(ws.energy) ? ws.energy : 50, 0, 100),
+    timing: clamp(Number.isFinite(ws.timing) ? ws.timing : 50, 0, 100)
+  };
+  normalized.readinessBonus = Number.isFinite(session.readinessBonus) ? session.readinessBonus : 0;
+  return normalized;
+}
+
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const step = session.steps[session.stepIndex];
   const variant = competitionPromptForStep(session);
@@ -4415,6 +4444,7 @@ function resolvePendingCompetitions(horse) {
 function renderShows() {
   app.showSelections = app.showSelections || {};
   const panel = document.getElementById('shows');
+  if (app.competitionRpg) app.competitionRpg = normalizeCompetitionRpgSession(app.competitionRpg);
   const activeSession = app.competitionRpg;
   if (activeSession) {
     const horse = app.horses.find((h) => h.id === activeSession.horseId);
