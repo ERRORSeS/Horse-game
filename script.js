@@ -1969,6 +1969,80 @@ function soundnessForecastLine(years) {
   return 'Should retire from competing... (less then 1 year left)';
 }
 
+function addIllness(horse, illnessTemplate) {
+  if (!horse || !illnessTemplate) return null;
+  horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
+  const existingActive = horse.illnesses.find((i) => i.active && i.name === illnessTemplate.name);
+  if (existingActive) return existingActive;
+  const severity = illnessTemplate.severity || pick(['Easy', 'Medium', 'More Than Medium']);
+  const illness = {
+    name: illnessTemplate.name || 'Condition',
+    impact: Number.isFinite(illnessTemplate.impact) ? illnessTemplate.impact : 8,
+    severity,
+    surgeryRisk: Number.isFinite(illnessTemplate.surgeryRisk) ? illnessTemplate.surgeryRisk : 0,
+    retirementRisk: Number.isFinite(illnessTemplate.retirementRisk) ? illnessTemplate.retirementRisk : 0,
+    remaining: Number.isFinite(illnessTemplate.remaining) ? illnessTemplate.remaining : injuryRecoveryMonths(severity),
+    active: true,
+    hidden: Boolean(illnessTemplate.hidden)
+  };
+  horse.illnesses.push(illness);
+  applySoundnessLoss(horse, severity);
+  horse.injuryCountYear = (horse.injuryCountYear || 0) + 1;
+  return illness;
+}
+
+function maybeAddRandomIllness(horse) {
+  if (!horse || horse.retiredForever || horse.deceased) return;
+  horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
+  const activeCount = horse.illnesses.filter((i) => i.active).length;
+  if (activeCount > 0) return;
+  let chance = 4;
+  if ((horse.qualityOfLife || 65) < 45) chance += 3;
+  if ((horse.stallCleanliness || 65) < 45) chance += 2;
+  if ((horse.dailyGrooming || 65) < 45) chance += 1;
+  if (horse.healthGenetics === 'High') chance += 2;
+  if (horse.healthGenetics === 'Low') chance -= 1;
+  chance = clamp(chance, 1, 14);
+  if (rnd(1, 100) > chance) return;
+  const picked = pick(SICKNESS_TYPES);
+  const issue = addIllness(horse, picked);
+  if (!issue) return;
+  const severityLine = issue.severity ? ` (${issue.severity})` : '';
+  pushReport(`${horse.name} developed ${issue.name}${severityLine}. Estimated recovery ${issue.remaining} month(s).`);
+}
+
+function maybeAddOvertrainingInjury(horse) {
+  if (!horse || horse.retiredForever || horse.deceased) return;
+  if (horse.pendingOvertrainingInjury) {
+    horse.pendingOvertrainingInjury = false;
+    const issue = addIllness(horse, { name: 'Overtraining Strain', impact: 12, severity: 'More Than Medium', surgeryRisk: 2, retirementRisk: 4 });
+    if (issue) pushReport(`${horse.name} picked up an overtraining strain. Reduce sessions and monitor recovery.`);
+    return;
+  }
+  const sessions = horse.trainingSessionsThisMonth || 0;
+  const pref = horse.preferredTrainingSessions || trainingSessionBounds(horse.trainingPreference || 'Medium')[1];
+  if (sessions > pref + 3 && rnd(1, 100) <= 8) {
+    const issue = addIllness(horse, { name: 'Muscle Soreness', impact: 6, severity: 'Easy', surgeryRisk: 0, retirementRisk: 0 });
+    if (issue) pushReport(`${horse.name} is sore from heavy training volume.`);
+  }
+}
+
+function applySoundnessWear(horse) {
+  if (!horse || horse.retiredForever || horse.deceased || horse.age < 3) return;
+  const sessions = horse.trainingSessionsThisMonth || 0;
+  const shows = horse.showEntriesThisMonth || 0;
+  const workLoad = sessions + (shows * 2);
+  if (workLoad <= 0) return;
+  const baseWear = Math.min(0.6, 0.06 * workLoad);
+  const mult = soundnessLossMultiplier(horse);
+  horse.soundnessYears = Math.max(0, Number((horse.soundnessYears - (baseWear * mult)).toFixed(1)));
+  if (horse.soundnessYears <= 0.4 && !horse.unridable && rnd(1, 100) <= 20) {
+    horse.unridable = true;
+    horse.retiredToBreeding = true;
+    pushReport(`${horse.name} can no longer compete due to long-term soundness decline and was retired to breeding.`);
+  }
+}
+
 function trainingSessionBounds(level) {
   if (level === 'Low') return [1, 3];
   if (level === 'High') return [6, 10];
@@ -6337,6 +6411,96 @@ function reminderDueThisMonth(reminder) {
 function activeRemindersForCurrentMonth() {
   const closed = new Set(app.closedReminderIds || []);
   return (app.calendarReminders || []).filter((r) => reminderDueThisMonth(r) && !closed.has(r.id));
+}
+
+
+function renderRegistries() {
+  const panel = document.getElementById('registries');
+  if (!panel) return;
+  const horses = app.horses.filter((h) => !h.retiredForever);
+  panel.innerHTML = `
+    <h2>Registries</h2>
+    <div class='box'>
+      <p class='small'>Registry records for your active horses.</p>
+      ${horses.length ? horses.map((h) => {
+        const reg = h.registryInspection;
+        return `<p>${horseDisplayName(h)} — ${reg ? `${reg.registry || h.breed}: ${reg.result} (${reg.totalScore?.toFixed?.(2) ?? reg.totalScore})` : 'Not inspected yet'}</p>`;
+      }).join('') : '<p class="small">No horses in your stable.</p>'}
+    </div>
+  `;
+}
+
+function renderBreeders() {
+  const panel = document.getElementById('breeders');
+  if (!panel) return;
+  const mares = app.horses.filter((h) => h.gender === 'Mare' && !h.retiredForever);
+  const stallions = app.horses.filter((h) => h.gender === 'Stallion' && !h.retiredForever);
+  panel.innerHTML = `
+    <h2>Breeders Board</h2>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Mares</h3>
+        ${mares.length ? mares.map((h) => `<p>${horseDisplayName(h)} — Potential J:${h.potential?.jumping || 0}% D:${h.potential?.dressage || 0}%</p>`).join('') : '<p class="small">No mares available.</p>'}
+      </div>
+      <div class='box'>
+        <h3>Stallions</h3>
+        ${stallions.length ? stallions.map((h) => `<p>${horseDisplayName(h)} — Potential J:${h.potential?.jumping || 0}% D:${h.potential?.dressage || 0}%</p>`).join('') : '<p class="small">No stallions available.</p>'}
+      </div>
+    </div>
+    <p class='small'>Use Vet and Breeding tabs to perform breeding procedures.</p>
+  `;
+}
+
+function renderFreezer() {
+  const panel = document.getElementById('freezer');
+  if (!panel) return;
+  panel.innerHTML = `
+    <h2>Freezer</h2>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Semen Straws (${app.semenStraws.length})</h3>
+        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
+      </div>
+      <div class='box'>
+        <h3>Embryos (${app.embryos.length})</h3>
+        ${app.embryos.length ? app.embryos.map((e) => `<p>${e.donor} × ${e.sire} <span class='small'>(${e.id})</span></p>`).join('') : '<p class="small">No embryos stored.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderRescue() {
+  const panel = document.getElementById('rescue');
+  if (!panel) return;
+  app.rescueHorses = Array.isArray(app.rescueHorses) ? app.rescueHorses : [];
+  panel.innerHTML = `
+    <h2>Rescue</h2>
+    <div class='box'>
+      <p class='small'>Adopt rescue horses into your stable.</p>
+      ${app.rescueHorses.length ? app.rescueHorses.map((h) => `
+        <div class='box'>
+          <p><strong>${horseDisplayName(h)}</strong> — ${h.breed}, age ${h.age}</p>
+          <p class='small'>Fee: ${money(h.rescueFee || 0)} | Illnesses: ${(h.illnesses || []).filter((i) => i.active).map((i) => i.name).join(', ') || 'None listed'}</p>
+          <button data-rescue='${h.id}'>Adopt</button>
+        </div>
+      `).join('') : '<p class="small">No rescue horses currently available.</p>'}
+    </div>
+  `;
+  panel.querySelectorAll('[data-rescue]').forEach((btn) => {
+    btn.onclick = () => {
+      const horse = app.rescueHorses.find((h) => h.id === btn.dataset.rescue);
+      if (!horse) return;
+      const fee = horse.rescueFee || 0;
+      if (!tryCharge(fee)) return;
+      horse.owner = 'Your Stable';
+      horse.isRescue = true;
+      horse.rescueId = horse.rescueId || uid();
+      app.horses.push(horse);
+      app.rescueHorses = app.rescueHorses.filter((h) => h.id !== horse.id);
+      pushReport(`Adopted rescue horse ${horse.name} for ${money(fee)}.`);
+      renderRescue();
+    };
+  });
 }
 
 function renderCalendar() {
