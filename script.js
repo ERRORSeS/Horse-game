@@ -4346,10 +4346,20 @@ function competitionPromptForStep(session) {
   if (!step) return null;
   if (step.stage === 'course_walk') return COMPETITION_COURSE_WALK_VARIANTS[step.variantIndex % COMPETITION_COURSE_WALK_VARIANTS.length];
   if (step.stage === 'warm_up') {
-    const universalCount = COMPETITION_WARMUP_UNIVERSAL.length;
+    const universalCount = Math.min(3, COMPETITION_WARMUP_UNIVERSAL.length);
     if (step.variantIndex < universalCount) return COMPETITION_WARMUP_UNIVERSAL[step.variantIndex];
     const set = COMPETITION_WARMUP_VARIANTS[session.discipline] || [];
     return set[(step.variantIndex - universalCount) % Math.max(1, set.length)] || COMPETITION_WARMUP_UNIVERSAL[0];
+  }
+  if (step.stage === 'main_round' && session.discipline === 'eventing') {
+    const phase = String(step.phase || '').toLowerCase();
+    if (phase.includes('dressage')) {
+      return COMPETITION_RPG_VARIANTS.dressage[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.dressage.length];
+    }
+    if (phase.includes('cross-country')) {
+      return COMPETITION_RPG_VARIANTS.eventing[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.eventing.length];
+    }
+    return COMPETITION_RPG_VARIANTS.jumping[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.jumping.length];
   }
   const set = COMPETITION_RPG_VARIANTS[session.discipline] || COMPETITION_RPG_VARIANTS.jumping;
   return set[step.variantIndex % set.length];
@@ -4363,22 +4373,50 @@ function competitionJumpTypesForDiscipline(discipline) {
 }
 
 function buildCompetitionRpgSession(horse, discipline, level) {
-  const mainCount = discipline === 'jumping' ? 10 : 8;
-  const warmupCount = COMPETITION_WARMUP_UNIVERSAL.length + 4;
-  const phases = competitionInteractionPhases(discipline);
+  const warmupCount = 6;
   const jumpTypes = competitionJumpTypesForDiscipline(discipline);
   const steps = [];
-  for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk' });
-  for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up' });
-  for (let i = 0; i < mainCount; i += 1) {
-    steps.push({
-      stage: 'main_round',
-      variantIndex: i,
-      phase: phases[i % phases.length],
-      jumpNumber: i + 1,
-      jumpType: pick(jumpTypes)
+  for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk', randomBias: rnd(-6, 6) });
+  for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up', randomBias: rnd(-6, 6) });
+
+  if (discipline === 'eventing') {
+    const eventingPlan = [
+      { phase: 'dressage phase', source: 'dressage' },
+      { phase: 'cross-country phase', source: 'eventing' },
+      { phase: 'showjumping phase', source: 'jumping' }
+    ];
+    let jumpNo = 1;
+    eventingPlan.forEach((part) => {
+      for (let i = 0; i < 5; i += 1) {
+        const list = COMPETITION_RPG_VARIANTS[part.source] || COMPETITION_RPG_VARIANTS.jumping;
+        const prompt = list[i % list.length] || {};
+        steps.push({
+          stage: 'main_round',
+          variantIndex: i,
+          phaseVariantIndex: i,
+          phase: part.phase,
+          jumpNumber: jumpNo,
+          jumpType: prompt.title || pick(jumpTypes),
+          randomBias: rnd(-8, 8)
+        });
+        jumpNo += 1;
+      }
     });
+  } else {
+    const mainCount = discipline === 'jumping' ? 10 : 8;
+    const phases = competitionInteractionPhases(discipline);
+    for (let i = 0; i < mainCount; i += 1) {
+      steps.push({
+        stage: 'main_round',
+        variantIndex: i,
+        phase: phases[i % phases.length],
+        jumpNumber: i + 1,
+        jumpType: pick(jumpTypes),
+        randomBias: rnd(-8, 8)
+      });
+    }
   }
+
   return {
     horseId: horse.id,
     discipline,
@@ -4394,6 +4432,7 @@ function buildCompetitionRpgSession(horse, discipline, level) {
     warmupState: { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 },
     readinessBonus: 0,
     currentStage: 'course_walk',
+    horseChanceBias: rnd(-5, 5),
     roundStats: { faults: 0, refusals: 0, clearJumps: 0, majorFaults: 0, eliminated: false, eliminationReason: '' }
   };
 }
@@ -4424,6 +4463,7 @@ function normalizeCompetitionRpgSession(session) {
     timing: clamp(Number.isFinite(ws.timing) ? ws.timing : 50, 0, 100)
   };
   normalized.readinessBonus = Number.isFinite(session.readinessBonus) ? session.readinessBonus : 0;
+  normalized.horseChanceBias = Number.isFinite(session.horseChanceBias) ? clamp(session.horseChanceBias, -8, 8) : 0;
   const rs = session.roundStats || {};
   normalized.roundStats = {
     faults: Number.isFinite(rs.faults) ? Math.max(0, rs.faults) : 0,
@@ -4452,11 +4492,18 @@ function competitionChanceModifiers(session, horse, step) {
 
 function competitionOptionChances(session, horse, option, step) {
   const mods = competitionChanceModifiers(session, horse, step);
-  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.2);
-  const successChance = clamp(option.success + skillMod + mods.personality + mods.mood + mods.warmup + mods.bond, 10, 95);
-  const neutralChance = clamp(option.neutral, 3, 70);
+  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.22);
+  const confidenceField = session.discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
+  const confidenceMod = Math.round(((horse[confidenceField] || 50) - 50) * 0.12);
+  const memoryMod = Math.round(-competitionMemoryPenalty(horse, session.discipline));
+  const horseBias = Number.isFinite(session.horseChanceBias) ? session.horseChanceBias : 0;
+  const stepRandom = Number.isFinite(step?.randomBias) ? step.randomBias : 0;
+  const optionBias = Math.round(((option.success || 0) - (option.fail || 0)) * 0.03);
+  const randomSwing = stepRandom + optionBias;
+  const successChance = clamp(option.success + skillMod + confidenceMod + memoryMod + mods.personality + mods.mood + mods.warmup + mods.bond + horseBias + randomSwing, 5, 96);
+  const neutralChance = clamp(option.neutral + Math.round(-mods.mood * 0.2 + (stepRandom * -0.25)), 4, 75);
   const failChance = Math.max(1, 100 - successChance - neutralChance);
-  return { successChance, neutralChance, failChance, skillMod, mods };
+  return { successChance, neutralChance, failChance, skillMod, confidenceMod, memoryMod, horseBias, stepRandom, randomSwing, mods };
 }
 
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
@@ -4806,7 +4853,7 @@ function renderShows() {
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
         <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
         <p class='small'>Influenced chance: success ${finalSuccess} / partial ${computed.neutralChance} / fail ${finalFail}</p>
-        <p class='small'>Modifiers → Personality ${computed.mods.personality >= 0 ? '+' : ''}${computed.mods.personality}, Mood ${computed.mods.mood >= 0 ? '+' : ''}${computed.mods.mood}, Warm-Up ${computed.mods.warmup >= 0 ? '+' : ''}${computed.mods.warmup}, Bond ${computed.mods.bond >= 0 ? '+' : ''}${computed.mods.bond}${step.stage === 'main_round' ? `, Readiness ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}` : ''}</p>
+        <p class='small'>Modifiers → Personality ${computed.mods.personality >= 0 ? '+' : ''}${computed.mods.personality}, Mood ${computed.mods.mood >= 0 ? '+' : ''}${computed.mods.mood}, Warm-Up ${computed.mods.warmup >= 0 ? '+' : ''}${computed.mods.warmup}, Bond ${computed.mods.bond >= 0 ? '+' : ''}${computed.mods.bond}, HorseBias ${computed.horseBias >= 0 ? '+' : ''}${computed.horseBias}, StepRand ${computed.stepRandom >= 0 ? '+' : ''}${computed.stepRandom}${step.stage === 'main_round' ? `, Readiness ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}` : ''}</p>
         <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
