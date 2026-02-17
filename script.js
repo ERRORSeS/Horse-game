@@ -297,9 +297,6 @@ const BARN_SUFFIXES = ['Raven', 'Hoof', 'Flying', 'Winged', 'Apollo', 'Myth', 'B
 const BARN_ENDINGS = ['Acres', 'Ranch', 'Equine Facility', 'Stables', 'Farms'];
 const DISCIPLINES = ['dressage', 'eventing', 'jumping', 'hunter'];
 
-const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
-const NEGATIVE_MOODS = ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Overly-Active', 'Uncomfortable'];
-
 const ENVIRONMENT_OPTIONS = {
   wind: ['Calm', 'Light breeze', 'Steady wind', 'Gusty'],
   noise: ['Quiet', 'Mild arena chatter', 'Busy and noisy', 'Unexpected loud sounds'],
@@ -5838,7 +5835,7 @@ function renderBarn() {
   const eventStars = currentBarn?.eventsStars || 3;
   const lessonStars = currentBarn?.lessonsStars || 3;
   const lessonAvailBase = lessonStars === 1 ? 35 : lessonStars === 2 ? 45 : lessonStars === 3 ? 55 : lessonStars === 4 ? 65 : 75;
-  const currentCountry = currentBarn?.country;
+  const currentCountry = currentBarn?.country || 'USA';
   const filterDefault = currentCountry;
   panel.innerHTML = `
     <h2>Barn</h2>
@@ -5871,8 +5868,8 @@ function renderBarn() {
         </div>
       </div>
     </div>
-    <div class='box'>
-      <h3>Switch / Board Barn</h3>
+    <details class='box'>
+      <summary>Switch / Board Barns (Open/Close)</summary>
       <p class='small'>Refresh barn list manually every 4 months.</p>
       <label>Filter</label>
       <select id='barn-filter-country'>
@@ -5881,7 +5878,7 @@ function renderBarn() {
       </select>
       <button id='barn-refresh-list'>Refresh List</button>
       <div id='barn-catalog-list'></div>
-    </div>
+    </details>
   `;
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
@@ -5940,9 +5937,10 @@ function renderBarn() {
     wrap.querySelectorAll('[data-board-one]').forEach((btn) => {
       btn.onclick = () => {
         const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardOne);
+        if (!barn) return;
         const horseId = wrap.querySelector(`[data-board-horse='${barn.id}']`)?.value;
         const horse = app.horses.find((h) => h.id === horseId);
-        if (!barn || !horse) return;
+        if (!horse) return;
         const moveCost = transportCost(currentCountry, barn.country);
         if (!tryCharge(moveCost + barn.boardPerHorse)) return;
         app.currentBarn = { ...barn };
