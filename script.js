@@ -156,7 +156,7 @@ const app = {
 
 const options = {};
 const SAVE_KEY = 'horse_game_save_v1';
-const tabs = ['dashboard', 'horses', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
+const tabs = ['dashboard', 'horses', 'barn', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -165,6 +165,9 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const money = (v) => `$${Math.round(v).toLocaleString()}`;
 const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
+
+const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
+const NEGATIVE_MOODS = ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Overly-Active', 'Uncomfortable'];
 
 const ENVIRONMENT_OPTIONS = {
   wind: ['Calm', 'Light breeze', 'Steady wind', 'Gusty'],
@@ -179,6 +182,33 @@ const TRAINING_EVENT_POOL = {
   scary: ['A tarp snaps at the arena edge and tension runs through the neck.', 'A sudden clatter at the gate causes a quick shy off line.', 'A sharp noise sparks a brief bolt thought before control returns.'],
   realistic: ['A perfect transition lands exactly on your aid.', 'There is a brief misunderstanding of the aid, then a soft correction.', 'The first really confident jump effort appears in good balance.']
 };
+
+const BARN_TRAIL_VARIANTS = [
+  { title: 'Calm Walk Along Woods', options: [
+    { success: 90, neutral: 10, fail: 0 },
+    { success: 85, neutral: 10, fail: 5 },
+    { success: 75, neutral: 15, fail: 10 },
+    { success: 80, neutral: 15, fail: 5 }
+  ] },
+  { title: 'Encounter With Creek', options: [
+    { success: 80, neutral: 15, fail: 5 },
+    { success: 85, neutral: 10, fail: 5 },
+    { success: 70, neutral: 20, fail: 10 },
+    { success: 60, neutral: 20, fail: 20 }
+  ] },
+  { title: 'Spooking Rabbit', options: [
+    { success: 85, neutral: 10, fail: 5 },
+    { success: 80, neutral: 15, fail: 5 },
+    { success: 75, neutral: 15, fail: 10 },
+    { success: 70, neutral: 20, fail: 10 }
+  ] },
+  { title: 'Returning to Barn', options: [
+    { success: 90, neutral: 10, fail: 0 },
+    { success: 85, neutral: 10, fail: 5 },
+    { success: 85, neutral: 10, fail: 5 },
+    { success: 70, neutral: 15, fail: 15 }
+  ] }
+];
 
 const COMPETITION_CONTROLS = {
   steer: 'Arrows / WASD',
@@ -1601,13 +1631,15 @@ function advanceTrainingRpgSession(session, horse) {
 function resolveRpgOption(option, horse, session) {
   const moodBonus = option.moodMod?.[horse.mood] || 0;
   const personalityBonus = option.personalityMod?.[horse.personality] || 0;
-  const bondBonus = Math.floor((horse.bond || 0) / 12);
-  const controlBonus = Math.floor((horse.controlability || 0) / 20);
+  const bondBonus = Math.round(((horse.bond || 0) - 40) * 0.25);
+  const qualityBonus = Math.round((calculateHorseQualityOfLife(horse) - 55) * 0.3);
+  const controlBonus = Math.round(((horse.controlability || 50) - 50) * 0.18);
   const confidenceField = disciplineConfidenceField(session.discipline);
-  const confidenceBonus = Math.floor(((horse[confidenceField] ?? 50) - 50) / 5);
+  const confidenceBonus = Math.round(((horse[confidenceField] ?? 50) - 50) * 0.2);
+  const skillBonus = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.22);
   const environmentPenalty = session.environment && ['Gusty', 'Unexpected loud sounds', 'Slightly slick in spots', 'Choppy and uneven', 'Crowded schooling ring'].some((hazard) => Object.values(session.environment).includes(hazard)) ? -4 : 0;
   const successChance = clamp(
-    option.success + moodBonus + personalityBonus + moodOutcomeModifier(horse.mood) + personalityOutcomeModifier(horse.personality) + bondBonus + controlBonus + confidenceBonus + environmentPenalty,
+    Math.round(option.success * 0.25) + moodBonus + personalityBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.6) + bondBonus + qualityBonus + controlBonus + confidenceBonus + skillBonus + environmentPenalty,
     5,
     95
   );
@@ -2228,10 +2260,22 @@ function updateMonthlyCare(horse) {
   }
 
   horse.mood = mood;
+  horse.turnoutQuality = turnoutOkForHorse(horse) ? clamp((horse.turnoutQuality || 65) + 2, 0, 100) : clamp((horse.turnoutQuality || 65) - 3, 0, 100);
+  horse.stallCleanliness = clamp((horse.stallCleanliness || 65) + (horse.managed?.fed ? 1 : -2), 0, 100);
+  horse.hoofCare = clamp((horse.hoofCare || 65) + (horse.farrierThisMonth ? 6 : -1), 0, 100);
+  horse.dailyGrooming = clamp((horse.dailyGrooming || 65) + (horse.manualTrainingThisMonth ? 2 : -1), 0, 100);
+  horse.farrierCare = clamp((horse.farrierCare || 65) + (horse.farrierThisMonth ? 8 : (horse.due?.farrier ? -4 : 0)), 0, 100);
+  horse.qualityOfLife = calculateHorseQualityOfLife(horse);
   trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
   horse.handTrainingSessionsThisMonth = 0;
   horse.showEntriesThisMonth = 0;
+}
+
+function turnoutOkForHorse(horse) {
+  const stamina = horse.trainingPreference || 'Medium';
+  const [minTurnout, maxTurnout] = turnoutRangeBounds(stamina);
+  return (horse.turnoutHours || 0) >= minTurnout && (horse.turnoutHours || 0) <= maxTurnout;
 }
 
 
@@ -2351,6 +2395,15 @@ function hydrateFromSave(data) {
     h.manualTrainingThisMonth = h.manualTrainingThisMonth || false;
     h.farrierThisMonth = h.farrierThisMonth || false;
     h.turnoutHours = Number.isFinite(h.turnoutHours) ? h.turnoutHours : 0;
+    h.qualityOfLife = Number.isFinite(h.qualityOfLife) ? h.qualityOfLife : 65;
+    h.stallCleanliness = Number.isFinite(h.stallCleanliness) ? h.stallCleanliness : 65;
+    h.hoofCare = Number.isFinite(h.hoofCare) ? h.hoofCare : 65;
+    h.turnoutQuality = Number.isFinite(h.turnoutQuality) ? h.turnoutQuality : 65;
+    h.dailyGrooming = Number.isFinite(h.dailyGrooming) ? h.dailyGrooming : 65;
+    h.farrierCare = Number.isFinite(h.farrierCare) ? h.farrierCare : 65;
+    h.barnActivityQuality = Number.isFinite(h.barnActivityQuality) ? h.barnActivityQuality : 0;
+    h.barnAvailabilityPercent = Number.isFinite(h.barnAvailabilityPercent) ? h.barnAvailabilityPercent : rnd(40, 85);
+    h.barnAvailable = typeof h.barnAvailable === 'boolean' ? h.barnAvailable : rnd(1, 100) <= h.barnAvailabilityPercent;
     h.controlability = Number.isFinite(h.controlability) ? h.controlability : 50;
     h.confidenceJump = Number.isFinite(h.confidenceJump) ? h.confidenceJump : 50;
     h.confidenceFlat = Number.isFinite(h.confidenceFlat) ? h.confidenceFlat : 50;
@@ -2572,6 +2625,18 @@ function bondLevelLabel(horse) {
   return 'Heart Horse';
 }
 
+function calculateHorseQualityOfLife(horse) {
+  const stall = Number.isFinite(horse.stallCleanliness) ? horse.stallCleanliness : 65;
+  const hooves = Number.isFinite(horse.hoofCare) ? horse.hoofCare : 65;
+  const turnout = Number.isFinite(horse.turnoutQuality) ? horse.turnoutQuality : 65;
+  const grooming = Number.isFinite(horse.dailyGrooming) ? horse.dailyGrooming : 65;
+  const farrier = Number.isFinite(horse.farrierCare) ? horse.farrierCare : 65;
+  const activity = Number.isFinite(horse.barnActivityQuality) ? horse.barnActivityQuality : 0;
+  const baseCare = (stall + hooves + turnout + grooming + farrier) / 5;
+  const cappedCare = Math.min(90, baseCare);
+  return clamp(Math.round(cappedCare + activity), 0, 100);
+}
+
 function bondModifiers(horse) {
   const bond = horse.bond || 0;
   const rescuePenalty = horse.isRescue && bond < 0 ? 6 : 0;
@@ -2592,25 +2657,32 @@ function bondModifiers(horse) {
 
 function updateBondMonthly(horse) {
   if (horse.retiredForever) return;
-  let delta = 1;
-  if (horse.manualTrainingThisMonth) delta += 3;
+  let nextBond = horse.bond || 0;
+  nextBond += 1;
+  if (horse.manualTrainingThisMonth) nextBond += 3;
   const shows = Math.min(2, horse.lastShowEntries || 0);
-  delta += shows * 2;
+  nextBond += shows * 2;
   const [feedMin, feedMax] = feedRangeBounds(horse);
   const feedTotal = (horse.feedPlan || []).reduce((sum, f) => sum + f.grams, 0);
   const trainingOk = horse.lastTrainingSessions >= Math.floor((horse.preferredTrainingSessions || 25) * 0.4)
     && horse.lastTrainingSessions <= (horse.preferredTrainingSessions || 25);
-  const stamina = horse.trainingPreference || 'Medium';
-  const [minTurnout, maxTurnout] = turnoutRangeBounds(stamina);
-  const turnoutOk = horse.turnoutHours >= minTurnout && horse.turnoutHours <= maxTurnout;
+  const turnoutOk = turnoutOkForHorse(horse);
   const feedOk = feedTotal >= feedMin && feedTotal <= feedMax;
-  if (trainingOk && turnoutOk && feedOk) delta += 2;
-  if (horse.farrierThisMonth) delta += 3;
+  if (trainingOk && turnoutOk && feedOk) nextBond += 2;
+  if (horse.farrierThisMonth) nextBond += 3;
   if (horse.soundnessYears <= 0 && !horse.retiredToBreeding && !horse.retiredForever && (horse.lastTrainingSessions > 0 || (horse.lastShowEntries || 0) > 0)) {
-    delta -= 5;
+    nextBond -= 5;
   }
   const minBond = horse.isRescue ? -50 : 0;
-  horse.bond = clamp((horse.bond || 0) + delta, minBond, 100);
+  horse.bond = clamp(nextBond, minBond, 100);
+  if ((horse.bond || 0) >= 85 && ['Stubborn', 'Spooky', 'Unfocused'].includes(horse.personality) && rnd(1, 100) <= 15) {
+    horse.personality = pick(['Easy-Going', 'Bomb-proof']);
+  }
+  if ((horse.bond || 0) >= 45 && rnd(1, 100) <= 40) {
+    horse.mood = pick(POSITIVE_MOODS);
+  } else if ((horse.bond || 0) < 15 && rnd(1, 100) <= 45) {
+    horse.mood = pick(NEGATIVE_MOODS);
+  }
   horse.manualTrainingThisMonth = false;
   horse.farrierThisMonth = false;
 }
@@ -3050,6 +3122,13 @@ function baseHorse(type = 'trained', origin = 'player') {
     manualTrainingThisMonth: false,
     farrierThisMonth: false,
     turnoutHours: 0,
+    qualityOfLife: 65,
+    stallCleanliness: 65,
+    hoofCare: 65,
+    turnoutQuality: 65,
+    dailyGrooming: 65,
+    farrierCare: 65,
+    barnActivityQuality: 0,
     tack: {
       bridle: 'Snaffle Bridle',
       bit: 'Loose Ring Snaffle',
@@ -3596,6 +3675,8 @@ function createHorseCard(horse) {
     <p class='small'>Preferred feed range: ${feedRangeBounds(horse)[0]}-${feedRangeBounds(horse)[1]}g (you don’t need to be exact, just within range).</p>
     <label>Controlability</label>
     <p class='small'>${horse.controlability || 0}%</p>
+    <label>Quality Of Life</label>
+    <p class='small'>${calculateHorseQualityOfLife(horse)}%</p>
     <label>Tack: Bridle</label><select class='tack-bridle'>${TACK.bridle.map((x) => `<option ${horse.tack?.bridle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
     <label>Tack: Bit</label><select class='tack-bit'>${TACK.bit.map((x) => `<option ${horse.tack?.bit === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
     <label>Tack: Saddle</label><select class='tack-saddle'>${TACK.saddle.map((x) => `<option ${horse.tack?.saddle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
@@ -4010,6 +4091,8 @@ function simulateCompetitionRide(horse, discipline, level) {
   const baseSkill = effectiveDisciplineSkill(horse, discipline);
   const moodMod = moodOutcomeModifier(horse.mood);
   const personalityMod = personalityOutcomeModifier(horse.personality);
+  const bondMod = Math.round(((horse.bond || 0) - 45) * 0.2);
+  const qualityMod = Math.round((calculateHorseQualityOfLife(horse) - 55) * 0.2);
   const memoryPenalty = competitionMemoryPenalty(horse, discipline);
   const phases = competitionInteractionPhases(discipline);
   const log = [];
@@ -4017,7 +4100,7 @@ function simulateCompetitionRide(horse, discipline, level) {
   phases.forEach((phase) => {
     const event = rnd(1, 100) <= 45 ? pick(COMPETITION_RANDOM_EVENTS) : null;
     const randomMod = event ? event.mod : rnd(-5, 8);
-    const successChance = clamp(Math.round(baseSkill + moodMod + personalityMod - memoryPenalty + randomMod + ((horse[confidenceField] || 50) - 50) * 0.4), 8, 92);
+    const successChance = clamp(Math.round((baseSkill * 0.45) + (moodMod * 2.2) + (personalityMod * 1.6) + bondMod + qualityMod - memoryPenalty + randomMod + ((horse[confidenceField] || 50) - 50) * 0.45), 8, 92);
     const partialChance = clamp(100 - successChance - rnd(10, 25), 10, 70);
     const failChance = Math.max(5, 100 - successChance - partialChance);
     const roll = rnd(1, 100);
@@ -4479,7 +4562,8 @@ function normalizeCompetitionRpgSession(session) {
 function competitionChanceModifiers(session, horse, step) {
   const personality = personalityOutcomeModifier(horse.personality);
   const mood = moodOutcomeModifier(horse.mood);
-  const bond = Math.round(clamp((horse.bond || 0) / 25, -4, 4));
+  const bond = Math.round(((horse.bond || 0) - 45) * 0.2);
+  const quality = Math.round((calculateHorseQualityOfLife(horse) - 55) * 0.2);
   let warmup = 0;
   if (step?.stage === 'main_round') {
     const ws = session.warmupState || { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 };
@@ -4487,7 +4571,7 @@ function competitionChanceModifiers(session, horse, step) {
     const negative = (ws.tension - 50) * 0.1;
     warmup = Math.round(clamp(positive - negative, -10, 10));
   }
-  return { personality, mood, warmup, bond };
+  return { personality, mood, warmup, bond, quality };
 }
 
 function competitionOptionChances(session, horse, option, step) {
@@ -4500,7 +4584,7 @@ function competitionOptionChances(session, horse, option, step) {
   const stepRandom = Number.isFinite(step?.randomBias) ? step.randomBias : 0;
   const optionBias = Math.round(((option.success || 0) - (option.fail || 0)) * 0.03);
   const randomSwing = stepRandom + optionBias;
-  const successChance = clamp(option.success + skillMod + confidenceMod + memoryMod + mods.personality + mods.mood + mods.warmup + mods.bond + horseBias + randomSwing, 5, 96);
+  const successChance = clamp(Math.round((option.success * 0.25) + (skillMod * 1.8) + (confidenceMod * 1.2) + memoryMod + (mods.personality * 1.7) + (mods.mood * 2.2) + mods.warmup + mods.bond + mods.quality + horseBias + randomSwing), 5, 96);
   const neutralChance = clamp(option.neutral + Math.round(-mods.mood * 0.2 + (stepRandom * -0.25)), 4, 75);
   const failChance = Math.max(1, 100 - successChance - neutralChance);
   return { successChance, neutralChance, failChance, skillMod, confidenceMod, memoryMod, horseBias, stepRandom, randomSwing, mods };
@@ -4851,9 +4935,7 @@ function renderShows() {
       box.className = 'box';
       box.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
-        <p class='small'>Influenced chance: success ${finalSuccess} / partial ${computed.neutralChance} / fail ${finalFail}</p>
-        <p class='small'>Modifiers → Personality ${computed.mods.personality >= 0 ? '+' : ''}${computed.mods.personality}, Mood ${computed.mods.mood >= 0 ? '+' : ''}${computed.mods.mood}, Warm-Up ${computed.mods.warmup >= 0 ? '+' : ''}${computed.mods.warmup}, Bond ${computed.mods.bond >= 0 ? '+' : ''}${computed.mods.bond}, HorseBias ${computed.horseBias >= 0 ? '+' : ''}${computed.horseBias}, StepRand ${computed.stepRandom >= 0 ? '+' : ''}${computed.stepRandom}${step.stage === 'main_round' ? `, Readiness ${activeSession.readinessBonus >= 0 ? '+' : ''}${activeSession.readinessBonus}` : ''}</p>
+        <p class='small'>Final chance: success ${finalSuccess}% / partial ${computed.neutralChance}% / fail ${finalFail}%</p>
         <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
@@ -5258,7 +5340,7 @@ function renderTraining() {
         <p><strong>ACTION:</strong> ${actionLabel(session.action)} — Variant ${variant.id || '?'}</p>
         <p><strong>Scene:</strong> ${sceneText}</p>
         ${app.trainingRpgFeedback ? `<p><strong>Last choice result:</strong> ${app.trainingRpgFeedback}</p>` : ''}
-        <p class='small'><strong>GLOBAL CODING NOTE:</strong> Each option uses base outcome %, mood modifier, personality modifier, and can affect bond, skills, penalties/refusals and future mood.</p>
+        <p class='small'><strong>GLOBAL CODING NOTE:</strong> Final percentages already include horse training, quality of life, mood, personality, bond, and confidence.</p>
         <div id='rpg-options'></div>
         <button id='rpg-exit'>End Interactive Session</button>
       </div>
@@ -5267,9 +5349,10 @@ function renderTraining() {
     variant.options.forEach((opt, idx) => {
       const line = document.createElement('div');
       line.className = 'box';
+      const projected = resolveRpgOption(opt, { ...horse }, { ...session, pendingEvent: null });
       line.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        <p class='small'>BASE chance: success ${opt.success} / partial ${opt.neutral} / fail ${opt.fail}</p>
+        <p class='small'>Final chance: success ${projected.successChance}% / partial ${projected.neutralChance}% / fail ${projected.failChance}%</p>
         <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-rpg='${idx}'>Choose</button>
       `;
@@ -5310,7 +5393,7 @@ function renderTraining() {
         if (session.pendingEvent) summary.notableEvent = session.pendingEvent.text;
         session.summary = summary;
 
-        app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel} (roll chances S${result.successChance}/P${result.neutralChance}/F${result.failChance})`;
+        app.trainingRpgFeedback = `${actionLabel(session.action)}: ${outcomeLabel} (Final S${result.successChance}% / P${result.neutralChance}% / F${result.failChance}%)`;
         pushReport(`${horse.name} interactive ${actionLabel(session.action)}: ${outcomeLabel}.`);
         app.trainingRpg = advanceTrainingRpgSession(session, horse);
         if (!app.trainingRpg) {
@@ -5521,6 +5604,89 @@ function renderTraining() {
       render();
     };
   }
+}
+
+function applyBarnActivity(horse, activity) {
+  if (!horse) return;
+  if (activity === 'groom') {
+    horse.bond = clamp((horse.bond || 0) + 8, horse.isRescue ? -50 : 0, 100);
+    horse.dailyGrooming = clamp((horse.dailyGrooming || 65) + 6, 0, 100);
+    horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
+    pushReport(`Barn: ${horse.name} was groomed by hand (+Bond, +QOL).`);
+  }
+  if (activity === 'clean-stall') {
+    horse.stallCleanliness = clamp((horse.stallCleanliness || 65) + 8, 0, 100);
+    horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 1, 0, 10);
+    pushReport(`Barn: ${horse.name}'s stall was cleaned.`);
+  }
+  if (activity === 'hand-graze') {
+    horse.bond = clamp((horse.bond || 0) + 5, horse.isRescue ? -50 : 0, 100);
+    horse.mood = pick(POSITIVE_MOODS);
+    horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
+    pushReport(`Barn: ${horse.name} enjoyed hand grazing (+Bond, mood improved).`);
+  }
+  if (activity === 'lunge') {
+    horse.bond = clamp((horse.bond || 0) + 3, horse.isRescue ? -50 : 0, 100);
+    horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+    horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
+    pushReport(`Barn: ${horse.name} completed a lunging session.`);
+  }
+  if (activity === 'trail') {
+    const variant = pick(BARN_TRAIL_VARIANTS);
+    const choice = pick(variant.options);
+    const quality = calculateHorseQualityOfLife(horse);
+    const successChance = clamp(Math.round((choice.success * 0.25) + ((horse.bond || 0) * 0.35) + ((quality - 50) * 0.35) + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.5)), 10, 97);
+    const partialChance = clamp(choice.neutral, 2, 95 - successChance);
+    const roll = rnd(1, 100);
+    const outcome = roll <= successChance ? 'success' : roll <= successChance + partialChance ? 'partial' : 'fail';
+    const bondGain = outcome === 'success' ? 4 : outcome === 'partial' ? 2 : 1;
+    const qGain = outcome === 'success' ? 4 : outcome === 'partial' ? 2 : 1;
+    horse.bond = clamp((horse.bond || 0) + bondGain, horse.isRescue ? -50 : 0, 100);
+    horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + qGain, 0, 10);
+    pushReport(`Barn Trail: ${horse.name} — ${variant.title} (${outcome.toUpperCase()}: S${successChance}% / P${partialChance}% / F${100 - successChance - partialChance}%).`);
+  }
+  horse.qualityOfLife = calculateHorseQualityOfLife(horse);
+}
+
+function renderBarn() {
+  const panel = document.getElementById('barn');
+  if (!panel) return;
+  const horses = app.horses.filter((h) => !h.retiredForever);
+  const lesson = horses.filter((h) => h.owner !== 'Your Stable');
+  const privateHorses = horses.filter((h) => h.owner === 'Your Stable');
+  panel.innerHTML = `
+    <h2>Barn</h2>
+    <div class='box'>
+      <p class='small'>Lesson horses availability rerolls monthly (40%-85%). Barn activities improve Bond and Quality Of Life.</p>
+    </div>
+    <div class='grid two'>
+      <div class='box'>
+        <h3>Lesson Horses</h3>
+        ${lesson.length ? lesson.map((h) => `<p>${horseDisplayName(h)} — Available ${h.barnAvailabilityPercent || 0}% (${h.barnAvailable ? 'Available' : 'Not available'})</p>`).join('') : '<p class="small">No lesson horses currently listed.</p>'}
+      </div>
+      <div class='box'>
+        <h3>Private Horses</h3>
+        <label>Horse</label>
+        <select id='barn-horse'>${privateHorses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}</select>
+        <div class='inline'>
+          <button data-barn='groom'>Groom</button>
+          <button data-barn='clean-stall'>Clean Stall</button>
+          <button data-barn='hand-graze'>Hand Graze</button>
+          <button data-barn='trail'>Trail Ride</button>
+          <button data-barn='lunge'>Lunging Pen</button>
+        </div>
+      </div>
+    </div>
+  `;
+  panel.querySelectorAll('[data-barn]').forEach((btn) => {
+    btn.onclick = () => {
+      const horseId = document.getElementById('barn-horse')?.value;
+      const horse = app.horses.find((h) => h.id === horseId);
+      if (!horse) return;
+      applyBarnActivity(horse, btn.dataset.barn);
+      renderBarn();
+    };
+  });
 }
 
 function renderBreeding() {
@@ -6056,6 +6222,9 @@ function monthlyProgress() {
     h.offspring.forEach((o) => { if (app.month === 1) o.age += 1; });
     updateMonthlyCare(h);
     updateBondMonthly(h);
+    h.barnActivityQuality = 0;
+    h.barnAvailabilityPercent = rnd(40, 85);
+    h.barnAvailable = rnd(1, 100) <= h.barnAvailabilityPercent;
     maybeAddOvertrainingInjury(h);
     resolvePendingCompetitions(h);
     if (!processAgingAndMortality(h)) survivors.push(h);
@@ -6194,6 +6363,7 @@ function render() {
   safeRun('updateHeader', updateHeader);
   safeRun('renderDashboard', renderDashboard);
   safeRun('renderHorses', renderHorses);
+  safeRun('renderBarn', renderBarn);
   safeRun('renderMarket', renderMarket);
   safeRun('renderSales', renderSales);
   safeRun('renderStud', renderStud);
