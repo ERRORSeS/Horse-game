@@ -6414,6 +6414,10 @@ function activeRemindersForCurrentMonth() {
 }
 
 
+function renderRigistries() {
+  return renderRegistries();
+}
+
 function renderRegistries() {
   const panel = document.getElementById('registries');
   if (!panel) return;
@@ -6696,7 +6700,7 @@ function render() {
   safeRun('renderFarrier', renderFarrier);
   safeRun('renderTraining', renderTraining);
   safeRun('renderBreeding', renderBreeding);
-  safeRun('renderRegistries', renderRegistries);
+  safeRun('renderRegistries', typeof renderRegistries === 'function' ? renderRegistries : renderRigistries);
   safeRun('renderBreeders', renderBreeders);
   safeRun('renderFreezer', renderFreezer);
   safeRun('renderRescue', renderRescue);
