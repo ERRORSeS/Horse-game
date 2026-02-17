@@ -132,6 +132,11 @@ const app = {
   reports: [],
   competitionReports: [],
   rescueHorses: [],
+  currentBarn: null,
+  barnCatalog: [],
+  barnShows: [],
+  signedUpShows: [],
+  lastBarnRefreshMonth: 0,
   settings: {
     barnName: 'Oxer to Oxer Stable Manager',
     breedingCode: '',
@@ -165,6 +170,132 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const money = (v) => `$${Math.round(v).toLocaleString()}`;
 const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
+const starText = (n) => '★'.repeat(clamp(Number(n) || 1, 1, 5));
+
+function randomBarnName(allowRepeat = false) {
+  const suffix = pick(BARN_SUFFIXES);
+  const ending = pick(BARN_ENDINGS);
+  return `${suffix} ${ending}`;
+}
+
+function currentMonthAbsolute() {
+  return app.year * 12 + app.month;
+}
+
+function transportCost(fromCountry, toCountry) {
+  if (!fromCountry || !toCountry || fromCountry === toCountry) return rnd(1000, 2000);
+  return rnd(20000, 40000);
+}
+
+function boardPriceByStars(stars) {
+  const s = clamp(Number(stars) || 1, 1, 5);
+  if (s === 5) return rnd(1500, 2500);
+  if (s === 4) return rnd(1100, 1800);
+  if (s === 3) return rnd(950, 1500);
+  if (s === 2) return rnd(650, 900);
+  return rnd(250, 650);
+}
+
+function ensureBarnState() {
+  if (!app.currentBarn) {
+    const country = 'USA';
+    const city = pick(BARN_COUNTRIES[country]);
+    app.currentBarn = {
+      id: uid(),
+      name: app.settings?.barnName || 'Oxer to Oxer Stable Manager',
+      country,
+      city,
+      careStars: 3,
+      facilityStars: 3,
+      eventsStars: 3,
+      lessonsStars: 3,
+      boardPerHorse: boardPriceByStars(3)
+    };
+  }
+  if (!Array.isArray(app.barnCatalog) || !app.barnCatalog.length) {
+    refreshBarnCatalog(true);
+  }
+  if (!Array.isArray(app.barnShows) || !app.barnShows.length) {
+    refreshBarnShows();
+  }
+}
+
+function refreshBarnCatalog(force = false) {
+  const now = currentMonthAbsolute();
+  if (!force && app.lastBarnRefreshMonth && now - app.lastBarnRefreshMonth < 4) return false;
+  app.lastBarnRefreshMonth = now;
+  const existingNames = new Set();
+  app.barnCatalog = Object.entries(BARN_COUNTRIES).flatMap(([country, cities]) => Array.from({ length: 10 }, () => {
+    let name = randomBarnName();
+    let attempts = 0;
+    while (existingNames.has(name) && rnd(1, 100) > 5 && attempts < 12) {
+      name = randomBarnName();
+      attempts += 1;
+    }
+    existingNames.add(name);
+    const careStars = rnd(1, 5);
+    const facilityStars = rnd(1, 5);
+    const eventsStars = rnd(1, 5);
+    const lessonsStars = rnd(1, 5);
+    return {
+      id: uid(),
+      name,
+      country,
+      city: pick(cities),
+      careStars,
+      facilityStars,
+      eventsStars,
+      lessonsStars,
+      boardPerHorse: boardPriceByStars(Math.round((careStars + facilityStars) / 2))
+    };
+  }));
+  return true;
+}
+
+function barnFacilityTurnoutRange(stars) {
+  const s = clamp(Number(stars) || 1, 1, 5);
+  if (s === 1) return [1, 2];
+  if (s === 2) return [2, 3];
+  if (s === 3) return [3, 6];
+  if (s === 4) return [6, 8];
+  return [8, 14];
+}
+
+function refreshBarnShows() {
+  if (!app.currentBarn) return;
+  const eventsStars = app.currentBarn?.eventsStars || 1;
+  const showCount = eventsStars === 1 ? 1 : eventsStars === 2 ? rnd(1, 2) : eventsStars === 3 ? rnd(2, 3) : eventsStars === 4 ? rnd(3, 4) : rnd(4, 6);
+  const maxSkill = eventsStars === 1 ? 20 : eventsStars === 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
+  app.barnShows = Array.from({ length: showCount }, () => {
+    const discipline = pick(DISCIPLINES);
+    return {
+      id: uid(),
+      barnId: app.currentBarn.id,
+      barnName: app.currentBarn.name,
+      country: app.currentBarn.country,
+      city: app.currentBarn.city,
+      fee: rnd(20, 1000),
+      discipline,
+      maxSkill,
+      level: pick(SHOW_LEVELS[discipline] || []),
+      month: app.month,
+      year: app.year
+    };
+  });
+}
+
+const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
+const NEGATIVE_MOODS = ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Overly-Active', 'Uncomfortable'];
+const BARN_COUNTRIES = {
+  USA: ['Lexington', 'Wellington', 'Ocala', 'Tryon', 'Aiken'],
+  Germany: ['Warendorf', 'Hamburg', 'Munich', 'Berlin', 'Cologne'],
+  Netherlands: ['Amsterdam', 'Rotterdam', 'Utrecht', 'Arnhem', 'Eindhoven'],
+  France: ['Paris', 'Lyon', 'Caen', 'Bordeaux', 'Nantes'],
+  UK: ['London', 'Birmingham', 'Leeds', 'Manchester', 'Bristol']
+};
+const BARN_SUFFIXES = ['Raven', 'Hoof', 'Flying', 'Winged', 'Apollo', 'Myth', 'Belivers', 'Pine', 'Willow', 'Elite', 'Bronze', 'Golden', 'Diamond', 'Crystal', 'Domino', 'Alpine', 'Red', 'Yellow', 'Orange', 'Green', 'Pink', 'Dance', 'Flow', 'Melody', 'Orchestre'];
+const BARN_ENDINGS = ['Acres', 'Ranch', 'Equine Facility', 'Stables', 'Farms'];
+const DISCIPLINES = ['dressage', 'eventing', 'jumping', 'hunter'];
 
 const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
 const NEGATIVE_MOODS = ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Overly-Active', 'Uncomfortable'];
@@ -2173,7 +2304,6 @@ function tackControlabilityDelta(horse, discipline = 'flatwork') {
   if (tack.body === 'Martingal') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 6 : 1;
   if (tack.body === 'Draw Reins') {
     const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
-  const rpgRoundStats = interaction?.roundStats && typeof interaction.roundStats === 'object' ? interaction.roundStats : null;
     delta += hotBlooded ? 6 : -30;
   }
   return delta;
@@ -2212,7 +2342,10 @@ function updateMonthlyCare(horse) {
   if (horse.retiredForever && !horse.retiredToBreeding) return;
   evaluateFeedEffects(horse);
   const stamina = horse.trainingPreference || 'Medium';
-  const [minTurnout, maxTurnout] = turnoutRangeBounds(stamina);
+  const [baseTurnoutMin, baseTurnoutMax] = turnoutRangeBounds(stamina);
+  const [facilityTurnoutMin, facilityTurnoutMax] = barnFacilityTurnoutRange(app.currentBarn?.facilityStars || 3);
+  const minTurnout = Math.max(baseTurnoutMin, facilityTurnoutMin);
+  const maxTurnout = Math.min(baseTurnoutMax, facilityTurnoutMax);
   const effectiveTurnout = horse.turnoutAssignmentHours > 0 ? horse.turnoutAssignmentHours : rnd(minTurnout, maxTurnout);
   horse.turnoutHours = (horse.illnesses || []).some((i) => i.active) ? 0 : Math.max(0.5, Math.min(14, effectiveTurnout));
   horse.lastTurnoutIssue = '';
@@ -2266,6 +2399,14 @@ function updateMonthlyCare(horse) {
   horse.dailyGrooming = clamp((horse.dailyGrooming || 65) + (horse.manualTrainingThisMonth ? 2 : -1), 0, 100);
   horse.farrierCare = clamp((horse.farrierCare || 65) + (horse.farrierThisMonth ? 8 : (horse.due?.farrier ? -4 : 0)), 0, 100);
   horse.qualityOfLife = calculateHorseQualityOfLife(horse);
+  const careStars = app.currentBarn?.careStars || 3;
+  if (careStars === 1 && !horse.managed?.fed) {
+    horse.qualityOfLife = clamp(horse.qualityOfLife - 2, 0, 100);
+    if (rnd(1, 100) <= 35) horse.mood = pick(NEGATIVE_MOODS);
+  } else if (careStars === 5) {
+    horse.qualityOfLife = clamp(horse.qualityOfLife + 2, 0, 100);
+    if (NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 40) horse.mood = pick(POSITIVE_MOODS);
+  }
   trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
   horse.handTrainingSessionsThisMonth = 0;
@@ -2274,7 +2415,10 @@ function updateMonthlyCare(horse) {
 
 function turnoutOkForHorse(horse) {
   const stamina = horse.trainingPreference || 'Medium';
-  const [minTurnout, maxTurnout] = turnoutRangeBounds(stamina);
+  const [baseTurnoutMin, baseTurnoutMax] = turnoutRangeBounds(stamina);
+  const [facilityTurnoutMin, facilityTurnoutMax] = barnFacilityTurnoutRange(app.currentBarn?.facilityStars || 3);
+  const minTurnout = Math.max(baseTurnoutMin, facilityTurnoutMin);
+  const maxTurnout = Math.min(baseTurnoutMax, facilityTurnoutMax);
   return (horse.turnoutHours || 0) >= minTurnout && (horse.turnoutHours || 0) <= maxTurnout;
 }
 
@@ -2325,6 +2469,11 @@ function hydrateFromSave(data) {
   app.reports = Array.isArray(data.reports) ? data.reports : [];
   app.competitionReports = Array.isArray(data.competitionReports) ? data.competitionReports : [];
   app.rescueHorses = Array.isArray(data.rescueHorses) ? data.rescueHorses : [];
+  app.currentBarn = data.currentBarn && typeof data.currentBarn === 'object' ? data.currentBarn : null;
+  app.barnCatalog = Array.isArray(data.barnCatalog) ? data.barnCatalog : [];
+  app.barnShows = Array.isArray(data.barnShows) ? data.barnShows : [];
+  app.signedUpShows = Array.isArray(data.signedUpShows) ? data.signedUpShows : [];
+  app.lastBarnRefreshMonth = Number.isFinite(data.lastBarnRefreshMonth) ? data.lastBarnRefreshMonth : 0;
   app.settings = typeof data.settings === 'object' && data.settings ? {
     barnName: data.settings.barnName || 'Oxer to Oxer Stable Manager',
     breedingCode: data.settings.breedingCode || '',
@@ -2351,6 +2500,7 @@ function hydrateFromSave(data) {
   app.trainingClinicSelection = typeof data.trainingClinicSelection === 'object' && data.trainingClinicSelection ? data.trainingClinicSelection : { discipline: 'jumping' };
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
+  ensureBarnState();
 
   app.horses.forEach((h) => {
     h.socks = h.socks || pick(SOCKS);
@@ -2404,6 +2554,7 @@ function hydrateFromSave(data) {
     h.barnActivityQuality = Number.isFinite(h.barnActivityQuality) ? h.barnActivityQuality : 0;
     h.barnAvailabilityPercent = Number.isFinite(h.barnAvailabilityPercent) ? h.barnAvailabilityPercent : rnd(40, 85);
     h.barnAvailable = typeof h.barnAvailable === 'boolean' ? h.barnAvailable : rnd(1, 100) <= h.barnAvailabilityPercent;
+    h.lessonReplacedYear = Number.isFinite(h.lessonReplacedYear) ? h.lessonReplacedYear : 0;
     h.controlability = Number.isFinite(h.controlability) ? h.controlability : 50;
     h.confidenceJump = Number.isFinite(h.confidenceJump) ? h.confidenceJump : 50;
     h.confidenceFlat = Number.isFinite(h.confidenceFlat) ? h.confidenceFlat : 50;
@@ -2522,6 +2673,11 @@ function resetGame() {
   app.reports = [];
   app.competitionReports = [];
   app.rescueHorses = [];
+  app.currentBarn = null;
+  app.barnCatalog = [];
+  app.barnShows = [];
+  app.signedUpShows = [];
+  app.lastBarnRefreshMonth = 0;
   app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
@@ -3129,6 +3285,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     dailyGrooming: 65,
     farrierCare: 65,
     barnActivityQuality: 0,
+    lessonReplacedYear: 0,
     tack: {
       bridle: 'Snaffle Bridle',
       bit: 'Loose Ring Snaffle',
@@ -3280,6 +3437,8 @@ function seed() {
   });
   refreshNpcAds();
   refreshRescueHorses();
+  ensureBarnState();
+  refreshBarnShows();
 }
 
 function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
@@ -3790,6 +3949,10 @@ function createHorseCard(horse) {
       }
       if (action === 'toggle-notes') horse.showNotes = !horse.showNotes;
       if (action === 'save-tack') {
+        if (horse.leaseLocked) {
+          alert('Leased horses use barn-managed tack and cannot be changed.');
+          return;
+        }
         horse.tack = horse.tack || {};
         horse.tack.bridle = node.querySelector('.tack-bridle')?.value || horse.tack.bridle;
         horse.tack.bit = node.querySelector('.tack-bit')?.value || horse.tack.bit;
@@ -3800,18 +3963,32 @@ function createHorseCard(horse) {
         pushReport(`Updated tack for ${horse.name}.`);
       }
       if (action === 'save-turnout') {
+        if (horse.leaseLocked) {
+          alert('Leased horses use barn-managed turnout and cannot be changed.');
+          return;
+        }
         const value = Number(node.querySelector('.turnout-hours')?.value);
         if (Number.isFinite(value)) horse.turnoutAssignmentHours = Math.max(0.5, Math.min(14, value));
       }
       if (action === 'toggle-trainer-notes') horse.showTrainerNotes = !horse.showTrainerNotes;
       if (action === 'add-feed') {
+        if (horse.leaseLocked) {
+          alert('Leased horses use barn-managed feed and cannot be changed.');
+          return;
+        }
         const type = node.querySelector('.feed-type')?.value;
         const grams = Number(node.querySelector('.feed-grams')?.value) || 150;
         if (type && grams >= 50 && grams <= 250) {
           horse.feedPlan.push({ type, grams });
         }
       }
-      if (action === 'clear-feed') horse.feedPlan = [];
+      if (action === 'clear-feed') {
+        if (horse.leaseLocked) {
+          alert('Leased horses use barn-managed feed and cannot be changed.');
+          return;
+        }
+        horse.feedPlan = [];
+      }
       if (action === 'save-auto-focus') {
         horse.autoTrainingFocus = node.querySelector('.auto-focus')?.value || '';
       }
@@ -5649,20 +5826,37 @@ function applyBarnActivity(horse, activity) {
 }
 
 function renderBarn() {
+  ensureBarnState();
   const panel = document.getElementById('barn');
   if (!panel) return;
   const horses = app.horses.filter((h) => !h.retiredForever);
-  const lesson = horses.filter((h) => h.owner !== 'Your Stable');
+  const lesson = horses.filter((h) => h.owner !== 'Your Stable' && !h.isLeased);
   const privateHorses = horses.filter((h) => h.owner === 'Your Stable');
+  const currentBarn = app.currentBarn;
+  const careStars = currentBarn?.careStars || 3;
+  const facilityStars = currentBarn?.facilityStars || 3;
+  const eventStars = currentBarn?.eventsStars || 3;
+  const lessonStars = currentBarn?.lessonsStars || 3;
+  const lessonAvailBase = lessonStars === 1 ? 35 : lessonStars === 2 ? 45 : lessonStars === 3 ? 55 : lessonStars === 4 ? 65 : 75;
+  const currentCountry = currentBarn?.country;
+  const filterDefault = currentCountry;
   panel.innerHTML = `
     <h2>Barn</h2>
     <div class='box'>
-      <p class='small'>Lesson horses availability rerolls monthly (40%-85%). Barn activities improve Bond and Quality Of Life.</p>
+      <p><strong>Current Barn:</strong> ${currentBarn.name} | <strong>Location:</strong> ${currentBarn.country}, ${currentBarn.city}</p>
+      <details>
+        <summary>Open/Close: Star Rating</summary>
+        <p class='small'>⭐ CARE RATING: ${starText(careStars)}</p>
+        <p class='small'>⭐ FACILITY RATING: ${starText(facilityStars)} (Turnout ${barnFacilityTurnoutRange(facilityStars)[0]}-${barnFacilityTurnoutRange(facilityStars)[1]}h/day)</p>
+        <p class='small'>⭐ EVENTS RATING: ${starText(eventStars)}</p>
+        <p class='small'>⭐ LESSONS RATING: ${starText(lessonStars)} (base availability ${lessonAvailBase}%)</p>
+      </details>
     </div>
     <div class='grid two'>
       <div class='box'>
         <h3>Lesson Horses</h3>
         ${lesson.length ? lesson.map((h) => `<p>${horseDisplayName(h)} — Available ${h.barnAvailabilityPercent || 0}% (${h.barnAvailable ? 'Available' : 'Not available'})</p>`).join('') : '<p class="small">No lesson horses currently listed.</p>'}
+        ${lessonStars >= 3 && lesson.length ? `<label>Lease Lesson Horse</label><select id='barn-lease-horse'>${lesson.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select><button id='barn-lease-btn'>Lease Selected Horse</button>` : ''}
       </div>
       <div class='box'>
         <h3>Private Horses</h3>
@@ -5677,6 +5871,17 @@ function renderBarn() {
         </div>
       </div>
     </div>
+    <div class='box'>
+      <h3>Switch / Board Barn</h3>
+      <p class='small'>Refresh barn list manually every 4 months.</p>
+      <label>Filter</label>
+      <select id='barn-filter-country'>
+        <option value='${filterDefault}'>My Country (${filterDefault})</option>
+        <option value='OTHER'>Other Country</option>
+      </select>
+      <button id='barn-refresh-list'>Refresh List</button>
+      <div id='barn-catalog-list'></div>
+    </div>
   `;
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
@@ -5687,6 +5892,95 @@ function renderBarn() {
       renderBarn();
     };
   });
+
+  const leaseBtn = document.getElementById('barn-lease-btn');
+  if (leaseBtn) {
+    leaseBtn.onclick = () => {
+      const lessonId = document.getElementById('barn-lease-horse')?.value;
+      const source = app.horses.find((h) => h.id === lessonId);
+      if (!source) return;
+      const leasedHorse = {
+        ...JSON.parse(JSON.stringify(source)),
+        id: uid(),
+        owner: 'Your Stable',
+        isLeased: true,
+        leaseSourceId: source.id,
+        leaseLocked: true,
+        feedPlan: source.feedPlan || [],
+        turnoutAssignmentHours: source.turnoutAssignmentHours || 0
+      };
+      app.horses.push(leasedHorse);
+      pushReport(`Leased ${source.name}. Leased horses can train/show but feed/tack/turnout are locked.`);
+      renderBarn();
+    };
+  }
+
+  const renderCatalogList = () => {
+    const filter = document.getElementById('barn-filter-country')?.value || filterDefault;
+    const list = app.barnCatalog.filter((b) => (filter === 'OTHER' ? b.country !== currentCountry : b.country === currentCountry));
+    const wrap = document.getElementById('barn-catalog-list');
+    if (!wrap) return;
+    wrap.innerHTML = list.map((barn) => {
+      const moveCost = transportCost(currentCountry, barn.country);
+      const horseOptions = privateHorses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
+      return `<div class='box'>
+        <p><strong>${barn.name}</strong></p>
+        <p class='small'>Location: ${barn.country}, ${barn.city} | Move fee: ${money(moveCost)}</p>
+        <p class='small'>Care ${starText(barn.careStars)} | Events ${starText(barn.eventsStars)} | Lessons ${starText(barn.lessonsStars)} | Facility ${starText(barn.facilityStars)}</p>
+        <p class='small'>Monthly Board: ${money(barn.boardPerHorse)} per horse</p>
+        <label>Horse for board</label>
+        <select data-board-horse='${barn.id}'>${horseOptions}</select>
+        <div class='inline'>
+          <button data-board-one='${barn.id}'>Board Selected</button>
+          <button data-board-all='${barn.id}'>Board All</button>
+        </div>
+      </div>`;
+    }).join('') || '<p class="small">No barns for this filter.</p>';
+
+    wrap.querySelectorAll('[data-board-one]').forEach((btn) => {
+      btn.onclick = () => {
+        const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardOne);
+        const horseId = wrap.querySelector(`[data-board-horse='${barn.id}']`)?.value;
+        const horse = app.horses.find((h) => h.id === horseId);
+        if (!barn || !horse) return;
+        const moveCost = transportCost(currentCountry, barn.country);
+        if (!tryCharge(moveCost + barn.boardPerHorse)) return;
+        app.currentBarn = { ...barn };
+        horse.boardingBarnId = barn.id;
+        pushReport(`${horse.name} boarded at ${barn.name}. Fees paid: ${money(moveCost + barn.boardPerHorse)}.`);
+        refreshBarnShows();
+        renderBarn();
+      };
+    });
+    wrap.querySelectorAll('[data-board-all]').forEach((btn) => {
+      btn.onclick = () => {
+        const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardAll);
+        if (!barn) return;
+        const count = privateHorses.length;
+        const moveCost = transportCost(currentCountry, barn.country);
+        const total = moveCost + (barn.boardPerHorse * count);
+        if (!tryCharge(total)) return;
+        app.currentBarn = { ...barn };
+        privateHorses.forEach((h) => { h.boardingBarnId = barn.id; });
+        pushReport(`All horses boarded at ${barn.name}. Fees paid: ${money(total)}.`);
+        refreshBarnShows();
+        renderBarn();
+      };
+    });
+  };
+
+  const refreshBtn = document.getElementById('barn-refresh-list');
+  if (refreshBtn) {
+    refreshBtn.onclick = () => {
+      const refreshed = refreshBarnCatalog(false);
+      if (!refreshed) {
+        alert('Barn list can be refreshed once every 4 months.');
+      }
+      renderCatalogList();
+    };
+  }
+  document.getElementById('barn-filter-country')?.addEventListener('change', renderCatalogList);
+  renderCatalogList();
 }
 
 function renderBreeding() {
@@ -6177,6 +6471,7 @@ function processAgingAndMortality(horse) {
 }
 
 function monthlyProgress() {
+  ensureBarnState();
   app.month += 1;
   if (app.month > 12) {
     app.month = 1;
@@ -6223,13 +6518,31 @@ function monthlyProgress() {
     updateMonthlyCare(h);
     updateBondMonthly(h);
     h.barnActivityQuality = 0;
-    h.barnAvailabilityPercent = rnd(40, 85);
+    const lessonStars = app.currentBarn?.lessonsStars || 3;
+    const lessonAvailBase = lessonStars === 1 ? 35 : lessonStars === 2 ? 45 : lessonStars === 3 ? 55 : lessonStars === 4 ? 65 : 75;
+    h.barnAvailabilityPercent = h.owner === 'Your Stable' ? 100 : clamp(lessonAvailBase + rnd(-5, 10), 35, 85);
     h.barnAvailable = rnd(1, 100) <= h.barnAvailabilityPercent;
+    const replaceChance = h.lessonReplacedYear === app.year ? 6 : 15;
+    if (h.owner !== 'Your Stable' && !h.isLeased && rnd(1, 100) <= replaceChance) {
+      const replacement = baseHorse('trained', 'npc');
+      replacement.owner = h.owner;
+      replacement.lessonReplacedYear = app.year;
+      replacement.barnAvailabilityPercent = h.barnAvailabilityPercent;
+      replacement.barnAvailable = h.barnAvailable;
+      Object.assign(h, replacement);
+    }
     maybeAddOvertrainingInjury(h);
     resolvePendingCompetitions(h);
     if (!processAgingAndMortality(h)) survivors.push(h);
   });
   app.horses = survivors.concat(newborns);
+  const boardedHorses = app.horses.filter((h) => !h.retiredForever).length;
+  const monthlyBoard = (app.currentBarn?.boardPerHorse || 0) * boardedHorses;
+  if (monthlyBoard > 0) {
+    app.money -= monthlyBoard;
+    pushReport(`Monthly board paid at ${app.currentBarn.name}: ${money(monthlyBoard)} (${boardedHorses} horse(s)).`);
+  }
+  refreshBarnShows();
   app.closedReminderIds = [];
   refreshNpcAds();
   refreshRescueHorses();
@@ -6259,7 +6572,9 @@ function activeRemindersForCurrentMonth() {
 }
 
 function renderCalendar() {
+  ensureBarnState();
   const reminders = app.calendarReminders || [];
+  const shows = app.barnShows || [];
   document.getElementById('calendar').innerHTML = `
     <h2>Calendar</h2>
     <div class='box'>
@@ -6279,6 +6594,22 @@ function renderCalendar() {
     </div>
     <div class='cards'>
       ${reminders.map((r) => `<div class='box'><h3>${r.type}</h3><p>${r.note || '-'}</p><p class='small'>${r.scheduleText}</p><button data-cal-del='${r.id}'>Delete</button></div>`).join('') || '<p class="small">No reminders yet.</p>'}
+    </div>
+    <div class='box'>
+      <h3>Upcoming Horse Shows</h3>
+      ${shows.map((show) => {
+        const tCost = transportCost(app.currentBarn?.country, show.country);
+        return `<div class='box'>
+          <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
+          <p class='small'><strong>Show Fee:</strong> ${money(show.fee)} | <strong>Transport Fee:</strong> ${money(tCost)}</p>
+          <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
+          <label>Horse</label>
+          <select data-show-horse='${show.id}'>
+            ${app.horses.filter((h) => !h.retiredForever && canCompeteUnderSaddle(h)).map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}
+          </select>
+          <button data-show-signup='${show.id}'>Sign Up</button>
+        </div>`;
+      }).join('') || '<p class="small">No upcoming shows listed at this time.</p>'}
     </div>
   `;
   document.getElementById('cal-add').onclick = () => {
@@ -6307,6 +6638,22 @@ function renderCalendar() {
   document.querySelectorAll('[data-cal-del]').forEach((btn) => {
     btn.onclick = () => {
       app.calendarReminders = (app.calendarReminders || []).filter((r) => r.id !== btn.dataset.calDel);
+      renderCalendar();
+    };
+  });
+
+  document.querySelectorAll('[data-show-signup]').forEach((btn) => {
+    btn.onclick = () => {
+      const show = shows.find((s) => s.id === btn.dataset.showSignup);
+      if (!show) return;
+      const horseId = document.querySelector(`[data-show-horse='${show.id}']`)?.value;
+      const horse = app.horses.find((h) => h.id === horseId);
+      if (!horse) return alert('Select a horse first.');
+      const tCost = transportCost(app.currentBarn?.country, show.country);
+      const total = show.fee + tCost;
+      if (!tryCharge(total)) return;
+      registerShowEntry(horse, show.discipline, show.level);
+      pushReport(`${horse.name} signed up for ${cap(show.discipline)} at ${show.barnName}. Fees paid: ${money(total)}.`);
       renderCalendar();
     };
   });
@@ -6350,6 +6697,8 @@ function renderSettings() {
         trainingMode: document.getElementById('settings-training-mode').value === 'normal' ? 'normal' : 'rpg',
         competitionMode: document.getElementById('settings-competition-mode').value === 'normal' ? 'normal' : 'rpg'
       };
+      ensureBarnState();
+      if (app.currentBarn) app.currentBarn.name = app.settings.barnName;
       pushReport('Settings updated.');
       render();
       saveGame(false);
