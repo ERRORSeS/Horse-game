@@ -5774,7 +5774,7 @@ function renderTraining() {
         <p><strong>ACTION:</strong> ${actionLabel(session.action)} — Variant ${variant.id || '?'}</p>
         <p><strong>Scene:</strong> ${sceneText}</p>
         ${app.trainingRpgFeedback ? `<p><strong>Last choice result:</strong> ${app.trainingRpgFeedback}</p>` : ''}
-        <p class='small'><strong>GLOBAL CODING NOTE:</strong> Final percentages already include horse training, quality of life, mood, personality, bond, and confidence.</p>
+        <p class='small'><strong>TRAINING/SHOW NOTE:</strong> Percentage starts from a small base, then is adjusted by Bond (high impact), Skills (slight impact), Quality of Life (medium impact), controlability, and tack.</p>
         <div id='rpg-options'></div>
         <button id='rpg-exit'>End Interactive Session</button>
       </div>
