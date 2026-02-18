@@ -162,6 +162,7 @@ const app = {
   competitionHorseScope: 'both',
   calendarReminders: [],
   closedReminderIds: [],
+  upcomingEvents: [],
   lessonHorsesByBarn: {},
   barnLessonSelectionId: '',
   barnHorseSelectionId: ''
@@ -367,34 +368,76 @@ function showTransportFee(show) {
   return 12000;
 }
 
+function createBarnShowEvent(options = {}) {
+  const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)].filter(Boolean);
+  if (!venues.length) return null;
+  const foreignVenues = venues.filter((v) => v.country !== app.currentBarn.country);
+  const discipline = options.discipline || pick(DISCIPLINES);
+  let venue = options.venue;
+  if (!venue) {
+    venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
+    if (options.forceCurrentBarn) venue = app.currentBarn;
+    if (options.forceForeignVenue && foreignVenues.length) venue = pick(foreignVenues);
+  }
+  const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
+  return {
+    id: uid(),
+    barnId: venue.id,
+    barnName: venue.name,
+    country: venue.country,
+    city: venue.city,
+    fee: rnd(120, 1800),
+    transportFee,
+    discipline,
+    maxSkill: options.maxSkill ?? 100,
+    level: options.level || pick(SHOW_LEVELS[discipline] || []),
+    month: options.month ?? app.month,
+    year: options.year ?? app.year,
+    isUpcomingEvent: options.isUpcomingEvent === true,
+    monthsUntilStart: Number.isFinite(options.monthsUntilStart) ? Math.max(0, Math.floor(options.monthsUntilStart)) : 0
+  };
+}
+
+function ensureUpcomingEventsPool(target = 6) {
+  app.upcomingEvents = Array.isArray(app.upcomingEvents) ? app.upcomingEvents : [];
+  while (app.upcomingEvents.length < target) {
+    const event = createBarnShowEvent({
+      maxSkill: rnd(75, 100),
+      isUpcomingEvent: true,
+      monthsUntilStart: rnd(1, 6)
+    });
+    if (!event) break;
+    app.upcomingEvents.push(event);
+  }
+}
+
 function refreshBarnShows() {
   if (!app.currentBarn) return;
   const eventsStars = app.currentBarn?.eventsStars || 1;
-  const showCount = eventsStars === 1 ? 1 : eventsStars === 2 ? rnd(1, 2) : eventsStars === 3 ? rnd(2, 3) : eventsStars === 4 ? rnd(3, 4) : rnd(4, 6);
-  const maxSkill = eventsStars === 1 ? 20 : eventsStars === 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
-  const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)];
-  const foreignVenues = venues.filter((v) => v.country !== app.currentBarn.country);
-  app.barnShows = Array.from({ length: showCount }, (_, index) => {
-    const discipline = pick(DISCIPLINES);
-    let venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
-    if (showCount >= 2 && index === 0) venue = app.currentBarn;
-    if (showCount >= 2 && index === 1 && foreignVenues.length) venue = pick(foreignVenues);
-    const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
-    return {
-      id: uid(),
-      barnId: venue.id,
-      barnName: venue.name,
-      country: venue.country,
-      city: venue.city,
-      fee: rnd(120, 1800),
-      transportFee,
-      discipline,
-      maxSkill,
-      level: pick(SHOW_LEVELS[discipline] || []),
-      month: app.month,
-      year: app.year
-    };
-  });
+  const maxSkill = eventsStars <= 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
+  const showCount = rnd(3, 10);
+  const keySet = new Set();
+  const shows = [];
+  for (let index = 0; index < showCount; index += 1) {
+    let attempts = 0;
+    while (attempts < 30) {
+      const show = createBarnShowEvent({
+        maxSkill,
+        forceCurrentBarn: index === 0,
+        forceForeignVenue: index === 1
+      });
+      if (!show) break;
+      const key = `${show.barnId}-${show.discipline}-${show.level}`;
+      if (!keySet.has(key)) {
+        keySet.add(key);
+        shows.push(show);
+        break;
+      }
+      attempts += 1;
+    }
+  }
+  app.barnShows = shows;
+  ensureUpcomingEventsPool();
 }
 
 const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
@@ -2699,6 +2742,7 @@ function hydrateFromSave(data) {
   app.competitionHorseScope = ['private', 'lesson', 'both'].includes(data.competitionHorseScope) ? data.competitionHorseScope : 'both';
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
+  app.upcomingEvents = Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [];
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
   app.barnLessonSelectionId = data.barnLessonSelectionId || '';
   app.barnHorseSelectionId = data.barnHorseSelectionId || '';
@@ -2861,6 +2905,11 @@ function hydrateFromSave(data) {
     h.leaseDurationMonths = Number.isFinite(h.leaseDurationMonths) ? Math.max(0, Math.floor(h.leaseDurationMonths)) : h.leaseMonthsRemaining;
     h.leaseMonthlyCost = Number.isFinite(h.leaseMonthlyCost) ? Math.max(0, Math.round(h.leaseMonthlyCost)) : 0;
   });
+  app.upcomingEvents = app.upcomingEvents.map((event) => ({
+    ...event,
+    isUpcomingEvent: true,
+    monthsUntilStart: Number.isFinite(event.monthsUntilStart) ? Math.max(0, Math.floor(event.monthsUntilStart)) : rnd(1, 4)
+  })).filter((event) => event.monthsUntilStart > 0);
   refreshRescueHorses();
 }
 
@@ -2899,6 +2948,7 @@ function resetGame() {
   app.competitionHorseScope = 'both';
   app.calendarReminders = [];
   app.closedReminderIds = [];
+  app.upcomingEvents = [];
   app.lessonHorsesByBarn = {};
   app.barnLessonSelectionId = '';
   app.barnHorseSelectionId = '';
@@ -6470,7 +6520,28 @@ function monthlyProgress() {
     app.money -= monthlyBoard;
     pushReport(`Monthly board paid at ${app.currentBarn.name}: ${money(monthlyBoard)} (${boardedHorses} horse(s)).`);
   }
+  app.upcomingEvents = (app.upcomingEvents || []).map((event) => ({
+    ...event,
+    isUpcomingEvent: true,
+    monthsUntilStart: Math.max(0, (Number(event.monthsUntilStart) || 0) - 1)
+  }));
+  const eventsHappeningNow = app.upcomingEvents.filter((event) => event.monthsUntilStart <= 0).map((event) => ({
+    ...event,
+    id: uid(),
+    isUpcomingEvent: false,
+    month: app.month,
+    year: app.year
+  }));
+  if (eventsHappeningNow.length) {
+    app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
+    eventsHappeningNow.forEach((event) => {
+      pushReport(`Upcoming event is now live: ${cap(event.discipline)} ${event.level} at ${event.barnName}.`);
+    });
+  }
+  app.upcomingEvents = app.upcomingEvents.filter((event) => event.monthsUntilStart > 0);
   refreshBarnShows();
+  app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
+  ensureUpcomingEventsPool();
   ensureLessonRosterForBarn(app.currentBarn, true);
   app.closedReminderIds = [];
   refreshNpcAds();
@@ -6723,6 +6794,7 @@ function renderCalendar() {
   ensureBarnState();
   const reminders = app.calendarReminders || [];
   const shows = app.barnShows || [];
+  const upcomingEvents = (app.upcomingEvents || []).slice().sort((a, b) => (a.monthsUntilStart || 0) - (b.monthsUntilStart || 0));
   document.getElementById('calendar').innerHTML = `
     <h2>Calendar</h2>
     <div class='box'>
@@ -6744,7 +6816,7 @@ function renderCalendar() {
       ${reminders.map((r) => `<div class='box'><h3>${r.type}</h3><p>${r.note || '-'}</p><p class='small'>${r.scheduleText}</p><button data-cal-del='${r.id}'>Delete</button></div>`).join('') || '<p class="small">No reminders yet.</p>'}
     </div>
     <div class='box'>
-      <h3>Upcoming Horse Shows</h3>
+      <h3>Events Happening Right Now</h3>
       ${shows.map((show) => {
         const tCost = showTransportFee(show);
         return `<div class='box'>
@@ -6758,6 +6830,14 @@ function renderCalendar() {
           <button data-show-signup='${show.id}'>Sign Up</button>
         </div>`;
       }).join('') || '<p class="small">No upcoming shows listed at this time.</p>'}
+    </div>
+    <div class='box'>
+      <h3>Upcoming Events (Higher Skill Levels)</h3>
+      ${upcomingEvents.map((show) => `<div class='box'>
+        <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
+        <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Level:</strong> ${show.level}</p>
+        <p class='small'><strong>Date:</strong> Hidden (${show.monthsUntilStart} month(s) remaining)</p>
+      </div>`).join('') || '<p class="small">No high-level upcoming events currently listed.</p>'}
     </div>
   `;
   document.getElementById('cal-add').onclick = () => {
@@ -6855,6 +6935,8 @@ function renderSettings() {
   document.getElementById('settings').innerHTML = `
     <h2>Settings</h2>
     <div class='box'>
+      <label>Money</label>
+      <input id='settings-money' type='number' min='0' step='1' value='${Math.max(0, Math.round(app.money || 0))}' />
       <label>Barn Name</label>
       <input id='settings-barn-name' type='text' value='${current.barnName || ''}' placeholder='Barn name' />
       <label>Breeding Code</label>
@@ -6881,6 +6963,12 @@ function renderSettings() {
   const saveBtn = document.getElementById('settings-save');
   if (saveBtn) {
     saveBtn.onclick = () => {
+      const enteredMoney = Number(document.getElementById('settings-money').value);
+      if (!Number.isFinite(enteredMoney) || enteredMoney < 0) {
+        alert('Money must be a non-negative number.');
+        return;
+      }
+      app.money = Math.round(enteredMoney);
       app.settings = {
         barnName: (document.getElementById('settings-barn-name').value || '').trim() || 'Oxer to Oxer Stable Manager',
         breedingCode: (document.getElementById('settings-breeding-code').value || '').trim(),
