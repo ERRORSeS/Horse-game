@@ -163,7 +163,8 @@ const app = {
   calendarReminders: [],
   closedReminderIds: [],
   lessonHorsesByBarn: {},
-  barnLessonSelectionId: ''
+  barnLessonSelectionId: '',
+  barnHorseSelectionId: ''
 };
 
 const options = {};
@@ -2700,6 +2701,7 @@ function hydrateFromSave(data) {
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
   app.barnLessonSelectionId = data.barnLessonSelectionId || '';
+  app.barnHorseSelectionId = data.barnHorseSelectionId || '';
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -2857,6 +2859,7 @@ function hydrateFromSave(data) {
     h.hiddenIllnesses = Array.isArray(h.hiddenIllnesses) ? h.hiddenIllnesses : [];
     h.leaseMonthsRemaining = Number.isFinite(h.leaseMonthsRemaining) ? Math.max(0, Math.floor(h.leaseMonthsRemaining)) : 0;
     h.leaseDurationMonths = Number.isFinite(h.leaseDurationMonths) ? Math.max(0, Math.floor(h.leaseDurationMonths)) : h.leaseMonthsRemaining;
+    h.leaseMonthlyCost = Number.isFinite(h.leaseMonthlyCost) ? Math.max(0, Math.round(h.leaseMonthlyCost)) : 0;
   });
   refreshRescueHorses();
 }
@@ -2898,6 +2901,7 @@ function resetGame() {
   app.closedReminderIds = [];
   app.lessonHorsesByBarn = {};
   app.barnLessonSelectionId = '';
+  app.barnHorseSelectionId = '';
   seed();
   saveGame(false);
 }
@@ -3891,7 +3895,15 @@ function updateHeader() {
   const titleEl = document.querySelector('.topbar h1');
   if (titleEl) titleEl.textContent = app.settings?.barnName || 'Oxer to Oxer Stable Manager';
   if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
-  if (moneyEl) moneyEl.innerHTML = `<span class="money">${money(app.money)}</span>`;
+  if (moneyEl) moneyEl.innerHTML = `<span class="money money-clickable" title="Click to set money amount">${money(app.money)}</span>`;
+}
+
+function releaseLeasedHorseToLessonProgram(horse) {
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    const sourceLessonHorse = roster.find((x) => x.id === horse.leaseSourceId);
+    if (sourceLessonHorse) sourceLessonHorse.barnAvailable = true;
+  });
 }
 
 function changeTab(tab) {
@@ -4284,7 +4296,7 @@ function horseProfileMarkup(horse) {
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'} • Condition: ${horse.registryInspection.condition.toFixed(1)} • Pedigree: ${horse.registryInspection.pedigree == null ? 'N/A' : horse.registryInspection.pedigree.toFixed(1)}</p>`
     : '';
   const leaseLine = horse.isLeased && Number.isFinite(horse.leaseMonthsRemaining)
-    ? `<p class='small'>Lease Time Remaining: ${horse.leaseMonthsRemaining} month(s)</p>`
+    ? `<p class='small'>Lease Time Remaining: ${horse.leaseMonthsRemaining}/${horse.leaseDurationMonths || horse.leaseMonthsRemaining} month(s) • Lease Cost: ${money(horse.leaseMonthlyCost || 0)}/month</p>`
     : '';
   const titles = formattedHorseTitles(horse);
   const titlesLine = titles ? `<p class='small'>Titles: ${titles}</p>` : '';
@@ -6162,6 +6174,7 @@ function renderBarn() {
   const currentBarn = app.currentBarn;
   const lesson = ensureLessonRosterForBarn(currentBarn);
   const privateHorses = horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
+  if (!privateHorses.some((h) => h.id === app.barnHorseSelectionId)) app.barnHorseSelectionId = '';
   const careStars = currentBarn?.careStars || 3;
   const facilityStars = currentBarn?.facilityStars || 3;
   const eventStars = currentBarn?.eventsStars || 3;
@@ -6190,7 +6203,10 @@ function renderBarn() {
       <div class='box'>
         <h3>Private Horses</h3>
         <label>Horse</label>
-        <select id='barn-horse'>${privateHorses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}</select>
+        <select id='barn-horse'>
+          <option value=''>Choose a horse…</option>
+          ${privateHorses.map((h) => `<option value='${h.id}' ${app.barnHorseSelectionId === h.id ? 'selected' : ''}>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}
+        </select>
         <div class='inline'>
           <button data-barn='groom'>Groom</button>
           <button data-barn='clean-stall'>Clean Stall</button>
@@ -6216,12 +6232,25 @@ function renderBarn() {
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
       const horseId = document.getElementById('barn-horse')?.value;
+      if (!horseId) {
+        alert('Choose a horse before using a barn action.');
+        return;
+      }
       const horse = horsesIncludingLessons().find((h) => h.id === horseId);
       if (!horse) return;
       applyBarnActivity(horse, btn.dataset.barn);
+      app.barnHorseSelectionId = '';
       renderBarn();
     };
   });
+
+  const barnHorseSelect = document.getElementById('barn-horse');
+  if (barnHorseSelect) {
+    barnHorseSelect.value = app.barnHorseSelectionId || '';
+    barnHorseSelect.onchange = () => {
+      app.barnHorseSelectionId = barnHorseSelect.value || '';
+    };
+  }
 
   panel.querySelectorAll('[data-lesson-profile]').forEach((btn) => {
     btn.onclick = () => {
@@ -6251,7 +6280,8 @@ function renderBarn() {
     if (leaseBtn) leaseBtn.onclick = () => {
       const alreadyLeased = app.horses.some((h) => h.isLeased && h.leaseSourceId === selectedLessonHorse.id && !h.retiredForever);
       if (alreadyLeased) return alert('You already have an active lease for this lesson horse.');
-      const leaseDuration = rnd(1, 12);
+      const leaseDuration = rnd(5, 15);
+      const leaseMonthlyCost = rnd(250, 2500);
       const leasedHorse = {
         ...JSON.parse(JSON.stringify(selectedLessonHorse)),
         id: uid(),
@@ -6259,11 +6289,13 @@ function renderBarn() {
         isLeased: true,
         leaseSourceId: selectedLessonHorse.id,
         leaseLocked: true,
+        leaseMonthlyCost,
         leaseDurationMonths: leaseDuration,
         leaseMonthsRemaining: leaseDuration
       };
       app.horses.push(leasedHorse);
-      pushReport(`Leased ${selectedLessonHorse.name} for ${leaseDuration} month(s). Leased horses can train/show but feed/tack/turnout are locked.`);
+      selectedLessonHorse.barnAvailable = false;
+      pushReport(`Leased ${selectedLessonHorse.name} for ${leaseDuration} month(s) at ${money(leaseMonthlyCost)}/month. Leased horses can train/show but feed/tack/turnout are locked.`);
       render();
     };
   }
@@ -6401,13 +6433,20 @@ function monthlyProgress() {
     resolvePendingCompetitions(h);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
+        const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
+        if (leaseMonthlyCost > 0) {
+          if (app.money >= leaseMonthlyCost) {
+            app.money -= leaseMonthlyCost;
+            pushReport(`Lease fee paid for ${h.name}: ${money(leaseMonthlyCost)}.`);
+          } else {
+            releaseLeasedHorseToLessonProgram(h);
+            pushReport(`Lease for ${h.name} ended early because you could not pay ${money(leaseMonthlyCost)} this month.`);
+            return;
+          }
+        }
         h.leaseMonthsRemaining = Math.max(0, h.leaseMonthsRemaining - 1);
         if (h.leaseMonthsRemaining <= 0) {
-          Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
-            if (!Array.isArray(roster)) return;
-            const sourceLessonHorse = roster.find((x) => x.id === h.leaseSourceId);
-            if (sourceLessonHorse) sourceLessonHorse.barnAvailable = true;
-          });
+          releaseLeasedHorseToLessonProgram(h);
           pushReport(`${h.name}'s lease ended and the horse returned to the lesson program.`);
           return;
         }
@@ -6886,8 +6925,26 @@ const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
 const resetGameBtn = document.getElementById('resetGameBtn');
+const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
 if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
+if (moneyLabel) {
+  moneyLabel.style.cursor = 'pointer';
+  moneyLabel.title = 'Click to set your money amount';
+  moneyLabel.onclick = () => {
+    const entered = prompt('Set money amount:', `${Math.round(app.money)}`);
+    if (entered == null) return;
+    const normalized = entered.replace(/[$,\s]/g, '');
+    const value = Number(normalized);
+    if (!Number.isFinite(value) || value < 0) {
+      alert('Please enter a valid non-negative number.');
+      return;
+    }
+    app.money = Math.round(value);
+    render();
+    saveGame(false);
+  };
+}
 if (saveGameBtn) saveGameBtn.onclick = () => { if (saveGame(true)) render(); };
 if (loadGameBtn) loadGameBtn.onclick = () => { if (loadGame(true)) render(); };
 if (resetGameBtn) resetGameBtn.onclick = () => {
