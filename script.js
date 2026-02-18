@@ -162,8 +162,10 @@ const app = {
   competitionHorseScope: 'both',
   calendarReminders: [],
   closedReminderIds: [],
+  upcomingEvents: [],
   lessonHorsesByBarn: {},
-  barnLessonSelectionId: ''
+  barnLessonSelectionId: '',
+  barnHorseSelectionId: ''
 };
 
 const options = {};
@@ -366,34 +368,76 @@ function showTransportFee(show) {
   return 12000;
 }
 
+function createBarnShowEvent(options = {}) {
+  const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)].filter(Boolean);
+  if (!venues.length) return null;
+  const foreignVenues = venues.filter((v) => v.country !== app.currentBarn.country);
+  const discipline = options.discipline || pick(DISCIPLINES);
+  let venue = options.venue;
+  if (!venue) {
+    venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
+    if (options.forceCurrentBarn) venue = app.currentBarn;
+    if (options.forceForeignVenue && foreignVenues.length) venue = pick(foreignVenues);
+  }
+  const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
+  return {
+    id: uid(),
+    barnId: venue.id,
+    barnName: venue.name,
+    country: venue.country,
+    city: venue.city,
+    fee: rnd(120, 1800),
+    transportFee,
+    discipline,
+    maxSkill: options.maxSkill ?? 100,
+    level: options.level || pick(SHOW_LEVELS[discipline] || []),
+    month: options.month ?? app.month,
+    year: options.year ?? app.year,
+    isUpcomingEvent: options.isUpcomingEvent === true,
+    monthsUntilStart: Number.isFinite(options.monthsUntilStart) ? Math.max(0, Math.floor(options.monthsUntilStart)) : 0
+  };
+}
+
+function ensureUpcomingEventsPool(target = 6) {
+  app.upcomingEvents = Array.isArray(app.upcomingEvents) ? app.upcomingEvents : [];
+  while (app.upcomingEvents.length < target) {
+    const event = createBarnShowEvent({
+      maxSkill: rnd(75, 100),
+      isUpcomingEvent: true,
+      monthsUntilStart: rnd(1, 6)
+    });
+    if (!event) break;
+    app.upcomingEvents.push(event);
+  }
+}
+
 function refreshBarnShows() {
   if (!app.currentBarn) return;
   const eventsStars = app.currentBarn?.eventsStars || 1;
-  const showCount = eventsStars === 1 ? 1 : eventsStars === 2 ? rnd(1, 2) : eventsStars === 3 ? rnd(2, 3) : eventsStars === 4 ? rnd(3, 4) : rnd(4, 6);
-  const maxSkill = eventsStars === 1 ? 20 : eventsStars === 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
-  const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)];
-  const foreignVenues = venues.filter((v) => v.country !== app.currentBarn.country);
-  app.barnShows = Array.from({ length: showCount }, (_, index) => {
-    const discipline = pick(DISCIPLINES);
-    let venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
-    if (showCount >= 2 && index === 0) venue = app.currentBarn;
-    if (showCount >= 2 && index === 1 && foreignVenues.length) venue = pick(foreignVenues);
-    const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
-    return {
-      id: uid(),
-      barnId: venue.id,
-      barnName: venue.name,
-      country: venue.country,
-      city: venue.city,
-      fee: rnd(120, 1800),
-      transportFee,
-      discipline,
-      maxSkill,
-      level: pick(SHOW_LEVELS[discipline] || []),
-      month: app.month,
-      year: app.year
-    };
-  });
+  const maxSkill = eventsStars <= 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
+  const showCount = rnd(3, 10);
+  const keySet = new Set();
+  const shows = [];
+  for (let index = 0; index < showCount; index += 1) {
+    let attempts = 0;
+    while (attempts < 30) {
+      const show = createBarnShowEvent({
+        maxSkill,
+        forceCurrentBarn: index === 0,
+        forceForeignVenue: index === 1
+      });
+      if (!show) break;
+      const key = `${show.barnId}-${show.discipline}-${show.level}`;
+      if (!keySet.has(key)) {
+        keySet.add(key);
+        shows.push(show);
+        break;
+      }
+      attempts += 1;
+    }
+  }
+  app.barnShows = shows;
+  ensureUpcomingEventsPool();
 }
 
 const POSITIVE_MOODS = ['Motivated', 'Happy', 'Try-Hard'];
@@ -2698,8 +2742,10 @@ function hydrateFromSave(data) {
   app.competitionHorseScope = ['private', 'lesson', 'both'].includes(data.competitionHorseScope) ? data.competitionHorseScope : 'both';
   app.calendarReminders = Array.isArray(data.calendarReminders) ? data.calendarReminders : [];
   app.closedReminderIds = Array.isArray(data.closedReminderIds) ? data.closedReminderIds : [];
+  app.upcomingEvents = Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [];
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
   app.barnLessonSelectionId = data.barnLessonSelectionId || '';
+  app.barnHorseSelectionId = data.barnHorseSelectionId || '';
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -2857,7 +2903,13 @@ function hydrateFromSave(data) {
     h.hiddenIllnesses = Array.isArray(h.hiddenIllnesses) ? h.hiddenIllnesses : [];
     h.leaseMonthsRemaining = Number.isFinite(h.leaseMonthsRemaining) ? Math.max(0, Math.floor(h.leaseMonthsRemaining)) : 0;
     h.leaseDurationMonths = Number.isFinite(h.leaseDurationMonths) ? Math.max(0, Math.floor(h.leaseDurationMonths)) : h.leaseMonthsRemaining;
+    h.leaseMonthlyCost = Number.isFinite(h.leaseMonthlyCost) ? Math.max(0, Math.round(h.leaseMonthlyCost)) : 0;
   });
+  app.upcomingEvents = app.upcomingEvents.map((event) => ({
+    ...event,
+    isUpcomingEvent: true,
+    monthsUntilStart: Number.isFinite(event.monthsUntilStart) ? Math.max(0, Math.floor(event.monthsUntilStart)) : rnd(1, 4)
+  })).filter((event) => event.monthsUntilStart > 0);
   refreshRescueHorses();
 }
 
@@ -2896,8 +2948,10 @@ function resetGame() {
   app.competitionHorseScope = 'both';
   app.calendarReminders = [];
   app.closedReminderIds = [];
+  app.upcomingEvents = [];
   app.lessonHorsesByBarn = {};
   app.barnLessonSelectionId = '';
+  app.barnHorseSelectionId = '';
   seed();
   saveGame(false);
 }
@@ -3891,7 +3945,15 @@ function updateHeader() {
   const titleEl = document.querySelector('.topbar h1');
   if (titleEl) titleEl.textContent = app.settings?.barnName || 'Oxer to Oxer Stable Manager';
   if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
-  if (moneyEl) moneyEl.innerHTML = `<span class="money">${money(app.money)}</span>`;
+  if (moneyEl) moneyEl.innerHTML = `<span class="money money-clickable" title="Click to set money amount">${money(app.money)}</span>`;
+}
+
+function releaseLeasedHorseToLessonProgram(horse) {
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    const sourceLessonHorse = roster.find((x) => x.id === horse.leaseSourceId);
+    if (sourceLessonHorse) sourceLessonHorse.barnAvailable = true;
+  });
 }
 
 function changeTab(tab) {
@@ -4284,7 +4346,7 @@ function horseProfileMarkup(horse) {
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'} • Condition: ${horse.registryInspection.condition.toFixed(1)} • Pedigree: ${horse.registryInspection.pedigree == null ? 'N/A' : horse.registryInspection.pedigree.toFixed(1)}</p>`
     : '';
   const leaseLine = horse.isLeased && Number.isFinite(horse.leaseMonthsRemaining)
-    ? `<p class='small'>Lease Time Remaining: ${horse.leaseMonthsRemaining} month(s)</p>`
+    ? `<p class='small'>Lease Time Remaining: ${horse.leaseMonthsRemaining}/${horse.leaseDurationMonths || horse.leaseMonthsRemaining} month(s) • Lease Cost: ${money(horse.leaseMonthlyCost || 0)}/month</p>`
     : '';
   const titles = formattedHorseTitles(horse);
   const titlesLine = titles ? `<p class='small'>Titles: ${titles}</p>` : '';
@@ -6162,6 +6224,7 @@ function renderBarn() {
   const currentBarn = app.currentBarn;
   const lesson = ensureLessonRosterForBarn(currentBarn);
   const privateHorses = horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
+  if (!privateHorses.some((h) => h.id === app.barnHorseSelectionId)) app.barnHorseSelectionId = '';
   const careStars = currentBarn?.careStars || 3;
   const facilityStars = currentBarn?.facilityStars || 3;
   const eventStars = currentBarn?.eventsStars || 3;
@@ -6190,7 +6253,10 @@ function renderBarn() {
       <div class='box'>
         <h3>Private Horses</h3>
         <label>Horse</label>
-        <select id='barn-horse'>${privateHorses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}</select>
+        <select id='barn-horse'>
+          <option value=''>Choose a horse…</option>
+          ${privateHorses.map((h) => `<option value='${h.id}' ${app.barnHorseSelectionId === h.id ? 'selected' : ''}>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}
+        </select>
         <div class='inline'>
           <button data-barn='groom'>Groom</button>
           <button data-barn='clean-stall'>Clean Stall</button>
@@ -6216,12 +6282,25 @@ function renderBarn() {
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
       const horseId = document.getElementById('barn-horse')?.value;
+      if (!horseId) {
+        alert('Choose a horse before using a barn action.');
+        return;
+      }
       const horse = horsesIncludingLessons().find((h) => h.id === horseId);
       if (!horse) return;
       applyBarnActivity(horse, btn.dataset.barn);
+      app.barnHorseSelectionId = '';
       renderBarn();
     };
   });
+
+  const barnHorseSelect = document.getElementById('barn-horse');
+  if (barnHorseSelect) {
+    barnHorseSelect.value = app.barnHorseSelectionId || '';
+    barnHorseSelect.onchange = () => {
+      app.barnHorseSelectionId = barnHorseSelect.value || '';
+    };
+  }
 
   panel.querySelectorAll('[data-lesson-profile]').forEach((btn) => {
     btn.onclick = () => {
@@ -6251,7 +6330,8 @@ function renderBarn() {
     if (leaseBtn) leaseBtn.onclick = () => {
       const alreadyLeased = app.horses.some((h) => h.isLeased && h.leaseSourceId === selectedLessonHorse.id && !h.retiredForever);
       if (alreadyLeased) return alert('You already have an active lease for this lesson horse.');
-      const leaseDuration = rnd(1, 12);
+      const leaseDuration = rnd(5, 15);
+      const leaseMonthlyCost = rnd(250, 2500);
       const leasedHorse = {
         ...JSON.parse(JSON.stringify(selectedLessonHorse)),
         id: uid(),
@@ -6259,11 +6339,13 @@ function renderBarn() {
         isLeased: true,
         leaseSourceId: selectedLessonHorse.id,
         leaseLocked: true,
+        leaseMonthlyCost,
         leaseDurationMonths: leaseDuration,
         leaseMonthsRemaining: leaseDuration
       };
       app.horses.push(leasedHorse);
-      pushReport(`Leased ${selectedLessonHorse.name} for ${leaseDuration} month(s). Leased horses can train/show but feed/tack/turnout are locked.`);
+      selectedLessonHorse.barnAvailable = false;
+      pushReport(`Leased ${selectedLessonHorse.name} for ${leaseDuration} month(s) at ${money(leaseMonthlyCost)}/month. Leased horses can train/show but feed/tack/turnout are locked.`);
       render();
     };
   }
@@ -6401,13 +6483,20 @@ function monthlyProgress() {
     resolvePendingCompetitions(h);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
+        const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
+        if (leaseMonthlyCost > 0) {
+          if (app.money >= leaseMonthlyCost) {
+            app.money -= leaseMonthlyCost;
+            pushReport(`Lease fee paid for ${h.name}: ${money(leaseMonthlyCost)}.`);
+          } else {
+            releaseLeasedHorseToLessonProgram(h);
+            pushReport(`Lease for ${h.name} ended early because you could not pay ${money(leaseMonthlyCost)} this month.`);
+            return;
+          }
+        }
         h.leaseMonthsRemaining = Math.max(0, h.leaseMonthsRemaining - 1);
         if (h.leaseMonthsRemaining <= 0) {
-          Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
-            if (!Array.isArray(roster)) return;
-            const sourceLessonHorse = roster.find((x) => x.id === h.leaseSourceId);
-            if (sourceLessonHorse) sourceLessonHorse.barnAvailable = true;
-          });
+          releaseLeasedHorseToLessonProgram(h);
           pushReport(`${h.name}'s lease ended and the horse returned to the lesson program.`);
           return;
         }
@@ -6431,7 +6520,28 @@ function monthlyProgress() {
     app.money -= monthlyBoard;
     pushReport(`Monthly board paid at ${app.currentBarn.name}: ${money(monthlyBoard)} (${boardedHorses} horse(s)).`);
   }
+  app.upcomingEvents = (app.upcomingEvents || []).map((event) => ({
+    ...event,
+    isUpcomingEvent: true,
+    monthsUntilStart: Math.max(0, (Number(event.monthsUntilStart) || 0) - 1)
+  }));
+  const eventsHappeningNow = app.upcomingEvents.filter((event) => event.monthsUntilStart <= 0).map((event) => ({
+    ...event,
+    id: uid(),
+    isUpcomingEvent: false,
+    month: app.month,
+    year: app.year
+  }));
+  if (eventsHappeningNow.length) {
+    app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
+    eventsHappeningNow.forEach((event) => {
+      pushReport(`Upcoming event is now live: ${cap(event.discipline)} ${event.level} at ${event.barnName}.`);
+    });
+  }
+  app.upcomingEvents = app.upcomingEvents.filter((event) => event.monthsUntilStart > 0);
   refreshBarnShows();
+  app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
+  ensureUpcomingEventsPool();
   ensureLessonRosterForBarn(app.currentBarn, true);
   app.closedReminderIds = [];
   refreshNpcAds();
@@ -6684,6 +6794,7 @@ function renderCalendar() {
   ensureBarnState();
   const reminders = app.calendarReminders || [];
   const shows = app.barnShows || [];
+  const upcomingEvents = (app.upcomingEvents || []).slice().sort((a, b) => (a.monthsUntilStart || 0) - (b.monthsUntilStart || 0));
   document.getElementById('calendar').innerHTML = `
     <h2>Calendar</h2>
     <div class='box'>
@@ -6705,7 +6816,7 @@ function renderCalendar() {
       ${reminders.map((r) => `<div class='box'><h3>${r.type}</h3><p>${r.note || '-'}</p><p class='small'>${r.scheduleText}</p><button data-cal-del='${r.id}'>Delete</button></div>`).join('') || '<p class="small">No reminders yet.</p>'}
     </div>
     <div class='box'>
-      <h3>Upcoming Horse Shows</h3>
+      <h3>Events Happening Right Now</h3>
       ${shows.map((show) => {
         const tCost = showTransportFee(show);
         return `<div class='box'>
@@ -6719,6 +6830,14 @@ function renderCalendar() {
           <button data-show-signup='${show.id}'>Sign Up</button>
         </div>`;
       }).join('') || '<p class="small">No upcoming shows listed at this time.</p>'}
+    </div>
+    <div class='box'>
+      <h3>Upcoming Events (Higher Skill Levels)</h3>
+      ${upcomingEvents.map((show) => `<div class='box'>
+        <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
+        <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Level:</strong> ${show.level}</p>
+        <p class='small'><strong>Date:</strong> Hidden (${show.monthsUntilStart} month(s) remaining)</p>
+      </div>`).join('') || '<p class="small">No high-level upcoming events currently listed.</p>'}
     </div>
   `;
   document.getElementById('cal-add').onclick = () => {
@@ -6816,6 +6935,8 @@ function renderSettings() {
   document.getElementById('settings').innerHTML = `
     <h2>Settings</h2>
     <div class='box'>
+      <label>Money</label>
+      <input id='settings-money' type='number' min='0' step='1' value='${Math.max(0, Math.round(app.money || 0))}' />
       <label>Barn Name</label>
       <input id='settings-barn-name' type='text' value='${current.barnName || ''}' placeholder='Barn name' />
       <label>Breeding Code</label>
@@ -6842,6 +6963,12 @@ function renderSettings() {
   const saveBtn = document.getElementById('settings-save');
   if (saveBtn) {
     saveBtn.onclick = () => {
+      const enteredMoney = Number(document.getElementById('settings-money').value);
+      if (!Number.isFinite(enteredMoney) || enteredMoney < 0) {
+        alert('Money must be a non-negative number.');
+        return;
+      }
+      app.money = Math.round(enteredMoney);
       app.settings = {
         barnName: (document.getElementById('settings-barn-name').value || '').trim() || 'Oxer to Oxer Stable Manager',
         breedingCode: (document.getElementById('settings-breeding-code').value || '').trim(),
@@ -6886,8 +7013,26 @@ const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
 const resetGameBtn = document.getElementById('resetGameBtn');
+const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
 if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
+if (moneyLabel) {
+  moneyLabel.style.cursor = 'pointer';
+  moneyLabel.title = 'Click to set your money amount';
+  moneyLabel.onclick = () => {
+    const entered = prompt('Set money amount:', `${Math.round(app.money)}`);
+    if (entered == null) return;
+    const normalized = entered.replace(/[$,\s]/g, '');
+    const value = Number(normalized);
+    if (!Number.isFinite(value) || value < 0) {
+      alert('Please enter a valid non-negative number.');
+      return;
+    }
+    app.money = Math.round(value);
+    render();
+    saveGame(false);
+  };
+}
 if (saveGameBtn) saveGameBtn.onclick = () => { if (saveGame(true)) render(); };
 if (loadGameBtn) loadGameBtn.onclick = () => { if (loadGame(true)) render(); };
 if (resetGameBtn) resetGameBtn.onclick = () => {
