@@ -354,9 +354,12 @@ function refreshBarnShows() {
   const showCount = eventsStars === 1 ? 1 : eventsStars === 2 ? rnd(1, 2) : eventsStars === 3 ? rnd(2, 3) : eventsStars === 4 ? rnd(3, 4) : rnd(4, 6);
   const maxSkill = eventsStars === 1 ? 20 : eventsStars === 2 ? 20 : eventsStars === 3 ? 50 : eventsStars === 4 ? 70 : 100;
   const venues = [app.currentBarn, ...(app.barnCatalog || []).filter((b) => b.id !== app.currentBarn.id)];
-  app.barnShows = Array.from({ length: showCount }, () => {
+  const foreignVenues = venues.filter((v) => v.country !== app.currentBarn.country);
+  app.barnShows = Array.from({ length: showCount }, (_, index) => {
     const discipline = pick(DISCIPLINES);
-    const venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
+    let venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
+    if (showCount >= 2 && index === 0) venue = app.currentBarn;
+    if (showCount >= 2 && index === 1 && foreignVenues.length) venue = pick(foreignVenues);
     const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
     return {
       id: uid(),
@@ -2066,6 +2069,16 @@ function turnoutRangeBounds(level) {
   return [3, 8];
 }
 
+function resolvedTurnoutBounds(horse) {
+  const stamina = horse.trainingPreference || 'Medium';
+  const [baseTurnoutMin, baseTurnoutMax] = turnoutRangeBounds(stamina);
+  const [facilityTurnoutMin, facilityTurnoutMax] = barnFacilityTurnoutRange(app.currentBarn?.facilityStars || 3);
+  const minTurnout = Math.max(baseTurnoutMin, facilityTurnoutMin);
+  const maxTurnout = Math.min(baseTurnoutMax, facilityTurnoutMax);
+  if (minTurnout > maxTurnout) return [baseTurnoutMin, baseTurnoutMax];
+  return [minTurnout, maxTurnout];
+}
+
 function feedRangeBounds(horse) {
   const pref = horse.preferredFeedGrams || 150;
   return [Math.max(50, pref - 25), Math.min(250, pref + 25)];
@@ -2327,6 +2340,10 @@ function evaluateFeedEffects(horse) {
   if (hasInjury && hasCalmFeed && hasRecoveryFeed && weightDelta > 0) {
     weightDelta = 0;
   }
+  const feedMatchesHorse = !wrongFeedUsed && (!moodOverride || !NEGATIVE_MOODS.includes(moodOverride));
+  if (feedMatchesHorse) {
+    weightDelta = 0;
+  }
   if (wrongFeedUsed) {
     horse.wrongFeedMonthsYear = (horse.wrongFeedMonthsYear || 0) + 1;
   }
@@ -2503,11 +2520,8 @@ function trainingControlabilitySession(horse, focus) {
 function updateMonthlyCare(horse) {
   if (horse.retiredForever && !horse.retiredToBreeding) return;
   evaluateFeedEffects(horse);
+  const [minTurnout, maxTurnout] = resolvedTurnoutBounds(horse);
   const stamina = horse.trainingPreference || 'Medium';
-  const [baseTurnoutMin, baseTurnoutMax] = turnoutRangeBounds(stamina);
-  const [facilityTurnoutMin, facilityTurnoutMax] = barnFacilityTurnoutRange(app.currentBarn?.facilityStars || 3);
-  const minTurnout = Math.max(baseTurnoutMin, facilityTurnoutMin);
-  const maxTurnout = Math.min(baseTurnoutMax, facilityTurnoutMax);
   const effectiveTurnout = horse.turnoutAssignmentHours > 0 ? horse.turnoutAssignmentHours : rnd(minTurnout, maxTurnout);
   horse.turnoutHours = (horse.illnesses || []).some((i) => i.active) ? 0 : Math.max(0.5, Math.min(14, effectiveTurnout));
   horse.lastTurnoutIssue = '';
@@ -2576,11 +2590,7 @@ function updateMonthlyCare(horse) {
 }
 
 function turnoutOkForHorse(horse) {
-  const stamina = horse.trainingPreference || 'Medium';
-  const [baseTurnoutMin, baseTurnoutMax] = turnoutRangeBounds(stamina);
-  const [facilityTurnoutMin, facilityTurnoutMax] = barnFacilityTurnoutRange(app.currentBarn?.facilityStars || 3);
-  const minTurnout = Math.max(baseTurnoutMin, facilityTurnoutMin);
-  const maxTurnout = Math.min(baseTurnoutMax, facilityTurnoutMax);
+  const [minTurnout, maxTurnout] = resolvedTurnoutBounds(horse);
   return (horse.turnoutHours || 0) >= minTurnout && (horse.turnoutHours || 0) <= maxTurnout;
 }
 
@@ -4628,7 +4638,10 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const trainingBoost = trainingPerformanceDelta(horse);
   const turnoutBoost = turnoutPerformanceDelta(horse);
   const interactionBoost = interaction?.modifier || 0;
-  const baseScore = clamp(Math.round(55 + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
+  const quality = calculateHorseQualityOfLife(horse);
+  const lowBondAndCare = (horse.bond || 0) < 0 && quality < 45;
+  const baseCompetitionPercent = lowBondAndCare ? rnd(15, 25) : rnd(25, 50);
+  const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
   const fieldSize = competitionFieldSize();
   let score = baseScore;
   let resultText = `${baseScore}`;
@@ -6188,7 +6201,7 @@ function renderBarn() {
   const lessonWrap = document.getElementById('barn-lesson-profile');
   if (selectedLessonHorse && lessonWrap) {
     lessonWrap.className = 'box';
-    const leaseVisible = (app.currentBarn?.lessonsStars || 3) <= 3;
+    const leaseVisible = (app.currentBarn?.lessonsStars || 3) >= 3;
     lessonWrap.innerHTML = `<h3>${selectedLessonHorse.name} — Lesson Horse Profile</h3>${horseProfileMarkup(selectedLessonHorse)}
       <div class='inline'>
         <button id='lesson-train-btn' ${selectedLessonHorse.barnAvailable ? '' : 'disabled'}>Train</button>
