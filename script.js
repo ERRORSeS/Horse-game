@@ -3616,7 +3616,7 @@ function createRescueHorse() {
   });
   horse.soundnessYears = Math.max(0, horse.soundnessYears - rnd(0, 3));
   horse.rescueId = uid();
-  horse.rescueFee = rnd(300, 900);
+  horse.rescueFee = rnd(500, 900);
   return horse;
 }
 
@@ -6464,15 +6464,24 @@ function activeRemindersForCurrentMonth() {
 function registryInspectionScore(horse) {
   const conformationMap = { 'Very Bad': 2.5, Bad: 4, Acceptable: 5.6, Good: 7, 'Very Good': 8.5, Excellent: 9.6 };
   const baseConformation = conformationMap[horse.conformation] || 5;
+  const conditionMap = {
+    'Very Underweight': 2.2,
+    Underweight: 4,
+    Moderate: 9.5,
+    Fleshy: 6.5,
+    Overweight: 3.8
+  };
   const behaviorScore = clamp(((horse.behavior || 0) / 1000) * 10, 1, 10);
-  const temperamentBoost = clamp(5 + (personalityOutcomeModifier(horse.personality) * 0.25), 1, 10);
-  const conditionScore = clamp(((behaviorScore * 0.55) + (temperamentBoost * 0.45)), 1, 10);
-  const pedigreeScore = clamp(10 - ((horse.coi || 0) * 0.2), 1, 10);
+  const weightScore = conditionMap[horse.weightStatus] || 5.5;
+  const conditionScore = clamp(((weightScore * 0.8) + (behaviorScore * 0.2)), 1, 10);
+  const purity = breedPurityPercent(horse.breed);
+  const isSportCross = purity < 100;
+  const pedigreeScore = isSportCross ? null : clamp(2 + (purity * 0.08), 1, 10);
   const potentialScore = clamp((Object.values(horse.potential || {}).reduce((sum, v) => sum + v, 0) / Math.max(1, Object.keys(horse.potential || {}).length)) / 10, 1, 10);
-  const totalScore = Number(((baseConformation + conditionScore + pedigreeScore + potentialScore) / 4).toFixed(2));
-  const passesConformation = ['Acceptable', 'Good', 'Very Good', 'Excellent'].includes(horse.conformation);
-  const result = (passesConformation && totalScore >= 5) ? 'Pass' : 'Fail';
-  const title = totalScore >= 9.5 ? 'Elite' : totalScore >= 8 ? 'Golden' : '';
+  const scored = [baseConformation, conditionScore, potentialScore, pedigreeScore].filter((v) => v != null);
+  const totalScore = Number((scored.reduce((sum, value) => sum + value, 0) / Math.max(1, scored.length)).toFixed(2));
+  const result = totalScore < 5 ? 'Fail' : 'Pass';
+  const title = totalScore >= 9.5 ? 'Elite' : (totalScore >= 8 && totalScore <= 9) ? 'Golden' : '';
   const registry = BREED_BRANDINGS[horse.breed] ? horse.breed : 'Cross-Breed';
   return {
     conformationScore: baseConformation,
@@ -6484,11 +6493,12 @@ function registryInspectionScore(horse) {
     title,
     branding: BREED_BRANDINGS[registry] || '',
     registry,
-    isSportCross: registry === 'Cross-Breed',
+    isSportCross,
     breakdown: {
       conformation: horse.conformation,
       behavior: horse.behavior || 0,
-      temperament: horse.personality
+      weightStatus: horse.weightStatus || 'Unknown',
+      purity
     }
   };
 }
@@ -6535,7 +6545,7 @@ function renderRegistries() {
         const reg = h.registryInspection;
         const resultLine = reg ? `${reg.registry || h.breed}: ${reg.result} (${reg.totalScore?.toFixed?.(2) ?? reg.totalScore})` : 'Not inspected yet';
         const detail = reg && h.showInspectionDetails
-          ? `<div class='box'><p class='small'>Conformation: ${reg.conformation.toFixed(1)} (${reg.breakdown?.conformation || h.conformation})</p><p class='small'>Behavior: ${reg.condition.toFixed(1)} (Behavior ${reg.breakdown?.behavior || 0}, Temperament ${reg.breakdown?.temperament || h.personality})</p><p class='small'>Pedigree: ${reg.pedigree?.toFixed?.(1) ?? reg.pedigree}</p><p class='small'>Potential: ${reg.potential.toFixed(1)}</p></div>`
+          ? `<div class='box'><p class='small'>Conformation: ${reg.conformation.toFixed(1)} (${reg.breakdown?.conformation || h.conformation})</p><p class='small'>Condition: ${reg.condition.toFixed(1)} (Weight ${reg.breakdown?.weightStatus || h.weightStatus || 'Unknown'}, Behavior ${reg.breakdown?.behavior || 0})</p><p class='small'>Pedigree: ${reg.pedigree == null ? 'N/A (Sport Cross)' : reg.pedigree.toFixed(1)}</p><p class='small'>Potential: ${reg.potential.toFixed(1)}</p></div>`
           : '';
         return `<div class='box'>
           <p><strong>${horseDisplayName(h)}</strong> — ${resultLine}</p>
@@ -6637,7 +6647,7 @@ function renderRescue() {
       const horse = baseHorse('untrained', 'npc');
       horse.name = rescueTemplate.name;
       horse.age = rescueTemplate.age;
-      horse.breed = (rescueTemplate.breed || '').split(' x ')[0].replace(/\s\d+%$/, '') || horse.breed;
+      horse.breed = rescueTemplate.breed || horse.breed;
       horse.gender = rescueTemplate.gender;
       horse.weightStatus = rescueTemplate.weightStatus;
       horse.owner = 'Your Stable';
