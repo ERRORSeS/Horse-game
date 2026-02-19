@@ -5176,14 +5176,52 @@ function competitionOptionChances(session, horse, option, step) {
   };
 }
 
+function competitionOptionFinalChances(session, horse, step, options) {
+  const prepMod = step?.stage === 'main_round' ? session.readinessBonus : 0;
+  const computedOptions = (options || []).map((option, index) => {
+    const computed = competitionOptionChances(session, horse, option, step);
+    const baseSuccess = clamp(computed.successChance + prepMod, computed.rangeMin, computed.rangeMax);
+    return { index, option, computed, successChance: baseSuccess };
+  });
+
+  const used = new Set();
+  computedOptions.forEach((entry) => {
+    let target = entry.successChance;
+    if (!used.has(target)) {
+      used.add(target);
+      entry.successChance = target;
+      return;
+    }
+    const min = entry.computed.rangeMin;
+    const max = entry.computed.rangeMax;
+    for (let distance = 1; distance <= (max - min); distance += 1) {
+      const up = target + distance;
+      if (up <= max && !used.has(up)) {
+        target = up;
+        break;
+      }
+      const down = target - distance;
+      if (down >= min && !used.has(down)) {
+        target = down;
+        break;
+      }
+    }
+    entry.successChance = target;
+    used.add(target);
+  });
+
+  return computedOptions;
+}
+
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const step = session.steps[session.stepIndex];
   const variant = competitionPromptForStep(session);
   if (!step || !variant) return;
-  const option = variant.options[choiceIndex];
-  const computed = competitionOptionChances(session, horse, option, step);
-  const prepMod = step.stage === 'main_round' ? session.readinessBonus : 0;
-  const successChance = clamp(computed.successChance + prepMod, computed.rangeMin, computed.rangeMax);
+  const optionOutcomes = competitionOptionFinalChances(session, horse, step, variant.options);
+  const selected = optionOutcomes.find((entry) => entry.index === choiceIndex);
+  if (!selected) return;
+  const computed = selected.computed;
+  const successChance = selected.successChance;
   const neutralChance = computed.neutralChance;
   const failChance = Math.max(1, 100 - successChance - neutralChance);
   const roll = rnd(1, 100);
@@ -5520,10 +5558,10 @@ function renderShows() {
       </div>
     `;
     const wrap = document.getElementById('comp-rpg-options');
-    variant.options.forEach((opt, idx) => {
+    const optionOutcomes = competitionOptionFinalChances(activeSession, horse, step, variant.options);
+    optionOutcomes.forEach((entry) => {
       const box = document.createElement('div');
-      const computed = competitionOptionChances(activeSession, horse, opt, step);
-      const finalSuccess = clamp(computed.successChance + (step.stage === 'main_round' ? activeSession.readinessBonus : 0), computed.rangeMin, computed.rangeMax);
+      const { index: idx, option: opt, computed, successChance: finalSuccess } = entry;
       const finalFail = Math.max(1, 100 - finalSuccess - computed.neutralChance);
       box.className = 'box';
       box.innerHTML = `
