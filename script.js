@@ -5128,18 +5128,31 @@ function competitionOptionChances(session, horse, option, step) {
   const horseBias = Number.isFinite(session.horseChanceBias) ? session.horseChanceBias : 0;
   const stepRandom = Number.isFinite(step?.randomBias) ? step.randomBias : 0;
   const optionBias = Math.round(((option.success || 0) - (option.fail || 0)) * 0.03);
-  const randomSwing = stepRandom + optionBias;
   const bond = horse.bond || 0;
   const qualityOfLife = calculateHorseQualityOfLife(horse);
-  const badCondition = qualityOfLife < 60;
+  const badCondition = qualityOfLife < 50;
   const rangeMin = badCondition ? 25 : 50;
-  const rangeMax = badCondition ? 60 : 75;
+  const rangeMax = badCondition ? 45 : 75;
   const normalizedOption = clamp((option.success || 0) / 100, 0, 1);
-  const rangeBase = rangeMin + ((rangeMax - rangeMin) * normalizedOption);
-  const careAdjust = Math.round(((qualityOfLife - 50) / 50) * 4);
-  const bondAdjust = Math.round((bond / 100) * 7);
-  const baseSuccessChance = clamp(Math.round(rangeBase + bondAdjust + careAdjust + (skillMod * 1.1) + confidenceMod + (mods.personality * 1.2) + (mods.mood * 1.5) + mods.warmup + memoryMod + horseBias + randomSwing), rangeMin, rangeMax);
-  const trainingPenalty = horse.personality === 'Hot-Blooded' ? 6 : horse.personality === 'Excitable' ? 3 : 0;
+  const rangeBase = badCondition
+    ? 25 + (normalizedOption * 6)
+    : 50 + ((rangeMax - rangeMin) * normalizedOption);
+  const careAdjust = badCondition
+    ? Math.round(((qualityOfLife - 40) / 10) * 2)
+    : Math.round(((qualityOfLife - 60) / 40) * 4);
+  const bondAdjust = badCondition
+    ? Math.round((bond / 100) * 3)
+    : Math.round((bond / 100) * 6);
+  const skillAdjust = Math.round(skillMod * 0.7);
+  const confidenceAdjust = Math.round(confidenceMod * 0.7);
+  const randomAdjust = Math.round((stepRandom * 0.6) + (optionBias * 0.4));
+  const randomSwing = randomAdjust;
+  const baseSuccessChance = clamp(
+    Math.round(rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust),
+    rangeMin,
+    rangeMax
+  );
+  const trainingPenalty = horse.personality === 'Hot-Blooded' ? 4 : horse.personality === 'Excitable' ? 2 : 0;
   const successChance = clamp(baseSuccessChance - trainingPenalty, rangeMin, rangeMax);
   const neutralChance = clamp(option.neutral + Math.round(-mods.mood * 0.2 + (stepRandom * -0.25)), 4, 75);
   const failChance = Math.max(1, 100 - successChance - neutralChance);
