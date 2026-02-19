@@ -91,6 +91,8 @@ textarea {
   width: 100%;
 }
 .money { color: var(--good); font-weight: 700; }
+.money-clickable { border-bottom: 1px dashed rgba(79,165,213,.6); padding-bottom: 1px; }
+.money-clickable:hover { color: #66f0a7; }
 .small { font-size: .85rem; color: var(--muted); }
 .inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .horse-section { margin-bottom: 1rem; }
