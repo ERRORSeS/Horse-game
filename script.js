@@ -5120,30 +5120,108 @@ function competitionChanceModifiers(session, horse, step) {
 
 function competitionOptionChances(session, horse, option, step) {
   const mods = competitionChanceModifiers(session, horse, step);
-  const skillMod = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.22);
+  const disciplineSkill = effectiveDisciplineSkill(horse, session.discipline);
+  const skillMod = Math.round((disciplineSkill - 50) * 0.12);
   const confidenceField = session.discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
-  const confidenceMod = Math.round(((horse[confidenceField] || 50) - 50) * 0.12);
+  const confidenceMod = Math.round(((horse[confidenceField] || 50) - 50) * 0.08);
   const memoryMod = Math.round(-competitionMemoryPenalty(horse, session.discipline));
   const horseBias = Number.isFinite(session.horseChanceBias) ? session.horseChanceBias : 0;
   const stepRandom = Number.isFinite(step?.randomBias) ? step.randomBias : 0;
   const optionBias = Math.round(((option.success || 0) - (option.fail || 0)) * 0.03);
-  const randomSwing = stepRandom + optionBias;
-  const baseSuccessChance = clamp(Math.round((option.success * 0.25) + (skillMod * 1.8) + (confidenceMod * 1.2) + memoryMod + (mods.personality * 1.7) + (mods.mood * 2.2) + mods.warmup + mods.bond + mods.quality + horseBias + randomSwing), 5, 96);
-  const trainingPenalty = horse.personality === 'Hot-Blooded' ? 35 : horse.personality === 'Excitable' ? 10 : 0;
-  const successChance = clamp(baseSuccessChance - trainingPenalty, 3, 96);
+  const bond = horse.bond || 0;
+  const qualityOfLife = calculateHorseQualityOfLife(horse);
+  const badCondition = qualityOfLife < 50;
+  const rangeMin = badCondition ? 25 : 50;
+  const rangeMax = badCondition ? 45 : 75;
+  const normalizedOption = clamp((option.success || 0) / 100, 0, 1);
+  const rangeBase = badCondition
+    ? 25 + (normalizedOption * 6)
+    : 50 + ((rangeMax - rangeMin) * normalizedOption);
+  const careAdjust = badCondition
+    ? Math.round(((qualityOfLife - 40) / 10) * 2)
+    : Math.round(((qualityOfLife - 60) / 40) * 4);
+  const bondAdjust = badCondition
+    ? Math.round((bond / 100) * 3)
+    : Math.round((bond / 100) * 6);
+  const skillAdjust = Math.round(skillMod * 0.7);
+  const confidenceAdjust = Math.round(confidenceMod * 0.7);
+  const randomAdjust = Math.round((stepRandom * 0.6) + (optionBias * 0.4));
+  const randomSwing = randomAdjust;
+  const baseSuccessChance = clamp(
+    Math.round(rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust),
+    rangeMin,
+    rangeMax
+  );
+  const trainingPenalty = horse.personality === 'Hot-Blooded' ? 4 : horse.personality === 'Excitable' ? 2 : 0;
+  const successChance = clamp(baseSuccessChance - trainingPenalty, rangeMin, rangeMax);
   const neutralChance = clamp(option.neutral + Math.round(-mods.mood * 0.2 + (stepRandom * -0.25)), 4, 75);
   const failChance = Math.max(1, 100 - successChance - neutralChance);
-  return { successChance, neutralChance, failChance, skillMod, confidenceMod, memoryMod, horseBias, stepRandom, randomSwing, mods };
+  return {
+    successChance,
+    neutralChance,
+    failChance,
+    skillMod,
+    confidenceMod,
+    memoryMod,
+    horseBias,
+    stepRandom,
+    randomSwing,
+    mods,
+    disciplineSkill,
+    bond,
+    qualityOfLife,
+    badCondition,
+    rangeMin,
+    rangeMax
+  };
+}
+
+function competitionOptionFinalChances(session, horse, step, options) {
+  const prepMod = step?.stage === 'main_round' ? session.readinessBonus : 0;
+  const computedOptions = (options || []).map((option, index) => {
+    const computed = competitionOptionChances(session, horse, option, step);
+    const baseSuccess = clamp(computed.successChance + prepMod, computed.rangeMin, computed.rangeMax);
+    return { index, option, computed, successChance: baseSuccess };
+  });
+
+  const used = new Set();
+  computedOptions.forEach((entry) => {
+    let target = entry.successChance;
+    if (!used.has(target)) {
+      used.add(target);
+      entry.successChance = target;
+      return;
+    }
+    const min = entry.computed.rangeMin;
+    const max = entry.computed.rangeMax;
+    for (let distance = 1; distance <= (max - min); distance += 1) {
+      const up = target + distance;
+      if (up <= max && !used.has(up)) {
+        target = up;
+        break;
+      }
+      const down = target - distance;
+      if (down >= min && !used.has(down)) {
+        target = down;
+        break;
+      }
+    }
+    entry.successChance = target;
+    used.add(target);
+  });
+
+  return computedOptions;
 }
 
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const step = session.steps[session.stepIndex];
   const variant = competitionPromptForStep(session);
   if (!step || !variant) return;
-  const option = variant.options[choiceIndex];
-  const computed = competitionOptionChances(session, horse, option, step);
-  const prepMod = step.stage === 'main_round' ? session.readinessBonus : 0;
-  const successChance = clamp(computed.successChance + prepMod, 10, 95);
+  const optionOutcomes = competitionOptionFinalChances(session, horse, step, variant.options);
+  const selected = optionOutcomes.find((entry) => entry.index === choiceIndex);
+  if (!selected) return;
+  const computed = selected.computed;
+  const successChance = selected.successChance;
   const neutralChance = computed.neutralChance;
   const failChance = Math.max(1, 100 - successChance - neutralChance);
   const roll = rnd(1, 100);
@@ -5480,10 +5558,10 @@ function renderShows() {
       </div>
     `;
     const wrap = document.getElementById('comp-rpg-options');
-    variant.options.forEach((opt, idx) => {
+    const optionOutcomes = competitionOptionFinalChances(activeSession, horse, step, variant.options);
+    optionOutcomes.forEach((entry) => {
       const box = document.createElement('div');
-      const computed = competitionOptionChances(activeSession, horse, opt, step);
-      const finalSuccess = clamp(computed.successChance + (step.stage === 'main_round' ? activeSession.readinessBonus : 0), 10, 95);
+      const { index: idx, option: opt, computed, successChance: finalSuccess } = entry;
       const finalFail = Math.max(1, 100 - finalSuccess - computed.neutralChance);
       box.className = 'box';
       box.innerHTML = `
