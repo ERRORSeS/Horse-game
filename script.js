@@ -5131,10 +5131,9 @@ function competitionOptionChances(session, horse, option, step) {
   const randomSwing = stepRandom + optionBias;
   const bond = horse.bond || 0;
   const qualityOfLife = calculateHorseQualityOfLife(horse);
-  const badCondition = bond < 0 || qualityOfLife < 45;
-  const goodCare = !badCondition && qualityOfLife >= 65 && bond >= 25;
-  const rangeMin = badCondition ? 25 : goodCare ? 50 : 38;
-  const rangeMax = badCondition ? 60 : goodCare ? 75 : 68;
+  const badCondition = qualityOfLife < 60;
+  const rangeMin = badCondition ? 25 : 50;
+  const rangeMax = badCondition ? 60 : 75;
   const normalizedOption = clamp((option.success || 0) / 100, 0, 1);
   const rangeBase = rangeMin + ((rangeMax - rangeMin) * normalizedOption);
   const careAdjust = Math.round(((qualityOfLife - 50) / 50) * 4);
@@ -5159,7 +5158,6 @@ function competitionOptionChances(session, horse, option, step) {
     bond,
     qualityOfLife,
     badCondition,
-    goodCare,
     rangeMin,
     rangeMax
   };
