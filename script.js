@@ -378,6 +378,10 @@ function createBarnShowEvent(options = {}) {
     venue = rnd(1, 100) <= 45 ? app.currentBarn : pick(venues);
     if (options.forceCurrentBarn) venue = app.currentBarn;
     if (options.forceForeignVenue && foreignVenues.length) venue = pick(foreignVenues);
+    if (options.forceSameCountryVenue) {
+      const sameCountryVenues = venues.filter((v) => v.country === app.currentBarn.country && v.id !== app.currentBarn.id);
+      if (sameCountryVenues.length) venue = pick(sameCountryVenues);
+    }
   }
   const transportFee = venue.id === app.currentBarn.id ? 0 : venue.country === app.currentBarn.country ? rnd(300, 1200) : rnd(7000, 18000);
   return {
@@ -418,13 +422,33 @@ function refreshBarnShows() {
   const showCount = rnd(3, 10);
   const keySet = new Set();
   const shows = [];
-  for (let index = 0; index < showCount; index += 1) {
+
+  const addShow = (options = {}) => {
+    let attempts = 0;
+    while (attempts < 30) {
+      const show = createBarnShowEvent({ ...options, maxSkill });
+      if (!show) break;
+      const key = `${show.barnId}-${show.discipline}-${show.level}`;
+      if (!keySet.has(key)) {
+        keySet.add(key);
+        shows.push(show);
+        return true;
+      }
+      attempts += 1;
+    }
+    return false;
+  };
+
+  // Keep monthly "happening now" variety: same barn (if stars are high enough), same country, and foreign country.
+  if (eventsStars >= 3) addShow({ forceCurrentBarn: true });
+  addShow({ forceSameCountryVenue: true });
+  addShow({ forceForeignVenue: true });
+
+  while (shows.length < showCount) {
     let attempts = 0;
     while (attempts < 30) {
       const show = createBarnShowEvent({
-        maxSkill,
-        forceCurrentBarn: index === 0,
-        forceForeignVenue: index === 1
+        maxSkill
       });
       if (!show) break;
       const key = `${show.barnId}-${show.discipline}-${show.level}`;
@@ -435,8 +459,9 @@ function refreshBarnShows() {
       }
       attempts += 1;
     }
+    if (attempts >= 30) break;
   }
-  app.barnShows = shows;
+  app.barnShows = shows.slice(0, 10);
   ensureUpcomingEventsPool();
 }
 
@@ -4976,7 +5001,9 @@ function buildCompetitionRpgSession(horse, discipline, level) {
   const warmupCount = 6;
   const jumpTypes = competitionJumpTypesForDiscipline(discipline);
   const steps = [];
-  for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk', randomBias: rnd(-6, 6) });
+  if (discipline !== 'dressage') {
+    for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk', randomBias: rnd(-6, 6) });
+  }
   for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up', randomBias: rnd(-6, 6) });
 
   if (discipline === 'eventing') {
@@ -5031,7 +5058,7 @@ function buildCompetitionRpgSession(horse, discipline, level) {
     feedback: '',
     warmupState: { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 },
     readinessBonus: 0,
-    currentStage: 'course_walk',
+    currentStage: steps[0]?.stage || 'warm_up',
     horseChanceBias: rnd(-5, 5),
     roundStats: { faults: 0, refusals: 0, clearJumps: 0, majorFaults: 0, eliminated: false, eliminationReason: '' }
   };
@@ -5425,6 +5452,8 @@ function renderShows() {
     const stageCount = activeSession.steps.filter((x) => x.stage === step.stage).length;
     const stageIndex = activeSession.steps.slice(0, activeSession.stepIndex + 1).filter((x) => x.stage === step.stage).length;
     const ws = activeSession.warmupState;
+    const includesCourseWalk = activeSession.steps.some((x) => x.stage === 'course_walk');
+    const schemeText = includesCourseWalk ? 'Course walk → Warm-up → Main round' : 'Warm-up → Main round';
     const sceneLine = step.stage === 'main_round'
       ? `${step.jumpNumber || stageIndex} (Jump Number), ${step.jumpType || 'Course element'} (Jump Type), ${variant.scene}`
       : `${variant.title}, ${variant.scene}`;
@@ -5432,7 +5461,7 @@ function renderShows() {
     panel.innerHTML = `
       <h2>🏆 Competition RPG — ${cap(activeSession.discipline)} (${activeSession.level})</h2>
       <div class='box'>
-        <p><strong>Scheme:</strong> Course walk → Warm-up → Main round</p>
+        <p><strong>Scheme:</strong> ${schemeText}</p>
         <p><strong>Horse:</strong> ${horse.name}</p>
         <p><strong>Mode:</strong> ${competitionModeLabel()}</p>
         <p><strong>Stage:</strong> ${stageLabel} (${stageIndex}/${stageCount})</p>
@@ -5445,6 +5474,7 @@ function renderShows() {
         <div id='comp-rpg-options'></div>
         <div class='inline'>
           <button id='comp-enter'>Enter</button>
+          ${step.stage === 'course_walk' ? "<button id='comp-skip-walk'>Skip Course Walk</button>" : ''}
           <button id='comp-retire'>Retire Round</button>
         </div>
       </div>
@@ -5486,6 +5516,22 @@ function renderShows() {
       }
       renderShows();
     };
+    const skipWalkBtn = document.getElementById('comp-skip-walk');
+    if (skipWalkBtn) {
+      skipWalkBtn.onclick = () => {
+        const nextNonWalk = activeSession.steps.findIndex((s, idx) => idx >= activeSession.stepIndex && s.stage !== 'course_walk');
+        if (nextNonWalk < 0) {
+          finalizeCompetitionRpgEntry(horse, activeSession);
+          renderShows();
+          return;
+        }
+        activeSession.stepIndex = nextNonWalk;
+        activeSession.awaitingAdvance = false;
+        activeSession.feedback = 'Course walk skipped. Proceeding directly to warm-up.';
+        pushReport(`${horse.name} skipped course walking and moved directly to warm-up.`);
+        renderShows();
+      };
+    }
     document.getElementById('comp-retire').onclick = () => {
       app.competitionRpg = null;
       pushReport(`${horse.name} retired before completing the RPG competition round.`);
@@ -6257,6 +6303,7 @@ function renderBarn() {
           <option value=''>Choose a horse…</option>
           ${privateHorses.map((h) => `<option value='${h.id}' ${app.barnHorseSelectionId === h.id ? 'selected' : ''}>${horseDisplayName(h)} (Bond ${Math.round(h.bond || 0)}%, QOL ${calculateHorseQualityOfLife(h)}%)</option>`).join('')}
         </select>
+        <p class='small'>Selected horse stays locked after each action so you can repeat actions quickly.</p>
         <div class='inline'>
           <button data-barn='groom'>Groom</button>
           <button data-barn='clean-stall'>Clean Stall</button>
@@ -6289,7 +6336,7 @@ function renderBarn() {
       const horse = horsesIncludingLessons().find((h) => h.id === horseId);
       if (!horse) return;
       applyBarnActivity(horse, btn.dataset.barn);
-      app.barnHorseSelectionId = '';
+      app.barnHorseSelectionId = horseId;
       renderBarn();
     };
   });
@@ -6533,14 +6580,19 @@ function monthlyProgress() {
     year: app.year
   }));
   if (eventsHappeningNow.length) {
-    app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
     eventsHappeningNow.forEach((event) => {
       pushReport(`Upcoming event is now live: ${cap(event.discipline)} ${event.level} at ${event.barnName}.`);
     });
   }
   app.upcomingEvents = app.upcomingEvents.filter((event) => event.monthsUntilStart > 0);
   refreshBarnShows();
-  app.barnShows = [...(app.barnShows || []), ...eventsHappeningNow];
+  const targetShowCount = rnd(3, 10);
+  app.barnShows = [...eventsHappeningNow, ...(app.barnShows || [])].slice(0, targetShowCount);
+  while (app.barnShows.length < 3) {
+    const fallbackShow = createBarnShowEvent({ maxSkill: 100 });
+    if (!fallbackShow) break;
+    app.barnShows.push(fallbackShow);
+  }
   ensureUpcomingEventsPool();
   ensureLessonRosterForBarn(app.currentBarn, true);
   app.closedReminderIds = [];
