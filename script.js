@@ -181,6 +181,17 @@ const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const starText = (n) => '★'.repeat(clamp(Number(n) || 1, 1, 5));
 
+function shuffledIndices(size) {
+  const indexes = Array.from({ length: Math.max(0, size) }, (_, i) => i);
+  for (let i = indexes.length - 1; i > 0; i -= 1) {
+    const j = rnd(0, i);
+    const temp = indexes[i];
+    indexes[i] = indexes[j];
+    indexes[j] = temp;
+  }
+  return indexes;
+}
+
 function rolledPersonality(gender = 'Mare') {
   const roll = rnd(1, 100);
   if (gender === 'Stallion') {
@@ -4969,25 +4980,35 @@ function competitionWarmupReadinessBonus(session) {
 function competitionPromptForStep(session) {
   const step = session.steps[session.stepIndex];
   if (!step) return null;
-  if (step.stage === 'course_walk') return COMPETITION_COURSE_WALK_VARIANTS[step.variantIndex % COMPETITION_COURSE_WALK_VARIANTS.length];
+  if (step.stage === 'course_walk') {
+    const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : (step.variantIndex % COMPETITION_COURSE_WALK_VARIANTS.length);
+    return COMPETITION_COURSE_WALK_VARIANTS[promptIndex % COMPETITION_COURSE_WALK_VARIANTS.length];
+  }
   if (step.stage === 'warm_up') {
-    const universalCount = Math.min(3, COMPETITION_WARMUP_UNIVERSAL.length);
-    if (step.variantIndex < universalCount) return COMPETITION_WARMUP_UNIVERSAL[step.variantIndex];
+    if (step.warmupSource === 'universal') {
+      const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : (step.variantIndex % COMPETITION_WARMUP_UNIVERSAL.length);
+      return COMPETITION_WARMUP_UNIVERSAL[promptIndex % COMPETITION_WARMUP_UNIVERSAL.length];
+    }
     const set = COMPETITION_WARMUP_VARIANTS[session.discipline] || [];
-    return set[(step.variantIndex - universalCount) % Math.max(1, set.length)] || COMPETITION_WARMUP_UNIVERSAL[0];
+    const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : step.variantIndex;
+    return set[promptIndex % Math.max(1, set.length)] || COMPETITION_WARMUP_UNIVERSAL[0];
   }
   if (step.stage === 'main_round' && session.discipline === 'eventing') {
     const phase = String(step.phase || '').toLowerCase();
     if (phase.includes('dressage')) {
-      return COMPETITION_RPG_VARIANTS.dressage[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.dressage.length];
+      const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : (step.phaseVariantIndex || 0);
+      return COMPETITION_RPG_VARIANTS.dressage[promptIndex % COMPETITION_RPG_VARIANTS.dressage.length];
     }
     if (phase.includes('cross-country')) {
-      return COMPETITION_RPG_VARIANTS.eventing[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.eventing.length];
+      const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : (step.phaseVariantIndex || 0);
+      return COMPETITION_RPG_VARIANTS.eventing[promptIndex % COMPETITION_RPG_VARIANTS.eventing.length];
     }
-    return COMPETITION_RPG_VARIANTS.jumping[(step.phaseVariantIndex || 0) % COMPETITION_RPG_VARIANTS.jumping.length];
+    const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : (step.phaseVariantIndex || 0);
+    return COMPETITION_RPG_VARIANTS.jumping[promptIndex % COMPETITION_RPG_VARIANTS.jumping.length];
   }
   const set = COMPETITION_RPG_VARIANTS[session.discipline] || COMPETITION_RPG_VARIANTS.jumping;
-  return set[step.variantIndex % set.length];
+  const promptIndex = Number.isInteger(step.promptIndex) ? step.promptIndex : step.variantIndex;
+  return set[promptIndex % set.length];
 }
 
 function competitionJumpTypesForDiscipline(discipline) {
@@ -5002,9 +5023,23 @@ function buildCompetitionRpgSession(horse, discipline, level) {
   const jumpTypes = competitionJumpTypesForDiscipline(discipline);
   const steps = [];
   if (discipline !== 'dressage') {
-    for (let i = 0; i < 5; i += 1) steps.push({ stage: 'course_walk', variantIndex: i, phase: 'course walk', randomBias: rnd(-6, 6) });
+    const walkOrder = shuffledIndices(COMPETITION_COURSE_WALK_VARIANTS.length).slice(0, 5);
+    walkOrder.forEach((promptIndex, i) => {
+      steps.push({ stage: 'course_walk', variantIndex: i, promptIndex, phase: 'course walk', randomBias: rnd(-6, 6) });
+    });
   }
-  for (let i = 0; i < warmupCount; i += 1) steps.push({ stage: 'warm_up', variantIndex: i, phase: 'warm-up', randomBias: rnd(-6, 6) });
+
+  const disciplineWarmup = COMPETITION_WARMUP_VARIANTS[discipline] || [];
+  const universalCount = Math.min(3, warmupCount, COMPETITION_WARMUP_UNIVERSAL.length);
+  const disciplineCount = Math.max(0, warmupCount - universalCount);
+  const universalOrder = shuffledIndices(COMPETITION_WARMUP_UNIVERSAL.length).slice(0, universalCount);
+  const disciplineOrder = shuffledIndices(disciplineWarmup.length).slice(0, disciplineCount);
+  universalOrder.forEach((promptIndex, i) => {
+    steps.push({ stage: 'warm_up', variantIndex: i, warmupSource: 'universal', promptIndex, phase: 'warm-up', randomBias: rnd(-6, 6) });
+  });
+  disciplineOrder.forEach((promptIndex, i) => {
+    steps.push({ stage: 'warm_up', variantIndex: universalCount + i, warmupSource: 'discipline', promptIndex, phase: 'warm-up', randomBias: rnd(-6, 6) });
+  });
 
   if (discipline === 'eventing') {
     const eventingPlan = [
@@ -5014,13 +5049,16 @@ function buildCompetitionRpgSession(horse, discipline, level) {
     ];
     let jumpNo = 1;
     eventingPlan.forEach((part) => {
+      const list = COMPETITION_RPG_VARIANTS[part.source] || COMPETITION_RPG_VARIANTS.jumping;
+      const promptOrder = shuffledIndices(list.length).slice(0, 5);
       for (let i = 0; i < 5; i += 1) {
-        const list = COMPETITION_RPG_VARIANTS[part.source] || COMPETITION_RPG_VARIANTS.jumping;
-        const prompt = list[i % list.length] || {};
+        const promptIndex = promptOrder[i % promptOrder.length] || 0;
+        const prompt = list[promptIndex] || {};
         steps.push({
           stage: 'main_round',
           variantIndex: i,
           phaseVariantIndex: i,
+          promptIndex,
           phase: part.phase,
           jumpNumber: jumpNo,
           jumpType: prompt.title || pick(jumpTypes),
@@ -5032,10 +5070,13 @@ function buildCompetitionRpgSession(horse, discipline, level) {
   } else {
     const mainCount = discipline === 'jumping' ? 10 : 8;
     const phases = competitionInteractionPhases(discipline);
+    const disciplineSet = COMPETITION_RPG_VARIANTS[discipline] || COMPETITION_RPG_VARIANTS.jumping;
+    const promptOrder = shuffledIndices(disciplineSet.length);
     for (let i = 0; i < mainCount; i += 1) {
       steps.push({
         stage: 'main_round',
         variantIndex: i,
+        promptIndex: promptOrder[i % promptOrder.length],
         phase: phases[i % phases.length],
         jumpNumber: i + 1,
         jumpType: pick(jumpTypes),
