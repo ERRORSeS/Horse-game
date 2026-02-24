@@ -2008,13 +2008,30 @@ function normalizeMarkingForBreed(marking, breed) {
   return pick(MARKINGS.filter((m) => m !== 'Rabicano'));
 }
 
-function randomMarking(breed) {
+function randomMarking(breed, opts = {}) {
   const roll = rnd(1, 100);
   const isDraft = String(breed || '').toLowerCase().includes('draft');
   const colorMarkings = RARE_MARKINGS.filter((m) => ['Overo', 'Sabino', 'Tobiano', 'Appaloosa', 'Leopard'].some((tag) => m.includes(tag)));
-  const chance = isDraft ? 25 : 7;
+  const salesMarketBonus = opts.salesMarketBoost && isDraft ? 45 : 0;
+  const chance = clamp((isDraft ? 25 : 7) + salesMarketBonus, 0, 100);
   const marking = roll <= chance ? pick(isDraft ? colorMarkings : RARE_MARKINGS) : 'None';
   return normalizeMarkingForBreed(marking, breed);
+}
+
+function conformationIndex(label) {
+  return Math.max(0, CONFORMATION.indexOf(label));
+}
+
+function foalConformationFromParents(dam, sire) {
+  const damIdx = conformationIndex(dam?.conformation);
+  const sireIdx = conformationIndex(sire?.conformation);
+  const center = Math.round((damIdx + sireIdx) / 2);
+  const roll = rnd(1, 100);
+  let shift = 0;
+  if (roll <= 20) shift = -1;
+  else if (roll >= 81) shift = 1;
+  const idx = clamp(center + shift, 0, CONFORMATION.length - 1);
+  return CONFORMATION[idx];
 }
 
 function currentMonthIndex() {
@@ -3766,6 +3783,7 @@ function processPregnancy(mare, newborns) {
   foal.owner = 'Your Stable';
   foal.gender = pick(['Mare', 'Stallion']);
   foal.breed = mare.breed || sire?.breed || pick(BREEDS);
+  foal.conformation = foalConformationFromParents(mare, sire || {});
   foal.height = heightFromBreed(foal.breed);
   foal.marking = randomMarking(foal.breed);
   foal.potential = foalPotential(mare, sire || {});
@@ -3806,6 +3824,7 @@ function seed() {
   app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
   app.saleBarn = [baseHorse('fully', 'npc'), baseHorse('trained', 'npc')].map((h) => {
     seedShowHistory(h, rnd(1, 3), 10);
+    h.marking = randomMarking(h.breed, { salesMarketBoost: true });
     return { ...h, owner: 'NPC Stable', price: Math.round(calculateHorsePrice(h, true) * rnd(95, 110) / 100) };
   });
   refreshNpcAds();
@@ -3868,6 +3887,7 @@ function refreshNpcAds() {
     applySalesAgeSkillBand(horse);
     seedShowHistory(horse, rnd(1, 4), 8);
     horse.owner = pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']);
+    horse.marking = randomMarking(horse.breed, { salesMarketBoost: true });
     horse.saleId = uid();
     horse.price = Math.round(calculateHorsePrice(horse, true) * rnd(90, 118) / 100);
     return horse;
@@ -4068,6 +4088,7 @@ function renderDashboard() {
         <p><strong>Competition:</strong> ${report.competitionName}</p>
         <p><strong>Penalties:</strong> ${report.penaltiesText || '-'}</p>
         <p><strong>Time/Score:</strong> ${report.timeScoreText || '-'}</p>
+        ${report.conformationBreakdown ? `<p><strong>Conformation Score Breakdown:</strong> Mood ${report.conformationBreakdown.mood}, Type ${report.conformationBreakdown.type}, Body ${report.conformationBreakdown.body}, Personality ${report.conformationBreakdown.personality}, QOL ${report.conformationBreakdown.qualityOfLife}, Random ${report.conformationBreakdown.random >= 0 ? '+' : ''}${report.conformationBreakdown.random}</p>` : ''}
         <p><strong>Horse Name:</strong> ${report.horseName}</p>
         <p><strong>Horse Breed:</strong> ${report.horseBreed}</p>
         <p><strong>Date:</strong> ${report.date}</p>
@@ -4540,7 +4561,7 @@ function renderMarket() {
       horse.gender = document.getElementById(`gender-${k.key}`).value;
       horse.height = heightFromBreed(horse.breed);
       applyBreedTraits(horse);
-      horse.marking = normalizeMarkingForBreed(horse.marking, horse.breed);
+      horse.marking = randomMarking(horse.breed, { salesMarketBoost: true });
       app.horses.push(horse);
       pushReport(`Bought ${horse.name} from Prospects Pasture.`);
       render();
@@ -6369,30 +6390,34 @@ function renderTraining() {
   }
 }
 
-function applyBarnActivity(horse, activity) {
+function applyBarnActivity(horse, activity, options = {}) {
   if (!horse) return;
+  const silent = options.silent === true;
+  const log = (text) => {
+    if (!silent) pushReport(text);
+  };
   if (activity === 'groom') {
     horse.bond = clamp((horse.bond || 0) + 8, horse.isRescue ? -50 : 0, 100);
     horse.dailyGrooming = clamp((horse.dailyGrooming || 65) + 6, 0, 100);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
-    pushReport(`Barn: ${horse.name} was groomed by hand (+Bond, +QOL).`);
+    log(`Barn: ${horse.name} was groomed by hand (+Bond, +QOL).`);
   }
   if (activity === 'clean-stall') {
     horse.stallCleanliness = clamp((horse.stallCleanliness || 65) + 8, 0, 100);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 1, 0, 10);
-    pushReport(`Barn: ${horse.name}'s stall was cleaned.`);
+    log(`Barn: ${horse.name}'s stall was cleaned.`);
   }
   if (activity === 'hand-graze') {
     horse.bond = clamp((horse.bond || 0) + 5, horse.isRescue ? -50 : 0, 100);
     horse.mood = pick(POSITIVE_MOODS);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
-    pushReport(`Barn: ${horse.name} enjoyed hand grazing (+Bond, mood improved).`);
+    log(`Barn: ${horse.name} enjoyed hand grazing (+Bond, mood improved).`);
   }
   if (activity === 'lunge') {
     horse.bond = clamp((horse.bond || 0) + 3, horse.isRescue ? -50 : 0, 100);
     horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
-    pushReport(`Barn: ${horse.name} completed a lunging session.`);
+    log(`Barn: ${horse.name} completed a lunging session.`);
   }
   if (activity === 'trail') {
     const variant = pick(BARN_TRAIL_VARIANTS);
@@ -6406,9 +6431,17 @@ function applyBarnActivity(horse, activity) {
     const qGain = outcome === 'success' ? 4 : outcome === 'partial' ? 2 : 1;
     horse.bond = clamp((horse.bond || 0) + bondGain, horse.isRescue ? -50 : 0, 100);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + qGain, 0, 10);
-    pushReport(`Barn Trail: ${horse.name} — ${variant.title} (${outcome.toUpperCase()}: S${successChance}% / P${partialChance}% / F${100 - successChance - partialChance}%).`);
+    log(`Barn Trail: ${horse.name} — ${variant.title} (${outcome.toUpperCase()}: S${successChance}% / P${partialChance}% / F${100 - successChance - partialChance}%).`);
   }
   horse.qualityOfLife = calculateHorseQualityOfLife(horse);
+}
+
+function careForAllBarnHorses(horses) {
+  const careActions = ['groom', 'clean-stall', 'hand-graze'];
+  horses.forEach((horse) => {
+    careActions.forEach((action) => applyBarnActivity(horse, action, { silent: true }));
+  });
+  pushReport(`Barn: Care for all completed for ${horses.length} horse(s).`);
 }
 
 function renderBarn() {
@@ -6457,6 +6490,7 @@ function renderBarn() {
           <button data-barn='groom'>Groom</button>
           <button data-barn='clean-stall'>Clean Stall</button>
           <button data-barn='hand-graze'>Hand Graze</button>
+          <button data-barn='care-all'>Care for all</button>
           <button data-barn='trail'>Trail Ride</button>
           <button data-barn='lunge'>Lunging Pen</button>
         </div>
@@ -6477,6 +6511,13 @@ function renderBarn() {
   `;
   panel.querySelectorAll('[data-barn]').forEach((btn) => {
     btn.onclick = () => {
+      if (btn.dataset.barn === 'care-all') {
+        if (!privateHorses.length) return;
+        careForAllBarnHorses(privateHorses);
+        app.barnHorseSelectionId = document.getElementById('barn-horse')?.value || app.barnHorseSelectionId;
+        renderBarn();
+        return;
+      }
       const horseId = document.getElementById('barn-horse')?.value;
       if (!horseId) {
         alert('Choose a horse before using a barn action.');
@@ -6854,6 +6895,35 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
     }
     horse.showResults = Array.isArray(horse.showResults) ? horse.showResults : [];
     horse.showResults.push({ date: dateLabel(), discipline: 'conformation', level: entry.label, score, placing, prize, resultText: `${score.toFixed(2)}/10` });
+    pushCompetitionReport({
+      horseName: horseDisplayName(horse),
+      horseBreed: horse.breed,
+      discipline: 'conformation',
+      level: entry.label,
+      placing,
+      fieldSize,
+      competitionName: entry.label,
+      penaltiesText: 'N/A',
+      timeScoreText: `${score.toFixed(2)}/10`,
+      date: dateLabel(),
+      highlights: [
+        `Mood ${mood.toFixed(1)}/10`,
+        `Type ${conf.toFixed(1)}/10`,
+        `Body ${weight.toFixed(1)}/10`,
+        `Personality ${personality.toFixed(1)}/10`,
+        `Quality of life ${qol.toFixed(1)}/10`
+      ],
+      comment: `Overall conformation score: ${score.toFixed(2)}/10.`,
+      suggestion: 'Keep quality of life and body condition stable to maintain strong conformation placements.',
+      conformationBreakdown: {
+        mood: Number(mood.toFixed(1)),
+        type: Number(conf.toFixed(1)),
+        body: Number(weight.toFixed(1)),
+        personality: Number(personality.toFixed(1)),
+        qualityOfLife: Number(qol.toFixed(1)),
+        random: Number(randomLight.toFixed(1))
+      }
+    });
     pushReport(`${horse.name} ${entry.label}: placed #${placing}/${fieldSize} with ${score.toFixed(2)}. ${prize ? `Won ${money(prize)}.` : 'No prize this time.'}`);
     updateHorseTitles(horse);
   });
