@@ -17,6 +17,13 @@ const SHOW_LEVELS = {
   eventing: ['Starter', 'Pre-Entry', 'Entry', 'Pre-Training', 'Training', 'Preliminary', 'Intermediate', 'Advanced', 'Four Star']
 };
 
+const CONFORMATION_SHOW_TYPES = [
+  { key: 'bronze', label: 'Bronze Conformation Show', feeMin: 250, feeMax: 1000, difficulty: 0.85, slots: [8, 10] },
+  { key: 'silver', label: 'Silver Conformation Show', feeMin: 2500, feeMax: 5500, difficulty: 1, slots: [8, 10] },
+  { key: 'golden', label: 'Golden Conformation Show', feeMin: 10000, feeMax: 45000, difficulty: 1.15, slots: [8, 10] },
+  { key: 'hoy', label: 'Horse Of The Year', feeMin: 100000, feeMax: 150000, difficulty: 1.28, slots: [8, 10], specialMonth: 12 }
+];
+
 const BREED_BRANDINGS = {
   'American Warmblood': 'AW',
   'Baden-Wuerttemberg': 'BWA',
@@ -165,7 +172,8 @@ const app = {
   upcomingEvents: [],
   lessonHorsesByBarn: {},
   barnLessonSelectionId: '',
-  barnHorseSelectionId: ''
+  barnHorseSelectionId: '',
+  marketSelections: {}
 };
 
 const options = {};
@@ -2002,7 +2010,10 @@ function normalizeMarkingForBreed(marking, breed) {
 
 function randomMarking(breed) {
   const roll = rnd(1, 100);
-  const marking = roll <= 7 ? pick(RARE_MARKINGS) : 'None';
+  const isDraft = String(breed || '').toLowerCase().includes('draft');
+  const colorMarkings = RARE_MARKINGS.filter((m) => ['Overo', 'Sabino', 'Tobiano', 'Appaloosa', 'Leopard'].some((tag) => m.includes(tag)));
+  const chance = isDraft ? 25 : 7;
+  const marking = roll <= chance ? pick(isDraft ? colorMarkings : RARE_MARKINGS) : 'None';
   return normalizeMarkingForBreed(marking, breed);
 }
 
@@ -2782,6 +2793,7 @@ function hydrateFromSave(data) {
   app.lessonHorsesByBarn = typeof data.lessonHorsesByBarn === 'object' && data.lessonHorsesByBarn ? data.lessonHorsesByBarn : {};
   app.barnLessonSelectionId = data.barnLessonSelectionId || '';
   app.barnHorseSelectionId = data.barnHorseSelectionId || '';
+  app.marketSelections = typeof data.marketSelections === 'object' && data.marketSelections ? data.marketSelections : {};
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -2891,6 +2903,8 @@ function hydrateFromSave(data) {
       h.healthTrackingYear = app.year;
     }
     h.pendingCompetitions = Array.isArray(h.pendingCompetitions) ? h.pendingCompetitions : [];
+    h.pendingConformationShows = Array.isArray(h.pendingConformationShows) ? h.pendingConformationShows : [];
+    h.conformationWins = h.conformationWins || { goldenFirsts: 0 };
     h.titles = Array.isArray(h.titles) ? h.titles : [];
     h.height = h.height || heightFromBreed(h.breed);
     h.soundnessYears = Number.isFinite(h.soundnessYears) ? h.soundnessYears : rnd(1, 15);
@@ -2969,6 +2983,7 @@ function resetGame() {
   app.signedUpShows = [];
   app.lastBarnRefreshMonth = 0;
   app.settings = { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
+  app.marketSelections = {};
   app.showOffspringWindow = true;
   app.trainingSelection = { horseId: '', discipline: 'jumping', exercise: '' };
   app.trainingRpgConfig = defaultTrainingRpgConfig();
@@ -3171,6 +3186,10 @@ function updateHorseTitles(horse) {
   const wins = horse.showResults?.filter((r) => r.placing === 1).length || 0;
   if (totalShows > 0 && wins / totalShows > 0.8) addTitle('Star');
   if (horse.registryInspection?.result === 'Fail' && hasGrandPrixWin(horse)) addTitle('Believer');
+  const genderTitle = horse.gender === 'Mare' ? 'Mare' : horse.gender === 'Stallion' ? 'Stallion' : '';
+  const goldenFirsts = horse.conformationWins?.goldenFirsts || 0;
+  if (genderTitle && goldenFirsts >= 5) addTitle(`Golden ${genderTitle}`);
+  if (genderTitle && goldenFirsts >= 10) addTitle(`Elite ${genderTitle}`);
   horse.titles = titles;
 }
 
@@ -3645,6 +3664,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     coi: rnd(0, 25),
     showResults: [],
     pendingCompetitions: [],
+    pendingConformationShows: [],
     titles: [],
     breedersEntries: 0,
     totalPoints: 0,
@@ -3652,6 +3672,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     reserves: 0,
     earnings: 0,
     topWins: { mareFilly: 0, breed: 0, overall: 0, highestScore: 0 },
+    conformationWins: { goldenFirsts: 0 },
     offspring: [],
     pedigree: {
       sire: null,
@@ -4163,7 +4184,7 @@ function createHorseCard(horse) {
     <p>Lifetime Earnings: ${money(horse.earnings)}</p>
     <p class='small'>Illnesses: ${illnessLineWithHidden}</p>
     <p>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>
-    <p>Top Mare/Filly: ${horse.topWins.mareFilly} | Best Breed: ${horse.topWins.breed} | Best Overall: ${horse.topWins.overall}</p>
+    <p>${horse.gender === 'Stallion' ? 'Top Stallion/Colt' : 'Top Mare/Filly'}: ${horse.topWins.mareFilly} | Best of breed: ${horse.topWins.breed} | Overall best: ${horse.topWins.overall}</p>
     ${horse.showResults.length ? `<p class='small'>Latest: ${horse.showResults[horse.showResults.length - 1].discipline} ${horse.showResults[horse.showResults.length - 1].level} — #${horse.showResults[horse.showResults.length - 1].placing} (${horse.showResults[horse.showResults.length - 1].resultText || horse.showResults[horse.showResults.length - 1].score})</p>` : '<p class="small">No show entries yet.</p>'}
     <p class='small'>${disciplineLevelSummary(horse, 'jumping')} | ${disciplineLevelSummary(horse, 'dressage')} | ${disciplineLevelSummary(horse, 'eventing')} | ${disciplineLevelSummary(horse, 'hunter')}</p>
   `;
@@ -4402,7 +4423,7 @@ function horseProfileMarkup(horse) {
       <div><h4>Jump Training</h4><ul class='stats'>${jumping}</ul></div>
       <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
     </div>
-    <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Top Breed ${horse.topWins?.breed || 0}.</p>
+    <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Best of breed ${horse.topWins?.breed || 0}.</p>
     ${leaseLine}
     ${showRecordLine}
     ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — #${latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
@@ -4481,6 +4502,7 @@ function renderHorses() {
 }
 
 function renderMarket() {
+  app.marketSelections = app.marketSelections || {};
   const kinds = [
     { key: 'untrained', cost: 2000 },
     { key: 'trained', cost: 10000 },
@@ -4493,16 +4515,24 @@ function renderMarket() {
         <h3>${cap(k.key)} Horse</h3>
         <p>Cost: ${money(k.cost)}</p><p class='small'>${k.key === 'untrained' ? 'Training points: 0-10' : k.key === 'trained' ? 'Training points: 30-60' : 'Training points: 85-95'}</p>
         <label>Breed</label>
-        <select id='breed-${k.key}'>${BREEDS.map((b) => `<option>${b}</option>`).join('')}</select>
+        <select id='breed-${k.key}'>${BREEDS.map((b) => `<option ${(app.marketSelections[k.key]?.breed || BREEDS[0]) === b ? 'selected' : ''}>${b}</option>`).join('')}</select>
         <label>Gender</label>
-        <select id='gender-${k.key}'><option>Mare</option><option>Stallion</option><option>Gelding</option></select>
+        <select id='gender-${k.key}'>${['Mare','Stallion','Gelding'].map((g) => `<option ${(app.marketSelections[k.key]?.gender || 'Mare') === g ? 'selected' : ''}>${g}</option>`).join('')}</select>
         <button id='buy-${k.key}'>Buy</button>
       </div>
     `).join('')}</div>
   `;
 
   kinds.forEach((k) => {
+    const breedEl = document.getElementById(`breed-${k.key}`);
+    const genderEl = document.getElementById(`gender-${k.key}`);
+    const saveSelection = () => {
+      app.marketSelections[k.key] = { breed: breedEl.value, gender: genderEl.value };
+    };
+    breedEl.onchange = saveSelection;
+    genderEl.onchange = saveSelection;
     document.getElementById(`buy-${k.key}`).onclick = () => {
+      saveSelection();
       if (app.money < k.cost) return alert('Not enough money');
       app.money -= k.cost;
       const horse = baseHorse(k.key, 'npc');
@@ -5915,8 +5945,8 @@ function renderVet() {
     if (success) {
       mare.pregnantBy = straw.stallionName;
       mare.gestation = 0;
-      mare.foalDue = rnd(10, 13);
-      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Due in ~${mare.foalDue} months.`);
+      mare.foalDue = rnd(10, 14);
+      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Due date is hidden (10-14 month window).`);
     } else {
       vetNote(mare, `AI attempt failed for ${mare.name} using ${straw.stallionName}.`);
     }
@@ -5955,8 +5985,8 @@ function renderVet() {
       app.embryos.splice(embryoIndex, 1);
       mare.pregnantEmbryo = embryo;
       mare.gestation = 0;
-      mare.foalDue = rnd(10, 13);
-      vetNote(mare, `Embryo transfer successful for ${mare.name}. Due in ~${mare.foalDue} months.`);
+      mare.foalDue = rnd(10, 14);
+      vetNote(mare, `Embryo transfer successful for ${mare.name}. Due date is hidden (10-14 month window).`);
     } else {
       vetNote(mare, `Embryo transfer failed for ${mare.name}.`);
     }
@@ -6614,6 +6644,7 @@ function monthlyProgress() {
 
   const survivors = [];
   const newborns = [];
+  const conformationBreedPlacings = new Set();
   app.horses.forEach((h) => {
     processPregnancy(h, newborns);
     maybeAddRandomIllness(h);
@@ -6647,6 +6678,7 @@ function monthlyProgress() {
     h.barnActivityQuality = 0;
     maybeAddOvertrainingInjury(h);
     resolvePendingCompetitions(h);
+    resolvePendingConformationShows(h, conformationBreedPlacings);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
         const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
@@ -6740,6 +6772,93 @@ function activeRemindersForCurrentMonth() {
   return (app.calendarReminders || []).filter((r) => reminderDueThisMonth(r) && !closed.has(r.id));
 }
 
+function conformationMoodScore(horse) {
+  const map = { Motivated: 9.4, Happy: 8.8, 'Try-Hard': 8.2, Neutral: 6.8, Moody: 5.1, Anxious: 4.4, Lazy: 4.2, Angry: 3.2 };
+  return clamp(map[horse.mood] || 6.5, 1, 10);
+}
+
+function conformationBodyScore(horse) {
+  const map = { 'Very Underweight': 2, Underweight: 4, Moderate: 10, Fleshy: 6.5, Overweight: 3.5 };
+  return clamp(map[horse.weightStatus] || 6, 1, 10);
+}
+
+function conformationTypeScore(horse) {
+  const map = { 'Very Bad': 2.2, Bad: 4.1, Acceptable: 5.9, Good: 7.2, 'Very Good': 8.7, Excellent: 9.8 };
+  return clamp(map[horse.conformation] || 6, 1, 10);
+}
+
+function conformationPersonalityScore(horse) {
+  const map = { 'Bomb-proof': 9.2, 'Easy-Going': 8.5, Energetic: 7, Lazy: 5.4, Unfocused: 4.7, Spooky: 4.3, Stubborn: 4.2, 'Hot-Blooded': 3.7, Excitable: 4.1 };
+  return clamp(map[horse.personality] || 6, 1, 10);
+}
+
+function registerConformationShow(horse, typeKey) {
+  if (!horse) return;
+  if (!['Mare', 'Stallion'].includes(horse.gender)) return alert('Only mares and stallions can participate.');
+  const type = CONFORMATION_SHOW_TYPES.find((x) => x.key === typeKey);
+  if (!type) return;
+  if (type.specialMonth && app.month !== type.specialMonth) return alert('Horse Of The Year is only available in month 12.');
+  horse.pendingConformationShows = Array.isArray(horse.pendingConformationShows) ? horse.pendingConformationShows : [];
+  if (horse.pendingConformationShows.some((entry) => entry.monthIndex === currentMonthIndex())) return alert('This horse is already entered this month.');
+  horse.pendingConformationShows.push({
+    id: uid(),
+    monthIndex: currentMonthIndex(),
+    date: dateLabel(),
+    type: type.key,
+    label: type.label,
+    slots: rnd(type.slots[0], type.slots[1])
+  });
+  pushReport(`${horse.name} entered ${type.label}. Results will arrive next month.`);
+}
+
+function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
+  const currentIndex = currentMonthIndex();
+  const pending = Array.isArray(horse.pendingConformationShows) ? horse.pendingConformationShows : [];
+  const due = pending.filter((entry) => entry.monthIndex < currentIndex);
+  horse.pendingConformationShows = pending.filter((entry) => entry.monthIndex >= currentIndex);
+  if (!due.length) return;
+  horse.topWins = horse.topWins || { mareFilly: 0, breed: 0, overall: 0, highestScore: 0 };
+  horse.conformationWins = horse.conformationWins || { goldenFirsts: 0 };
+  due.forEach((entry) => {
+    const showType = CONFORMATION_SHOW_TYPES.find((x) => x.key === entry.type) || CONFORMATION_SHOW_TYPES[0];
+    const mood = conformationMoodScore(horse);
+    const conf = conformationTypeScore(horse);
+    const weight = conformationBodyScore(horse);
+    const personality = conformationPersonalityScore(horse);
+    const qol = clamp((horse.qualityOfLife || 65) / 10, 1, 10);
+    const randomLight = rnd(-3, 3) / 10;
+    const scoreRaw = (mood * 0.24) + (conf * 0.29) + (weight * 0.22) + (personality * 0.08) + (qol * 0.15) + randomLight;
+    const score = clamp(Number(scoreRaw.toFixed(2)), 1, 10);
+    const fieldSize = entry.slots || rnd(8, 10);
+    const placing = score >= (8.9 * showType.difficulty) ? 1 : score >= (8.1 * showType.difficulty) ? 2 : score >= (7.4 * showType.difficulty) ? 3 : rnd(4, fieldSize);
+    const breedKey = `${app.year}-${app.month}-${horse.breed}`;
+    const breedPlacedAlready = monthlyBreedPlaced.has(breedKey);
+    const earnedBreedPlace = !breedPlacedAlready && placing <= 3;
+    if (earnedBreedPlace) monthlyBreedPlaced.add(breedKey);
+    const prize = placing <= 3 ? rnd(showType.feeMin, showType.feeMax) : 0;
+    if (prize) {
+      app.money += prize;
+      horse.earnings += prize;
+    }
+    if (placing === 1) {
+      horse.topWins.mareFilly += 1;
+      horse.topWins.overall += 1;
+      if (earnedBreedPlace) horse.topWins.breed += 1;
+      if (entry.type === 'golden') horse.conformationWins.goldenFirsts += 1;
+      if (entry.type === 'hoy') {
+        const valueBoost = rnd(80000, 120000);
+        horse.earnings += valueBoost;
+        horse.titles = Array.isArray(horse.titles) ? horse.titles : [];
+        if (!horse.titles.includes('Global Beauty')) horse.titles.push('Global Beauty');
+      }
+    }
+    horse.showResults = Array.isArray(horse.showResults) ? horse.showResults : [];
+    horse.showResults.push({ date: dateLabel(), discipline: 'conformation', level: entry.label, score, placing, prize, resultText: `${score.toFixed(2)}/10` });
+    pushReport(`${horse.name} ${entry.label}: placed #${placing}/${fieldSize} with ${score.toFixed(2)}. ${prize ? `Won ${money(prize)}.` : 'No prize this time.'}`);
+    updateHorseTitles(horse);
+  });
+}
+
 
 
 function registryInspectionScore(horse) {
@@ -6818,21 +6937,28 @@ function renderRegistries() {
   const panel = document.getElementById('registries');
   if (!panel) return;
   const horses = app.horses.filter((h) => !h.retiredForever);
+  const conformationTypes = CONFORMATION_SHOW_TYPES.filter((t) => !t.specialMonth || t.specialMonth === app.month);
   panel.innerHTML = `
     <h2>Registries</h2>
     <div class='box'>
       <p class='small'>Conformation inspection can be completed once per horse lifetime. Only mares and stallions can enter.</p>
+      <p class='small'>Conformation shows return results next month and enter both Gender and Breed divisions together.</p>
       ${horses.length ? horses.map((h) => {
         const reg = h.registryInspection;
         const resultLine = reg ? `${reg.registry || h.breed}: ${reg.result} (${reg.totalScore?.toFixed?.(2) ?? reg.totalScore})` : 'Not inspected yet';
         const detail = reg && h.showInspectionDetails
           ? `<div class='box'><p class='small'>Conformation: ${reg.conformation.toFixed(1)} (${reg.breakdown?.conformation || h.conformation})</p><p class='small'>Condition: ${reg.condition.toFixed(1)} (Weight ${reg.breakdown?.weightStatus || h.weightStatus || 'Unknown'}, Behavior ${reg.breakdown?.behavior || 0})</p><p class='small'>Pedigree: ${reg.pedigree == null ? 'N/A (Sport Cross)' : reg.pedigree.toFixed(1)}</p><p class='small'>Potential: ${reg.potential.toFixed(1)}</p></div>`
           : '';
+        const pendingShows = (h.pendingConformationShows || []).filter((x) => x.monthIndex === currentMonthIndex()).length;
+        const showButtons = ['Mare', 'Stallion'].includes(h.gender)
+          ? conformationTypes.map((t) => `<button data-reg-conformation='${h.id}' data-reg-show='${t.key}'>Register ${t.label}</button>`).join('')
+          : '<p class="small">Only mares and stallions can participate.</p>';
         return `<div class='box'>
           <p><strong>${horseDisplayName(h)}</strong> — ${resultLine}</p>
-          <p class='small'>Gender: ${h.gender} • Age: ${h.age} • Conformation: ${h.conformation}</p>
+          <p class='small'>Gender: ${h.gender} • Age: ${h.age} • Conformation: ${h.conformation} • Pending conformation entries this month: ${pendingShows}</p>
           <button data-reg-inspect='${h.id}' ${reg ? 'disabled' : ''}>${reg ? 'Inspection Complete' : 'Run Inspection'}</button>
           ${reg ? `<button data-reg-details='${h.id}'>${h.showInspectionDetails ? 'Hide Breakdown' : 'Show Breakdown'}</button>` : ''}
+          <div class='inline'>${showButtons}</div>
           ${detail}
         </div>`;
       }).join('') : '<p class="small">No horses in your stable.</p>'}
@@ -6853,6 +6979,16 @@ function renderRegistries() {
       if (!horse?.registryInspection) return;
       horse.showInspectionDetails = !horse.showInspectionDetails;
       renderRegistries();
+    };
+  });
+  panel.querySelectorAll('[data-reg-conformation]').forEach((btn) => {
+    btn.onclick = () => {
+      const horse = app.horses.find((h) => h.id === btn.dataset.regConformation);
+      if (!horse) return;
+      registerConformationShow(horse, btn.dataset.regShow);
+      renderRegistries();
+      renderCalendar();
+      renderHorses();
     };
   });
 }
@@ -6966,6 +7102,8 @@ function renderCalendar() {
   const reminders = app.calendarReminders || [];
   const shows = app.barnShows || [];
   const upcomingEvents = (app.upcomingEvents || []).slice().sort((a, b) => (a.monthsUntilStart || 0) - (b.monthsUntilStart || 0));
+  const conformationTypes = CONFORMATION_SHOW_TYPES.filter((t) => !t.specialMonth || t.specialMonth === app.month);
+  const conformationEntries = app.horses.flatMap((h) => (h.pendingConformationShows || []).filter((e) => e.monthIndex === currentMonthIndex()).map((e) => `${horseDisplayName(h)} — ${e.label}`));
   document.getElementById('calendar').innerHTML = `
     <h2>Calendar</h2>
     <div class='box'>
@@ -7002,6 +7140,14 @@ function renderCalendar() {
         </div>`;
       }).join('') || '<p class="small">No upcoming shows listed at this time.</p>'}
     </div>
+
+    <div class='box'>
+      <h3>Conformation Shows</h3>
+      <p class='small'>Available now: ${conformationTypes.map((t) => t.label).join(', ') || 'None this month'}.</p>
+      <p class='small'>Register from Registries. Results arrive next month. Horse Of The Year appears in month 12.</p>
+      ${conformationEntries.length ? conformationEntries.map((line) => `<p class='small'>${line}</p>`).join('') : '<p class="small">No conformation registrations this month.</p>'}
+    </div>
+
     <div class='box'>
       <h3>Upcoming Events (Higher Skill Levels)</h3>
       ${upcomingEvents.map((show) => `<div class='box'>
@@ -7092,7 +7238,7 @@ function renderBreeding() {
     </div>
     <div class='box'>
       <h3>Pregnancy List</h3>
-      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Due in ~${Math.max(0, (mare.foalDue || 0) - (mare.gestation || 0))} month(s)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Due date hidden (10-14 month window; revealed at birth)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
   const vetBtn = document.getElementById('breeding-open-vet');
