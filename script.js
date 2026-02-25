@@ -131,6 +131,8 @@ const DISCIPLINE_SKILLS = {
 const app = {
   money: 50000,
   month: 1,
+  day: 1,
+  hour: 0,
   year: 1,
   horses: [],
   semenStraws: [],
@@ -2977,6 +2979,8 @@ function hydrateFromSave(data) {
   if (!data || typeof data !== 'object') throw new Error('Invalid save data.');
   app.money = Number(data.money) || 50000;
   app.month = Number(data.month) || 1;
+  app.day = clamp(Number(data.day) || 1, 1, 30);
+  app.hour = clamp(Number(data.hour) || 0, 0, 23);
   app.year = Number(data.year) || 1;
   app.horses = Array.isArray(data.horses) ? data.horses.filter(Boolean) : [];
   app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
@@ -3041,6 +3045,14 @@ function hydrateFromSave(data) {
     h.marking2 = h.marking2 || phenotype.marking2 || 'None';
     h.legMarkings = h.legMarkings || phenotype.legMarkings;
     h.modifiers = h.modifiers || phenotype.modifiers;
+    if (isPregnantMare(h)) {
+      if (!Number.isFinite(h.pregnancyDays) && Number.isFinite(h.gestation)) h.pregnancyDays = Math.max(0, Math.round(h.gestation * 30));
+      if (!Number.isFinite(h.gestationLengthDays)) h.gestationLengthDays = Number.isFinite(h.foalDue) ? Math.round(h.foalDue * 30) : rnd(320, 360);
+      ensurePregnancyState(h);
+    } else {
+      h.pregnancyDays = Number.isFinite(h.pregnancyDays) ? h.pregnancyDays : 0;
+      h.gestationLengthDays = Number.isFinite(h.gestationLengthDays) ? h.gestationLengthDays : 0;
+    }
     h.personality = h.personality || rolledPersonality(h.gender);
     h.behavior = Number.isFinite(h.behavior) ? h.behavior : 0;
     h.extraPotential = h.extraPotential === true;
@@ -3207,6 +3219,8 @@ function hydrateFromSave(data) {
 function resetGame() {
   app.money = 50000;
   app.month = 1;
+  app.day = 1;
+  app.hour = 0;
   app.year = 1;
   app.horses = [];
   app.semenStraws = [];
@@ -3298,9 +3312,59 @@ function canRideUnderSaddle(horse) {
   return (horse.behavior || 0) >= required;
 }
 
+function isPregnantMare(horse) {
+  return Boolean(horse && (horse.pregnantBy || horse.pregnantEmbryo));
+}
+
+function ensurePregnancyState(mare) {
+  if (!mare) return;
+  if (!Number.isFinite(mare.pregnancyDays)) mare.pregnancyDays = 0;
+  if (!Number.isFinite(mare.gestationLengthDays)) mare.gestationLengthDays = rnd(320, 360);
+}
+
+function pregnancyStage(horse) {
+  if (!isPregnantMare(horse)) return { label: 'Not Pregnant', canCompete: true };
+  ensurePregnancyState(horse);
+  const days = horse.pregnancyDays || 0;
+  if (days < 90) return { label: '0-90 days', canCompete: true };
+  if (days < 120) return { label: '90-120 days', canCompete: false };
+  if (days < 210) return { label: '120-210 days', canCompete: false };
+  if (days < 320) return { label: '210-320 days', canCompete: false };
+  return { label: '320+ days', canCompete: false };
+}
+
+function eligibleForPhTest(mare) {
+  return isPregnantMare(mare) && (mare.pregnancyDays || 0) >= 320;
+}
+
+function phReadingForMare(mare) {
+  if (!eligibleForPhTest(mare)) return null;
+  ensurePregnancyState(mare);
+  const left = Math.max(0, (mare.gestationLengthDays || 340) - (mare.pregnancyDays || 0));
+  let minPh = 7.2;
+  let maxPh = 7.8;
+  if (left <= 0.5) {
+    minPh = 5.8;
+    maxPh = 5.9;
+  } else if (left <= 1) {
+    minPh = 6.0;
+    maxPh = 6.3;
+  } else if (left <= 2) {
+    minPh = 6.4;
+    maxPh = 6.7;
+  } else if (left <= 7) {
+    minPh = 6.8;
+    maxPh = 7.1;
+  }
+  const actual = minPh + Math.random() * (maxPh - minPh);
+  const reading = clamp(actual + ((Math.random() * 0.4) - 0.2), 5.8, 7.8);
+  return Number(reading.toFixed(2));
+}
+
 function canCompeteUnderSaddle(horse) {
   if (horse?.isLessonHorse && !horse?.barnAvailable) return false;
-  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever;
+  const pregnancy = pregnancyStage(horse);
+  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete;
 }
 
 function horseLifeStage(horse) {
@@ -4002,11 +4066,16 @@ function foalPotential(dam, sire) {
   return output;
 }
 
-function processPregnancy(mare, newborns) {
+function processPregnancy(mare, newborns, dayAdvance = 30) {
   if (!mare || !(mare.pregnantBy || mare.pregnantEmbryo)) return;
-  mare.gestation = Number.isFinite(mare.gestation) ? mare.gestation + 1 : 1;
-  const dueIn = Number.isFinite(mare.foalDue) ? mare.foalDue : 11;
-  if (mare.gestation < dueIn) return;
+  ensurePregnancyState(mare);
+  mare.pregnancyDays += Math.max(0, Number(dayAdvance) || 0);
+
+  if (mare.pregnancyDays < (mare.gestationLengthDays || 340)) {
+    if (mare.pregnancyDays >= 210) mare.weightStatus = 'Overweight';
+    else if (mare.pregnancyDays >= 90) mare.weightStatus = pick(['Moderate', 'Fleshy']);
+    return;
+  }
 
   const embryo = mare.pregnantEmbryo || null;
   const sire = embryo?.sireId
@@ -4026,8 +4095,8 @@ function processPregnancy(mare, newborns) {
     pushReport(`${mare.name} lost a foal due to lethal frame overo (OO).`);
     delete mare.pregnantBy;
     delete mare.pregnantEmbryo;
-    mare.gestation = 0;
-    mare.foalDue = 0;
+    mare.pregnancyDays = 0;
+    mare.gestationLengthDays = 0;
     return;
   }
   const foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
@@ -4045,6 +4114,19 @@ function processPregnancy(mare, newborns) {
       foal.potential[k] = Math.min(100, foal.potential[k] + rnd(4, 10));
     });
   }
+
+  const rare = [];
+  if (rnd(1, 10000) <= 100) rare.push('Twins (high risk)');
+  if (rnd(1, 10000) <= 200) rare.push('Premature foal');
+  if (rnd(1, 10000) <= 150) rare.push('Extra tall genetic spike');
+  if (rnd(1, 10000) <= 50) rare.push('Color mutation');
+  foal.foalVitality = {
+    score: rnd(0, 100),
+    shownUntilDay: 180,
+    ageDays: 0,
+    rareEvents: rare
+  };
+
   const code = (app.settings?.breedingCode || '').trim();
   if (code) {
     foal.name = app.settings?.breedingCodePosition === 'end' ? `${foal.name} ${code}` : `${code} ${foal.name}`;
@@ -4067,8 +4149,8 @@ function processPregnancy(mare, newborns) {
 
   delete mare.pregnantBy;
   delete mare.pregnantEmbryo;
-  mare.gestation = 0;
-  mare.foalDue = 0;
+  mare.pregnancyDays = 0;
+  mare.gestationLengthDays = 0;
 }
 
 
@@ -4273,8 +4355,14 @@ function updateHeader() {
   const moneyEl = document.getElementById('moneyLabel');
   const titleEl = document.querySelector('.topbar h1');
   if (titleEl) titleEl.textContent = app.settings?.barnName || 'Oxer to Oxer Stable Manager';
-  if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
+  if (monthEl) monthEl.textContent = `Day ${app.day}, Month ${app.month}, Year ${app.year} • ${String(app.hour).padStart(2, '0')}:00`; 
   if (moneyEl) moneyEl.innerHTML = `<span class="money money-clickable" title="Click to set money amount">${money(app.money)}</span>`;
+  const skipHourBtn = document.getElementById('skipHourBtn');
+  if (skipHourBtn) {
+    const unlocked = canSkipHour();
+    skipHourBtn.disabled = !unlocked;
+    skipHourBtn.style.display = unlocked ? '' : 'none';
+  }
 }
 
 function releaseLeasedHorseToLessonProgram(horse) {
@@ -4504,6 +4592,9 @@ function createHorseCard(horse) {
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: ${horse.pregnancyDays || 0} / ${horse.gestationLengthDays || '?'} days (${pregnancyStage(horse).label})</p>` : ''}
+    ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
+    ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
     <button data-action='save-turnout'>Save Turn-out</button>
     <details class='bond-box'>
       <summary>Bond</summary>
@@ -4620,6 +4711,15 @@ function createHorseCard(horse) {
         horse.tack.headwear = node.querySelector('.tack-headwear')?.value || horse.tack.headwear;
         horse.tack.body = node.querySelector('.tack-body')?.value || horse.tack.body;
         pushReport(`Updated tack for ${horse.name}.`);
+      }
+      if (action === 'test-ph') {
+        if (!eligibleForPhTest(horse)) {
+          alert('pH test is only available for mares over 320 pregnancy days.');
+          return;
+        }
+        const reading = phReadingForMare(horse);
+        horse.lastPhReading = reading;
+        vetNote(horse, `${horse.name} milk pH reading: ${reading}.`);
       }
       if (action === 'save-turnout') {
         if (horse.leaseLocked) {
@@ -5854,6 +5954,39 @@ function resolvePendingCompetitions(horse) {
   });
 }
 
+
+function applyDailyPregnancyUpdates(horse) {
+  if (!isPregnantMare(horse)) return;
+  ensurePregnancyState(horse);
+  const stage = pregnancyStage(horse);
+  if (stage.label === '90-120 days') horse.weightStatus = pick(['Moderate', 'Fleshy']);
+  if (stage.label === '210-320 days' || stage.label === '320+ days') horse.weightStatus = 'Overweight';
+}
+
+function advanceOneDay() {
+  const newborns = [];
+  app.horses.forEach((h) => {
+    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 1;
+    if (isPregnantMare(h)) processPregnancy(h, newborns, 1);
+    applyDailyPregnancyUpdates(h);
+  });
+  if (newborns.length) app.horses = app.horses.concat(newborns);
+  app.hour = 0;
+  app.day += 1;
+  if (app.day > 30) {
+    monthlyProgress();
+  }
+}
+
+function advanceOneHour() {
+  app.hour += 1;
+  if (app.hour >= 24) advanceOneDay();
+}
+
+function canSkipHour() {
+  return app.horses.some((h) => isPregnantMare(h) && (h.pregnancyDays || 0) >= 320);
+}
+
 function renderShows() {
   app.showSelections = app.showSelections || {};
   const panel = document.getElementById('shows');
@@ -6218,12 +6351,13 @@ function renderVet() {
     const success = rnd(1, 100) > 30;
     if (success) {
       mare.pregnantBy = straw.stallionName;
-      mare.gestation = 0;
-      mare.foalDue = rnd(10, 14);
-      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Due date is hidden (10-14 month window).`);
+      mare.pregnancyDays = 0;
+      mare.gestationLengthDays = rnd(320, 360);
+      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `AI attempt failed for ${mare.name} using ${straw.stallionName}.`);
     }
+    app.semenStraws = app.semenStraws.filter((x) => x.id !== straw.id);
     render();
   };
 
@@ -6233,6 +6367,7 @@ function renderVet() {
     const straw = app.semenStraws.find((s) => s.id === strawId);
     if (!mare || !straw || !tryCharge(1000)) return;
     if (!mare.retiredToBreeding) { app.money += 1000; return alert('Mare must be retired to breeding for embryo flush.'); }
+    app.semenStraws = app.semenStraws.filter((x) => x.id !== straw.id);
     const n = rnd(0, 2);
     for (let i = 0; i < n; i++) {
       app.embryos.push({
@@ -6258,9 +6393,9 @@ function renderVet() {
     if (success) {
       app.embryos.splice(embryoIndex, 1);
       mare.pregnantEmbryo = embryo;
-      mare.gestation = 0;
-      mare.foalDue = rnd(10, 14);
-      vetNote(mare, `Embryo transfer successful for ${mare.name}. Due date is hidden (10-14 month window).`);
+      mare.pregnancyDays = 0;
+      mare.gestationLengthDays = rnd(320, 360);
+      vetNote(mare, `Embryo transfer successful for ${mare.name}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `Embryo transfer failed for ${mare.name}.`);
     }
@@ -6283,8 +6418,8 @@ function renderVet() {
     if (!mare || !tryCharge(100)) return;
     delete mare.pregnantBy;
     delete mare.pregnantEmbryo;
-    mare.gestation = 0;
-    mare.foalDue = 0;
+    mare.pregnancyDays = 0;
+    mare.gestationLengthDays = 0;
     vetNote(mare, `${mare.name} received mismate shot. Pregnancy ended.`);
     render();
   };
@@ -6919,6 +7054,8 @@ function processAgingAndMortality(horse) {
 
 function monthlyProgress() {
   ensureBarnState();
+  app.day = 1;
+  app.hour = 0;
   app.month += 1;
   if (app.month > 12) {
     app.month = 1;
@@ -6941,6 +7078,7 @@ function monthlyProgress() {
   const conformationBreedPlacings = new Set();
   app.horses.forEach((h) => {
     processPregnancy(h, newborns);
+    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 30;
     maybeAddRandomIllness(h);
     if (h.deceased) {
       return;
@@ -7092,6 +7230,7 @@ function registerConformationShow(horse, typeKey) {
   const type = CONFORMATION_SHOW_TYPES.find((x) => x.key === typeKey);
   if (!type) return;
   if (type.specialMonth && app.month !== type.specialMonth) return alert('Horse Of The Year is only available in month 12.');
+  if (!pregnancyStage(horse).canCompete) return alert('Pregnant mares past 90 days cannot enter conformation shows.');
   horse.pendingConformationShows = Array.isArray(horse.pendingConformationShows) ? horse.pendingConformationShows : [];
   if (horse.pendingConformationShows.some((entry) => entry.monthIndex === currentMonthIndex())) return alert('This horse is already entered this month.');
   horse.pendingConformationShows.push({
@@ -7345,7 +7484,7 @@ function renderFreezer() {
     <div class='grid two'>
       <div class='box'>
         <h3>Semen Straws (${app.semenStraws.length})</h3>
-        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
+        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span> <button data-remove-straw='${s.id}'>Remove</button></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
       </div>
       <div class='box'>
         <h3>Embryos (${app.embryos.length})</h3>
@@ -7353,6 +7492,13 @@ function renderFreezer() {
       </div>
     </div>
   `;
+  panel.querySelectorAll('[data-remove-straw]').forEach((btn) => {
+    btn.onclick = () => {
+      app.semenStraws = app.semenStraws.filter((s) => s.id !== btn.dataset.removeStraw);
+      renderFreezer();
+      saveGame(false);
+    };
+  });
 }
 
 function renderRescue() {
@@ -7561,7 +7707,7 @@ function renderBreeding() {
     </div>
     <div class='box'>
       <h3>Pregnancy List</h3>
-      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Due date hidden (10-14 month window; revealed at birth)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Pregnant: ${mare.pregnancyDays || 0} day(s)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
   const vetBtn = document.getElementById('breeding-open-vet');
@@ -7649,12 +7795,21 @@ function render() {
 }
 
 const skipBtn = document.getElementById('skipMonthBtn');
+const skipDayBtn = document.getElementById('skipDayBtn');
+const skipHourBtn = document.getElementById('skipHourBtn');
 const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
 const resetGameBtn = document.getElementById('resetGameBtn');
 const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
+if (skipDayBtn) skipDayBtn.onclick = () => { advanceOneDay(); render(); saveGame(false); };
+if (skipHourBtn) skipHourBtn.onclick = () => {
+  if (!canSkipHour()) return alert('Skip Hour unlocks when a mare reaches 320 pregnancy days.');
+  advanceOneHour();
+  render();
+  saveGame(false);
+};
 if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
 if (moneyLabel) {
   moneyLabel.style.cursor = 'pointer';
