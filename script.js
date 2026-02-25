@@ -7750,7 +7750,10 @@ function renderBreeding() {
     </div>
     <div class='box'>
       <h3>Pregnancy List</h3>
-      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Pregnant: Confirmed (timeline hidden)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+      ${pregnant.length ? pregnant.map((mare) => {
+        const daysPregnant = Math.max(0, Math.round(Number(mare.pregnancyDays) || 0));
+        return `<p>${horseDisplayName(mare)}: ${daysPregnant} Days</p>`;
+      }).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
   const vetBtn = document.getElementById('breeding-open-vet');
