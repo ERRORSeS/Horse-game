@@ -175,7 +175,8 @@ const app = {
   lessonHorsesByBarn: {},
   barnLessonSelectionId: '',
   barnHorseSelectionId: '',
-  marketSelections: {}
+  marketSelections: {},
+  stablehandHired: false
 };
 
 const options = {};
@@ -2495,6 +2496,35 @@ function recommendedFeedForHorse(horse) {
   return 'Basic Feed';
 }
 
+function stablehandFeedPlanForHorse(horse) {
+  const [feedMin, feedMax] = feedRangeBounds(horse);
+  const targetGrams = clamp(Math.round((feedMin + feedMax) / 2), 50, 250);
+  const preferredFeed = recommendedFeedForHorse(horse);
+  return [{ type: preferredFeed, grams: targetGrams }];
+}
+
+function applyStablehandCare(horse) {
+  if (!app.stablehandHired || !horse || (horse.owner !== 'Your Stable' && !horse.isLeased)) return;
+  horse.feedPlan = stablehandFeedPlanForHorse(horse);
+  horse.managed = horse.managed || {};
+  horse.managed.fed = true;
+  horse.managed.vet = true;
+
+  (horse.illnesses || []).forEach((issue) => {
+    if (!issue) return;
+    issue.active = false;
+    issue.remaining = 0;
+    issue.hidden = false;
+  });
+
+  horse.stallCleanliness = Math.max(90, Number(horse.stallCleanliness) || 0);
+  horse.hoofCare = Math.max(90, Number(horse.hoofCare) || 0);
+  horse.turnoutQuality = Math.max(90, Number(horse.turnoutQuality) || 0);
+  horse.dailyGrooming = Math.max(90, Number(horse.dailyGrooming) || 0);
+  horse.farrierCare = Math.max(90, Number(horse.farrierCare) || 0);
+  horse.qualityOfLife = calculateHorseQualityOfLife(horse);
+}
+
 function trainerNotesForHorse(horse) {
   const notes = [];
   const { subject, object, possessive } = genderPronouns(horse);
@@ -3030,6 +3060,7 @@ function hydrateFromSave(data) {
   app.barnLessonSelectionId = data.barnLessonSelectionId || '';
   app.barnHorseSelectionId = data.barnHorseSelectionId || '';
   app.marketSelections = typeof data.marketSelections === 'object' && data.marketSelections ? data.marketSelections : {};
+  app.stablehandHired = data.stablehandHired === true;
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -4359,9 +4390,8 @@ function updateHeader() {
   if (moneyEl) moneyEl.innerHTML = `<span class="money money-clickable" title="Click to set money amount">${money(app.money)}</span>`;
   const skipHourBtn = document.getElementById('skipHourBtn');
   if (skipHourBtn) {
-    const unlocked = canSkipHour();
-    skipHourBtn.disabled = !unlocked;
-    skipHourBtn.style.display = unlocked ? '' : 'none';
+    skipHourBtn.disabled = false;
+    skipHourBtn.style.display = '';
   }
 }
 
@@ -4566,6 +4596,7 @@ function createHorseCard(horse) {
     <button data-action='list-sale'>List in Sale Barn ($)</button>
     <button data-action='npc-sell'>Sell to NPC (${money(horseWorth(horse))})</button>
     <button data-action='rehome'>Rehome for Free</button>
+    <button data-action='hire-stablehand'>${app.stablehandHired ? 'Stablehand On Duty (Free)' : 'Hire Stablehand (Free)'}</button>
     <label>Notes</label><textarea rows='3' class='note-input'>${horse.notes}</textarea>
     <button data-action='save-notes'>Save Notes</button>
     <button data-action='toggle-notes'>${horse.showNotes ? 'Hide Notes' : 'Show Notes'}</button>
@@ -4592,7 +4623,7 @@ function createHorseCard(horse) {
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
-    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: ${horse.pregnancyDays || 0} / ${horse.gestationLengthDays || '?'} days (${pregnancyStage(horse).label})</p>` : ''}
+    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: Confirmed (timeline hidden — use pH testing only).</p>` : ''}
     ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
     ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
     <button data-action='save-turnout'>Save Turn-out</button>
@@ -4692,6 +4723,15 @@ function createHorseCard(horse) {
       if (action === 'rehome') {
         app.horses = app.horses.filter((h) => h.id !== horse.id);
         pushReport(`${horse.name} was rehomed for free and left your stable.`);
+      }
+      if (action === 'hire-stablehand') {
+        app.stablehandHired = !app.stablehandHired;
+        if (app.stablehandHired) {
+          app.horses.forEach((h) => applyStablehandCare(h));
+          pushReport('Stablehand hired for free. Feed is now adjusted automatically, injuries are treated, and care stays high.');
+        } else {
+          pushReport('Stablehand dismissed. Manual horse care is active again.');
+        }
       }
       if (action === 'save-notes') {
         const text = node.querySelector('.note-input')?.value.trim() || '';
@@ -5968,6 +6008,7 @@ function advanceOneDay() {
   app.horses.forEach((h) => {
     if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 1;
     if (isPregnantMare(h)) processPregnancy(h, newborns, 1);
+    applyStablehandCare(h);
     applyDailyPregnancyUpdates(h);
   });
   if (newborns.length) app.horses = app.horses.concat(newborns);
@@ -5984,7 +6025,7 @@ function advanceOneHour() {
 }
 
 function canSkipHour() {
-  return app.horses.some((h) => isPregnantMare(h) && (h.pregnancyDays || 0) >= 320);
+  return true;
 }
 
 function renderShows() {
@@ -7079,6 +7120,7 @@ function monthlyProgress() {
   app.horses.forEach((h) => {
     processPregnancy(h, newborns);
     if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 30;
+    applyStablehandCare(h);
     maybeAddRandomIllness(h);
     if (h.deceased) {
       return;
@@ -7109,6 +7151,7 @@ function monthlyProgress() {
     updateBondMonthly(h);
     h.barnActivityQuality = 0;
     maybeAddOvertrainingInjury(h);
+    applyStablehandCare(h);
     resolvePendingCompetitions(h);
     resolvePendingConformationShows(h, conformationBreedPlacings);
     if (!processAgingAndMortality(h)) {
@@ -7707,7 +7750,7 @@ function renderBreeding() {
     </div>
     <div class='box'>
       <h3>Pregnancy List</h3>
-      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Pregnant: ${mare.pregnancyDays || 0} day(s)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Pregnant: Confirmed (timeline hidden)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
   const vetBtn = document.getElementById('breeding-open-vet');
@@ -7805,7 +7848,6 @@ const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
 if (skipDayBtn) skipDayBtn.onclick = () => { advanceOneDay(); render(); saveGame(false); };
 if (skipHourBtn) skipHourBtn.onclick = () => {
-  if (!canSkipHour()) return alert('Skip Hour unlocks when a mare reaches 320 pregnancy days.');
   advanceOneHour();
   render();
   saveGame(false);
