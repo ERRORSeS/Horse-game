@@ -4,10 +4,10 @@ const BREEDS = [
   'Polish Warmblood', 'Rhineland', 'Selle Francais', 'Swedish Warmblood', 'Trakehner', 'Westphalian', 'Zweibrucker',
   'Arabian', 'Draft', 'Iberian Horse', 'Riding Pony', 'Thoroughbred', 'Friesian'
 ];
-const COATS = ['Black', 'Bay (Light)', 'Bay (Medium)', 'Bay (Dark)', 'Palomino', 'Fleabitten', 'Grey (Light)', 'Grey (Medium)', 'Grey (Dark)', 'Dappled Grey (Light)', 'Dappled Grey (Medium)', 'Dappled Grey (Dark)', 'Seal Bay', 'Cremello', 'Perlino', 'Buckskin', 'Dun', 'Grullo', 'Chestnut (Light)', 'Chestnut (Medium)', 'Chestnut (Dark)', 'Dapple Bay (Light)', 'Dapple Bay (Medium)', 'Dapple Bay (Dark)'];
-const MARKINGS = ['Tobiano (Light)', 'Tobiano (Moderate)', 'Tobiano (Intense)', 'Overo', 'Sabino', 'Rabicano', 'Appaloosa (Light)', 'Appaloosa (Moderate)', 'Appaloosa (Intense)', 'Leopard (Light)', 'Leopard (Moderate)', 'Leopard (Intense)', 'None'];
+const COATS = ['Light Chestnut', 'Chestnut', 'Dark Chestnut', 'Liver Chestnut', 'Light Black', 'Bluish Black', 'True Black', 'Light Bay', 'Bay', 'Dark Bay', 'Blood Bay', 'Seal Bay', 'Palomino', 'Cremello', 'Buckskin', 'Perlino', 'Smoky Black', 'Smoky Cream', 'Red Dun', 'Bay Dun', 'Grullo', 'Dunalino', 'Dunskin', 'Gold Champagne', 'Amber Champagne', 'Classic Champagne', 'Pearl', 'Palomino Pearl', 'Buckskin Pearl', 'Grey', 'Dapple Grey', 'Flea-bitten Grey'];
+const MARKINGS = ['None', 'Tobiano', 'Frame Overo', 'Splash', 'Sabino', 'Leopard', 'Fewspot', 'Snowcap', 'Blanket', 'Spotted Blanket', 'Varnish Roan', 'Red Roan', 'Bay Roan', 'Blue Roan'];
 const CONFORMATION = ['Very Bad', 'Bad', 'Acceptable', 'Good', 'Very Good', 'Excellent'];
-const SOCKS = ['None', 'One Sock', 'Two Socks', 'Three Socks', 'Four Socks', 'Stockings'];
+const SOCKS = ['None', 'Pastern', 'Fetlock', 'Sock', 'Stocking', 'Full White'];
 const FACE_MARKINGS = ['Faint', 'Star', 'Stripe', 'Broken Stripe', 'Blaze', 'Snip', 'Blaze + Snip', 'Bald Face'];
 
 const SHOW_LEVELS = {
@@ -131,6 +131,8 @@ const DISCIPLINE_SKILLS = {
 const app = {
   money: 50000,
   month: 1,
+  day: 1,
+  hour: 0,
   year: 1,
   horses: [],
   semenStraws: [],
@@ -2008,12 +2010,227 @@ function normalizeMarkingForBreed(marking, breed) {
   return pick(MARKINGS.filter((m) => m !== 'Rabicano'));
 }
 
+const GENE_KEYS = ['extension', 'agouti', 'cream', 'dun', 'gray', 'champagne', 'pearl', 'roan', 'appaloosa', 'tobiano', 'overo', 'splash', 'sabino'];
+
+function randomAlleles(dominant, recessive, opts = {}) {
+  const chanceDominant = opts.chanceDominant ?? 22;
+  const chanceHomoDominant = opts.chanceHomoDominant ?? 4;
+  const roll = rnd(1, 100);
+  if (roll <= chanceHomoDominant) return `${dominant}/${dominant}`;
+  if (roll <= chanceDominant) return rnd(1, 100) <= 50 ? `${dominant}/${recessive}` : `${recessive}/${dominant}`;
+  return `${recessive}/${recessive}`;
+}
+
+function randomGenetics() {
+  return {
+    extension: randomAlleles('E', 'e', { chanceDominant: 76, chanceHomoDominant: 24 }),
+    agouti: randomAlleles('A', 'a', { chanceDominant: 68, chanceHomoDominant: 20 }),
+    cream: randomAlleles('Cr', 'n', { chanceDominant: 30, chanceHomoDominant: 5 }),
+    dun: randomAlleles('D', 'n', { chanceDominant: 18, chanceHomoDominant: 3 }),
+    gray: randomAlleles('G', 'n', { chanceDominant: 16, chanceHomoDominant: 4 }),
+    champagne: randomAlleles('Ch', 'n', { chanceDominant: 12, chanceHomoDominant: 2 }),
+    pearl: randomAlleles('Prl', 'n', { chanceDominant: 9, chanceHomoDominant: 2 }),
+    roan: randomAlleles('Rn', 'n', { chanceDominant: 20, chanceHomoDominant: 4 }),
+    appaloosa: randomAlleles('Lp', 'n', { chanceDominant: 18, chanceHomoDominant: 4 }),
+    tobiano: randomAlleles('TO', 'n', { chanceDominant: 24, chanceHomoDominant: 6 }),
+    overo: randomAlleles('O', 'n', { chanceDominant: 16, chanceHomoDominant: 2 }),
+    splash: randomAlleles('SW', 'n', { chanceDominant: 13, chanceHomoDominant: 2 }),
+    sabino: randomAlleles('Sb', 'n', { chanceDominant: 16, chanceHomoDominant: 3 })
+  };
+}
+
+function splitGenePair(pair, fallbackA, fallbackB) {
+  if (!pair || typeof pair !== 'string') return [fallbackA, fallbackB];
+  if (pair.includes('/')) {
+    const [left, right] = pair.split('/');
+    return [left || fallbackA, right || fallbackB];
+  }
+  const normalized = pair.trim();
+  if (normalized.length === 2) return [normalized[0], normalized[1]];
+  const parsed = normalized.match(/(Cr|Prl|Lp|TO|SW|Sb|Ch|Rn|[A-Za-z])/g);
+  if (!parsed || parsed.length < 2) return [fallbackA, fallbackB];
+  return [parsed[0], parsed[1]];
+}
+
+function isPresent(pair, allele) {
+  const [a, b] = splitGenePair(pair, 'n', 'n');
+  return a === allele || b === allele;
+}
+
+function countAllele(pair, allele) {
+  const [a, b] = splitGenePair(pair, 'n', 'n');
+  return (a === allele ? 1 : 0) + (b === allele ? 1 : 0);
+}
+
+function randomCoatShade(base) {
+  if (base === 'Chestnut') return pick(['Light Chestnut', 'Chestnut', 'Dark Chestnut', 'Liver Chestnut']);
+  if (base === 'Black') return pick(['Light Black', 'Bluish Black', 'True Black']);
+  return pick(['Light Bay', 'Bay', 'Dark Bay', 'Blood Bay', 'Seal Bay']);
+}
+
+function determineBaseCoat(genetics) {
+  const isChestnut = countAllele(genetics.extension, 'e') === 2;
+  if (isChestnut) return 'Chestnut';
+  const hasAgouti = isPresent(genetics.agouti, 'A');
+  return hasAgouti ? 'Bay' : 'Black';
+}
+
+function applyCream(base, genetics) {
+  const creamCount = countAllele(genetics.cream, 'Cr');
+  if (!creamCount) return base;
+  if (base === 'Chestnut') return creamCount === 2 ? 'Cremello' : 'Palomino';
+  if (base === 'Bay') return creamCount === 2 ? 'Perlino' : 'Buckskin';
+  return creamCount === 2 ? 'Smoky Cream' : 'Smoky Black';
+}
+
+function applyDun(color, base, genetics) {
+  if (!isPresent(genetics.dun, 'D')) return color;
+  if (color === 'Palomino') return 'Dunalino';
+  if (color === 'Buckskin') return 'Dunskin';
+  if (base === 'Chestnut') return 'Red Dun';
+  if (base === 'Black') return 'Grullo';
+  return 'Bay Dun';
+}
+
+function applyChampagne(color, base, genetics) {
+  if (!isPresent(genetics.champagne, 'Ch')) return color;
+  if (base === 'Chestnut') return 'Gold Champagne';
+  if (base === 'Black') return 'Classic Champagne';
+  return 'Amber Champagne';
+}
+
+function applyPearl(color, base, genetics) {
+  const pearlCount = countAllele(genetics.pearl, 'Prl');
+  const creamCount = countAllele(genetics.cream, 'Cr');
+  const activates = pearlCount === 2 || (pearlCount >= 1 && creamCount >= 1);
+  if (!activates) return color;
+  if (color.includes('Palomino')) return 'Palomino Pearl';
+  if (color.includes('Buckskin')) return 'Buckskin Pearl';
+  if (base === 'Chestnut' && creamCount >= 1) return 'Palomino Pearl';
+  if (base === 'Bay' && creamCount >= 1) return 'Buckskin Pearl';
+  return 'Pearl';
+}
+
+function applyGray(color, genetics) {
+  if (!isPresent(genetics.gray, 'G')) return color;
+  const family = pick(['Grey', 'Dapple Grey', 'Flea-bitten Grey']);
+  const depth = pick(['Light', 'Medium', 'Dark']);
+  return `${family} (${depth})`;
+}
+
+function randomIntensity() {
+  const roll = rnd(1, 100);
+  if (roll <= 30) return 'Light';
+  if (roll <= 70) return 'Medium';
+  return 'Intense';
+}
+
+function randomModifierPack() {
+  return {
+    sooty: pick(['None', 'Light', 'Medium', 'Heavy']),
+    brindle: pick(['None', 'Subtle', 'Defined', 'Intense']),
+    rabicano: pick(['None', 'Light', 'Medium', 'Heavy']),
+    birdcatcher: pick(['None', 'Few', 'Moderate', 'Many']),
+    pangare: pick(['None', 'Light', 'Medium', 'Strong']),
+    dapples: pick(['None', 'Light', 'Defined', 'High Contrast']),
+  };
+}
+
+function randomLegMarkings() {
+  const legs = ['FR', 'FL', 'BR', 'BL'];
+  const out = {};
+  legs.forEach((leg) => {
+    out[leg] = pick(SOCKS);
+  });
+  return out;
+}
+
+function socksFromLegMarkings(legs) {
+  if (!legs) return 'FR:None / FL:None / BR:None / BL:None';
+  return `FR:${legs.FR || 'None'} / FL:${legs.FL || 'None'} / BR:${legs.BR || 'None'} / BL:${legs.BL || 'None'}`;
+}
+
+function resolveWhitePattern(genetics) {
+  const patterns = [];
+  if (isPresent(genetics.appaloosa, 'Lp')) {
+    const lpCount = countAllele(genetics.appaloosa, 'Lp');
+    const appaloosaType = pick(['Leopard', 'Fewspot', 'Snowcap', 'Blanket', 'Spotted Blanket', 'Varnish Roan']);
+    const intensity = lpCount === 2 ? 'Intense' : randomIntensity();
+    patterns.push(`${appaloosaType} (${intensity})`);
+  }
+  if (isPresent(genetics.tobiano, 'TO')) patterns.push('Tobiano');
+  if (isPresent(genetics.overo, 'O')) patterns.push('Frame Overo');
+  if (isPresent(genetics.splash, 'SW')) patterns.push('Splash');
+  if (isPresent(genetics.sabino, 'Sb')) patterns.push('Sabino');
+  if (isPresent(genetics.roan, 'Rn')) {
+    patterns.push(pick(['Red Roan', 'Bay Roan', 'Blue Roan']));
+  }
+  return patterns;
+}
+
+function resolvePhenotypeFromGenetics(genetics, breed = '') {
+  const base = determineBaseCoat(genetics);
+  let color = randomCoatShade(base);
+  color = applyCream(base, genetics);
+  color = applyDun(color, base, genetics);
+  color = applyChampagne(color, base, genetics);
+  color = applyPearl(color, base, genetics);
+  color = applyGray(color, genetics);
+
+  const patternList = resolveWhitePattern(genetics);
+  const breedLower = String(breed || '').toLowerCase();
+  const marking = breedLower.includes('friesian') ? 'None' : (patternList[0] || 'None');
+  const marking2 = 'None';
+  const face = pick(FACE_MARKINGS);
+  const legs = randomLegMarkings();
+  const modifiers = randomModifierPack();
+  return {
+    coat: color,
+    marking,
+    marking2,
+    faceMarking: face,
+    legMarkings: legs,
+    socks: socksFromLegMarkings(legs),
+    modifiers
+  };
+}
+
+function inheritGenePair(parentA, parentB, fallbackA, fallbackB) {
+  const [a1, a2] = splitGenePair(parentA, fallbackA, fallbackB);
+  const [b1, b2] = splitGenePair(parentB, fallbackA, fallbackB);
+  return `${pick([a1, a2])}/${pick([b1, b2])}`;
+}
+
+function foalGeneticsFromParents(dam, sire) {
+  const damGen = dam?.genetics || randomGenetics();
+  const sireGen = sire?.genetics || randomGenetics();
+  return {
+    extension: inheritGenePair(damGen.extension, sireGen.extension, 'E', 'e'),
+    agouti: inheritGenePair(damGen.agouti, sireGen.agouti, 'A', 'a'),
+    cream: inheritGenePair(damGen.cream, sireGen.cream, 'Cr', 'n'),
+    dun: inheritGenePair(damGen.dun, sireGen.dun, 'D', 'n'),
+    gray: inheritGenePair(damGen.gray, sireGen.gray, 'G', 'n'),
+    champagne: inheritGenePair(damGen.champagne, sireGen.champagne, 'Ch', 'n'),
+    pearl: inheritGenePair(damGen.pearl, sireGen.pearl, 'Prl', 'n'),
+    roan: inheritGenePair(damGen.roan, sireGen.roan, 'Rn', 'n'),
+    appaloosa: inheritGenePair(damGen.appaloosa, sireGen.appaloosa, 'Lp', 'n'),
+    tobiano: inheritGenePair(damGen.tobiano, sireGen.tobiano, 'TO', 'n'),
+    overo: inheritGenePair(damGen.overo, sireGen.overo, 'O', 'n'),
+    splash: inheritGenePair(damGen.splash, sireGen.splash, 'SW', 'n'),
+    sabino: inheritGenePair(damGen.sabino, sireGen.sabino, 'Sb', 'n')
+  };
+}
+
 function randomMarking(breed, opts = {}) {
   const roll = rnd(1, 100);
-  const isDraft = String(breed || '').toLowerCase().includes('draft');
+  const breedLower = String(breed || '').toLowerCase();
+  const isDraft = breedLower.includes('draft');
+  const isFriesian = breedLower.includes('friesian');
+  const isWarmblood = breedLower.includes('warmblood');
   const colorMarkings = RARE_MARKINGS.filter((m) => ['Overo', 'Sabino', 'Tobiano', 'Appaloosa', 'Leopard'].some((tag) => m.includes(tag)));
-  const salesMarketBonus = opts.salesMarketBoost && isDraft ? 45 : 0;
-  const chance = clamp((isDraft ? 25 : 7) + salesMarketBonus, 0, 100);
+  const salesMarketBonus = opts.salesMarketBoost && isDraft ? 10 : 0;
+  const baseChance = isFriesian ? 1 : isDraft ? 65 : isWarmblood ? 40 : 20;
+  const chance = clamp(baseChance + salesMarketBonus, 0, 100);
   const marking = roll <= chance ? pick(isDraft ? colorMarkings : RARE_MARKINGS) : 'None';
   return normalizeMarkingForBreed(marking, breed);
 }
@@ -2762,6 +2979,8 @@ function hydrateFromSave(data) {
   if (!data || typeof data !== 'object') throw new Error('Invalid save data.');
   app.money = Number(data.money) || 50000;
   app.month = Number(data.month) || 1;
+  app.day = clamp(Number(data.day) || 1, 1, 30);
+  app.hour = clamp(Number(data.hour) || 0, 0, 23);
   app.year = Number(data.year) || 1;
   app.horses = Array.isArray(data.horses) ? data.horses.filter(Boolean) : [];
   app.semenStraws = Array.isArray(data.semenStraws) ? data.semenStraws : [];
@@ -2814,9 +3033,26 @@ function hydrateFromSave(data) {
   ensureBarnState();
 
   app.horses.forEach((h) => {
-    h.socks = h.socks || pick(SOCKS);
-    h.faceMarking = h.faceMarking || pick(FACE_MARKINGS);
-    h.marking = normalizeMarkingForBreed(h.marking || 'None', h.breed);
+    h.genetics = h.genetics && typeof h.genetics === 'object' ? h.genetics : randomGenetics();
+    GENE_KEYS.forEach((key) => {
+      if (!h.genetics[key]) h.genetics[key] = randomGenetics()[key];
+    });
+    const phenotype = resolvePhenotypeFromGenetics(h.genetics, h.breed);
+    h.coat = h.coat || phenotype.coat;
+    h.socks = h.socks || phenotype.socks;
+    h.faceMarking = h.faceMarking || phenotype.faceMarking;
+    h.marking = normalizeMarkingForBreed(h.marking || phenotype.marking || 'None', h.breed);
+    h.marking2 = h.marking2 || phenotype.marking2 || 'None';
+    h.legMarkings = h.legMarkings || phenotype.legMarkings;
+    h.modifiers = h.modifiers || phenotype.modifiers;
+    if (isPregnantMare(h)) {
+      if (!Number.isFinite(h.pregnancyDays) && Number.isFinite(h.gestation)) h.pregnancyDays = Math.max(0, Math.round(h.gestation * 30));
+      if (!Number.isFinite(h.gestationLengthDays)) h.gestationLengthDays = Number.isFinite(h.foalDue) ? Math.round(h.foalDue * 30) : rnd(320, 360);
+      ensurePregnancyState(h);
+    } else {
+      h.pregnancyDays = Number.isFinite(h.pregnancyDays) ? h.pregnancyDays : 0;
+      h.gestationLengthDays = Number.isFinite(h.gestationLengthDays) ? h.gestationLengthDays : 0;
+    }
     h.personality = h.personality || rolledPersonality(h.gender);
     h.behavior = Number.isFinite(h.behavior) ? h.behavior : 0;
     h.extraPotential = h.extraPotential === true;
@@ -2983,6 +3219,8 @@ function hydrateFromSave(data) {
 function resetGame() {
   app.money = 50000;
   app.month = 1;
+  app.day = 1;
+  app.hour = 0;
   app.year = 1;
   app.horses = [];
   app.semenStraws = [];
@@ -3074,9 +3312,59 @@ function canRideUnderSaddle(horse) {
   return (horse.behavior || 0) >= required;
 }
 
+function isPregnantMare(horse) {
+  return Boolean(horse && (horse.pregnantBy || horse.pregnantEmbryo));
+}
+
+function ensurePregnancyState(mare) {
+  if (!mare) return;
+  if (!Number.isFinite(mare.pregnancyDays)) mare.pregnancyDays = 0;
+  if (!Number.isFinite(mare.gestationLengthDays)) mare.gestationLengthDays = rnd(320, 360);
+}
+
+function pregnancyStage(horse) {
+  if (!isPregnantMare(horse)) return { label: 'Not Pregnant', canCompete: true };
+  ensurePregnancyState(horse);
+  const days = horse.pregnancyDays || 0;
+  if (days < 90) return { label: '0-90 days', canCompete: true };
+  if (days < 120) return { label: '90-120 days', canCompete: false };
+  if (days < 210) return { label: '120-210 days', canCompete: false };
+  if (days < 320) return { label: '210-320 days', canCompete: false };
+  return { label: '320+ days', canCompete: false };
+}
+
+function eligibleForPhTest(mare) {
+  return isPregnantMare(mare) && (mare.pregnancyDays || 0) >= 320;
+}
+
+function phReadingForMare(mare) {
+  if (!eligibleForPhTest(mare)) return null;
+  ensurePregnancyState(mare);
+  const left = Math.max(0, (mare.gestationLengthDays || 340) - (mare.pregnancyDays || 0));
+  let minPh = 7.2;
+  let maxPh = 7.8;
+  if (left <= 0.5) {
+    minPh = 5.8;
+    maxPh = 5.9;
+  } else if (left <= 1) {
+    minPh = 6.0;
+    maxPh = 6.3;
+  } else if (left <= 2) {
+    minPh = 6.4;
+    maxPh = 6.7;
+  } else if (left <= 7) {
+    minPh = 6.8;
+    maxPh = 7.1;
+  }
+  const actual = minPh + Math.random() * (maxPh - minPh);
+  const reading = clamp(actual + ((Math.random() * 0.4) - 0.2), 5.8, 7.8);
+  return Number(reading.toFixed(2));
+}
+
 function canCompeteUnderSaddle(horse) {
   if (horse?.isLessonHorse && !horse?.barnAvailable) return false;
-  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever;
+  const pregnancy = pregnancyStage(horse);
+  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete;
 }
 
 function horseLifeStage(horse) {
@@ -3577,7 +3865,11 @@ function baseHorse(type = 'trained', origin = 'player') {
     coat: pick(COATS),
     socks: pick(SOCKS),
     marking: 'None',
+    marking2: 'None',
     faceMarking: pick(FACE_MARKINGS),
+    legMarkings: null,
+    modifiers: null,
+    genetics: null,
     personality: '',
     behavior: 0,
     controlability: 50,
@@ -3706,6 +3998,15 @@ function baseHorse(type = 'trained', origin = 'player') {
   horse.height = heightFromBreed(horse.breed);
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
+  horse.genetics = randomGenetics();
+  const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
+  horse.coat = phenotype.coat;
+  horse.marking = phenotype.marking;
+  horse.marking2 = phenotype.marking2;
+  horse.faceMarking = phenotype.faceMarking;
+  horse.legMarkings = phenotype.legMarkings;
+  horse.socks = phenotype.socks;
+  horse.modifiers = phenotype.modifiers;
   if (origin === 'npc') {
     const { sireBreed, damBreed, sirePercent, damPercent } = pedigreeBaseFromBreed(horse.breed);
     horse.pedigree.sire = { name: randomPedigreeName('Sire', sireBreed), breed: sireBreed, coat: pick(COATS), percent: sirePercent };
@@ -3718,7 +4019,6 @@ function baseHorse(type = 'trained', origin = 'player') {
       horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
     });
   }
-  horse.marking = randomMarking(horse.breed);
   return horse;
 }
 
@@ -3766,11 +4066,16 @@ function foalPotential(dam, sire) {
   return output;
 }
 
-function processPregnancy(mare, newborns) {
+function processPregnancy(mare, newborns, dayAdvance = 30) {
   if (!mare || !(mare.pregnantBy || mare.pregnantEmbryo)) return;
-  mare.gestation = Number.isFinite(mare.gestation) ? mare.gestation + 1 : 1;
-  const dueIn = Number.isFinite(mare.foalDue) ? mare.foalDue : 11;
-  if (mare.gestation < dueIn) return;
+  ensurePregnancyState(mare);
+  mare.pregnancyDays += Math.max(0, Number(dayAdvance) || 0);
+
+  if (mare.pregnancyDays < (mare.gestationLengthDays || 340)) {
+    if (mare.pregnancyDays >= 210) mare.weightStatus = 'Overweight';
+    else if (mare.pregnancyDays >= 90) mare.weightStatus = pick(['Moderate', 'Fleshy']);
+    return;
+  }
 
   const embryo = mare.pregnantEmbryo || null;
   const sire = embryo?.sireId
@@ -3785,7 +4090,23 @@ function processPregnancy(mare, newborns) {
   foal.breed = mare.breed || sire?.breed || pick(BREEDS);
   foal.conformation = foalConformationFromParents(mare, sire || {});
   foal.height = heightFromBreed(foal.breed);
-  foal.marking = randomMarking(foal.breed);
+  foal.genetics = foalGeneticsFromParents(mare, sire || {});
+  if (countAllele(foal.genetics.overo, 'O') === 2) {
+    pushReport(`${mare.name} lost a foal due to lethal frame overo (OO).`);
+    delete mare.pregnantBy;
+    delete mare.pregnantEmbryo;
+    mare.pregnancyDays = 0;
+    mare.gestationLengthDays = 0;
+    return;
+  }
+  const foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
+  foal.coat = foalPhenotype.coat;
+  foal.marking = foalPhenotype.marking;
+  foal.marking2 = foalPhenotype.marking2;
+  foal.faceMarking = foalPhenotype.faceMarking;
+  foal.legMarkings = foalPhenotype.legMarkings;
+  foal.socks = foalPhenotype.socks;
+  foal.modifiers = foalPhenotype.modifiers;
   foal.potential = foalPotential(mare, sire || {});
   foal.extraPotential = inheritExtraPotential(mare, sire || {});
   if (foal.extraPotential) {
@@ -3793,6 +4114,19 @@ function processPregnancy(mare, newborns) {
       foal.potential[k] = Math.min(100, foal.potential[k] + rnd(4, 10));
     });
   }
+
+  const rare = [];
+  if (rnd(1, 10000) <= 100) rare.push('Twins (high risk)');
+  if (rnd(1, 10000) <= 200) rare.push('Premature foal');
+  if (rnd(1, 10000) <= 150) rare.push('Extra tall genetic spike');
+  if (rnd(1, 10000) <= 50) rare.push('Color mutation');
+  foal.foalVitality = {
+    score: rnd(0, 100),
+    shownUntilDay: 180,
+    ageDays: 0,
+    rareEvents: rare
+  };
+
   const code = (app.settings?.breedingCode || '').trim();
   if (code) {
     foal.name = app.settings?.breedingCodePosition === 'end' ? `${foal.name} ${code}` : `${code} ${foal.name}`;
@@ -3815,8 +4149,8 @@ function processPregnancy(mare, newborns) {
 
   delete mare.pregnantBy;
   delete mare.pregnantEmbryo;
-  mare.gestation = 0;
-  mare.foalDue = 0;
+  mare.pregnancyDays = 0;
+  mare.gestationLengthDays = 0;
 }
 
 
@@ -4021,8 +4355,14 @@ function updateHeader() {
   const moneyEl = document.getElementById('moneyLabel');
   const titleEl = document.querySelector('.topbar h1');
   if (titleEl) titleEl.textContent = app.settings?.barnName || 'Oxer to Oxer Stable Manager';
-  if (monthEl) monthEl.textContent = `Month ${app.month}, Year ${app.year}`;
+  if (monthEl) monthEl.textContent = `Day ${app.day}, Month ${app.month}, Year ${app.year} • ${String(app.hour).padStart(2, '0')}:00`; 
   if (moneyEl) moneyEl.innerHTML = `<span class="money money-clickable" title="Click to set money amount">${money(app.money)}</span>`;
+  const skipHourBtn = document.getElementById('skipHourBtn');
+  if (skipHourBtn) {
+    const unlocked = canSkipHour();
+    skipHourBtn.disabled = !unlocked;
+    skipHourBtn.style.display = unlocked ? '' : 'none';
+  }
 }
 
 function releaseLeasedHorseToLessonProgram(horse) {
@@ -4187,7 +4527,8 @@ function createHorseCard(horse) {
   titleEl.textContent = titleLabel || '';
   const socks = horse.socks || 'None';
   const face = horse.faceMarking || 'Faint';
-  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${socks} | ${horse.marking} | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
+  const marking2 = horse.marking2 || 'None';
+  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${horse.marking || 'None'} | ${marking2} | Socks (${socks}) | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
   node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
@@ -4251,6 +4592,9 @@ function createHorseCard(horse) {
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: ${horse.pregnancyDays || 0} / ${horse.gestationLengthDays || '?'} days (${pregnancyStage(horse).label})</p>` : ''}
+    ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
+    ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
     <button data-action='save-turnout'>Save Turn-out</button>
     <details class='bond-box'>
       <summary>Bond</summary>
@@ -4367,6 +4711,15 @@ function createHorseCard(horse) {
         horse.tack.headwear = node.querySelector('.tack-headwear')?.value || horse.tack.headwear;
         horse.tack.body = node.querySelector('.tack-body')?.value || horse.tack.body;
         pushReport(`Updated tack for ${horse.name}.`);
+      }
+      if (action === 'test-ph') {
+        if (!eligibleForPhTest(horse)) {
+          alert('pH test is only available for mares over 320 pregnancy days.');
+          return;
+        }
+        const reading = phReadingForMare(horse);
+        horse.lastPhReading = reading;
+        vetNote(horse, `${horse.name} milk pH reading: ${reading}.`);
       }
       if (action === 'save-turnout') {
         if (horse.leaseLocked) {
@@ -5601,6 +5954,39 @@ function resolvePendingCompetitions(horse) {
   });
 }
 
+
+function applyDailyPregnancyUpdates(horse) {
+  if (!isPregnantMare(horse)) return;
+  ensurePregnancyState(horse);
+  const stage = pregnancyStage(horse);
+  if (stage.label === '90-120 days') horse.weightStatus = pick(['Moderate', 'Fleshy']);
+  if (stage.label === '210-320 days' || stage.label === '320+ days') horse.weightStatus = 'Overweight';
+}
+
+function advanceOneDay() {
+  const newborns = [];
+  app.horses.forEach((h) => {
+    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 1;
+    if (isPregnantMare(h)) processPregnancy(h, newborns, 1);
+    applyDailyPregnancyUpdates(h);
+  });
+  if (newborns.length) app.horses = app.horses.concat(newborns);
+  app.hour = 0;
+  app.day += 1;
+  if (app.day > 30) {
+    monthlyProgress();
+  }
+}
+
+function advanceOneHour() {
+  app.hour += 1;
+  if (app.hour >= 24) advanceOneDay();
+}
+
+function canSkipHour() {
+  return app.horses.some((h) => isPregnantMare(h) && (h.pregnancyDays || 0) >= 320);
+}
+
 function renderShows() {
   app.showSelections = app.showSelections || {};
   const panel = document.getElementById('shows');
@@ -5965,12 +6351,13 @@ function renderVet() {
     const success = rnd(1, 100) > 30;
     if (success) {
       mare.pregnantBy = straw.stallionName;
-      mare.gestation = 0;
-      mare.foalDue = rnd(10, 14);
-      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Due date is hidden (10-14 month window).`);
+      mare.pregnancyDays = 0;
+      mare.gestationLengthDays = rnd(320, 360);
+      vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `AI attempt failed for ${mare.name} using ${straw.stallionName}.`);
     }
+    app.semenStraws = app.semenStraws.filter((x) => x.id !== straw.id);
     render();
   };
 
@@ -5980,6 +6367,7 @@ function renderVet() {
     const straw = app.semenStraws.find((s) => s.id === strawId);
     if (!mare || !straw || !tryCharge(1000)) return;
     if (!mare.retiredToBreeding) { app.money += 1000; return alert('Mare must be retired to breeding for embryo flush.'); }
+    app.semenStraws = app.semenStraws.filter((x) => x.id !== straw.id);
     const n = rnd(0, 2);
     for (let i = 0; i < n; i++) {
       app.embryos.push({
@@ -6005,9 +6393,9 @@ function renderVet() {
     if (success) {
       app.embryos.splice(embryoIndex, 1);
       mare.pregnantEmbryo = embryo;
-      mare.gestation = 0;
-      mare.foalDue = rnd(10, 14);
-      vetNote(mare, `Embryo transfer successful for ${mare.name}. Due date is hidden (10-14 month window).`);
+      mare.pregnancyDays = 0;
+      mare.gestationLengthDays = rnd(320, 360);
+      vetNote(mare, `Embryo transfer successful for ${mare.name}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `Embryo transfer failed for ${mare.name}.`);
     }
@@ -6030,8 +6418,8 @@ function renderVet() {
     if (!mare || !tryCharge(100)) return;
     delete mare.pregnantBy;
     delete mare.pregnantEmbryo;
-    mare.gestation = 0;
-    mare.foalDue = 0;
+    mare.pregnancyDays = 0;
+    mare.gestationLengthDays = 0;
     vetNote(mare, `${mare.name} received mismate shot. Pregnancy ended.`);
     render();
   };
@@ -6666,6 +7054,8 @@ function processAgingAndMortality(horse) {
 
 function monthlyProgress() {
   ensureBarnState();
+  app.day = 1;
+  app.hour = 0;
   app.month += 1;
   if (app.month > 12) {
     app.month = 1;
@@ -6688,6 +7078,7 @@ function monthlyProgress() {
   const conformationBreedPlacings = new Set();
   app.horses.forEach((h) => {
     processPregnancy(h, newborns);
+    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 30;
     maybeAddRandomIllness(h);
     if (h.deceased) {
       return;
@@ -6839,6 +7230,7 @@ function registerConformationShow(horse, typeKey) {
   const type = CONFORMATION_SHOW_TYPES.find((x) => x.key === typeKey);
   if (!type) return;
   if (type.specialMonth && app.month !== type.specialMonth) return alert('Horse Of The Year is only available in month 12.');
+  if (!pregnancyStage(horse).canCompete) return alert('Pregnant mares past 90 days cannot enter conformation shows.');
   horse.pendingConformationShows = Array.isArray(horse.pendingConformationShows) ? horse.pendingConformationShows : [];
   if (horse.pendingConformationShows.some((entry) => entry.monthIndex === currentMonthIndex())) return alert('This horse is already entered this month.');
   horse.pendingConformationShows.push({
@@ -7092,7 +7484,7 @@ function renderFreezer() {
     <div class='grid two'>
       <div class='box'>
         <h3>Semen Straws (${app.semenStraws.length})</h3>
-        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
+        ${app.semenStraws.length ? app.semenStraws.map((s) => `<p>${s.stallionName} <span class='small'>(${s.id})</span> <button data-remove-straw='${s.id}'>Remove</button></p>`).join('') : '<p class="small">No semen straws stored.</p>'}
       </div>
       <div class='box'>
         <h3>Embryos (${app.embryos.length})</h3>
@@ -7100,6 +7492,13 @@ function renderFreezer() {
       </div>
     </div>
   `;
+  panel.querySelectorAll('[data-remove-straw]').forEach((btn) => {
+    btn.onclick = () => {
+      app.semenStraws = app.semenStraws.filter((s) => s.id !== btn.dataset.removeStraw);
+      renderFreezer();
+      saveGame(false);
+    };
+  });
 }
 
 function renderRescue() {
@@ -7308,7 +7707,7 @@ function renderBreeding() {
     </div>
     <div class='box'>
       <h3>Pregnancy List</h3>
-      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Due date hidden (10-14 month window; revealed at birth)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
+      ${pregnant.length ? pregnant.map((mare) => `<p>${horseDisplayName(mare)} — Pregnant: ${mare.pregnancyDays || 0} day(s)</p>`).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
   const vetBtn = document.getElementById('breeding-open-vet');
@@ -7396,12 +7795,21 @@ function render() {
 }
 
 const skipBtn = document.getElementById('skipMonthBtn');
+const skipDayBtn = document.getElementById('skipDayBtn');
+const skipHourBtn = document.getElementById('skipHourBtn');
 const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
 const resetGameBtn = document.getElementById('resetGameBtn');
 const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
+if (skipDayBtn) skipDayBtn.onclick = () => { advanceOneDay(); render(); saveGame(false); };
+if (skipHourBtn) skipHourBtn.onclick = () => {
+  if (!canSkipHour()) return alert('Skip Hour unlocks when a mare reaches 320 pregnancy days.');
+  advanceOneHour();
+  render();
+  saveGame(false);
+};
 if (addMoneyBtn) addMoneyBtn.onclick = () => { app.money += 100000; render(); saveGame(false); };
 if (moneyLabel) {
   moneyLabel.style.cursor = 'pointer';
