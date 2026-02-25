@@ -2131,7 +2131,6 @@ function randomModifierPack() {
     birdcatcher: pick(['None', 'Few', 'Moderate', 'Many']),
     pangare: pick(['None', 'Light', 'Medium', 'Strong']),
     dapples: pick(['None', 'Light', 'Defined', 'High Contrast']),
-    bendOrSpots: pick(['None', 'Light', 'Medium', 'Intense'])
   };
 }
 
@@ -2179,7 +2178,7 @@ function resolvePhenotypeFromGenetics(genetics, breed = '') {
   const patternList = resolveWhitePattern(genetics);
   const breedLower = String(breed || '').toLowerCase();
   const marking = breedLower.includes('friesian') ? 'None' : (patternList[0] || 'None');
-  const marking2 = pick(['None', 'Bend-Or Spots (Light)', 'Bend-Or Spots (Medium)', 'Bend-Or Spots (Intense)']);
+  const marking2 = 'None';
   const face = pick(FACE_MARKINGS);
   const legs = randomLegMarkings();
   const modifiers = randomModifierPack();
