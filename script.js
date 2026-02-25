@@ -4,10 +4,10 @@ const BREEDS = [
   'Polish Warmblood', 'Rhineland', 'Selle Francais', 'Swedish Warmblood', 'Trakehner', 'Westphalian', 'Zweibrucker',
   'Arabian', 'Draft', 'Iberian Horse', 'Riding Pony', 'Thoroughbred', 'Friesian'
 ];
-const COATS = ['Black', 'Bay (Light)', 'Bay (Medium)', 'Bay (Dark)', 'Palomino', 'Fleabitten', 'Grey (Light)', 'Grey (Medium)', 'Grey (Dark)', 'Dappled Grey (Light)', 'Dappled Grey (Medium)', 'Dappled Grey (Dark)', 'Seal Bay', 'Cremello', 'Perlino', 'Buckskin', 'Dun', 'Grullo', 'Chestnut (Light)', 'Chestnut (Medium)', 'Chestnut (Dark)', 'Dapple Bay (Light)', 'Dapple Bay (Medium)', 'Dapple Bay (Dark)'];
-const MARKINGS = ['Tobiano (Light)', 'Tobiano (Moderate)', 'Tobiano (Intense)', 'Overo', 'Sabino', 'Rabicano', 'Appaloosa (Light)', 'Appaloosa (Moderate)', 'Appaloosa (Intense)', 'Leopard (Light)', 'Leopard (Moderate)', 'Leopard (Intense)', 'None'];
+const COATS = ['Light Chestnut', 'Chestnut', 'Dark Chestnut', 'Liver Chestnut', 'Light Black', 'Bluish Black', 'True Black', 'Light Bay', 'Bay', 'Dark Bay', 'Blood Bay', 'Seal Bay', 'Palomino', 'Cremello', 'Buckskin', 'Perlino', 'Smoky Black', 'Smoky Cream', 'Red Dun', 'Bay Dun', 'Grullo', 'Dunalino', 'Dunskin', 'Gold Champagne', 'Amber Champagne', 'Classic Champagne', 'Pearl', 'Palomino Pearl', 'Buckskin Pearl', 'Grey', 'Dapple Grey', 'Flea-bitten Grey'];
+const MARKINGS = ['None', 'Tobiano', 'Frame Overo', 'Splash', 'Sabino', 'Leopard', 'Fewspot', 'Snowcap', 'Blanket', 'Spotted Blanket', 'Varnish Roan', 'Red Roan', 'Bay Roan', 'Blue Roan'];
 const CONFORMATION = ['Very Bad', 'Bad', 'Acceptable', 'Good', 'Very Good', 'Excellent'];
-const SOCKS = ['None', 'One Sock', 'Two Socks', 'Three Socks', 'Four Socks', 'Stockings'];
+const SOCKS = ['None', 'Pastern', 'Fetlock', 'Sock', 'Stocking', 'Full White'];
 const FACE_MARKINGS = ['Faint', 'Star', 'Stripe', 'Broken Stripe', 'Blaze', 'Snip', 'Blaze + Snip', 'Bald Face'];
 
 const SHOW_LEVELS = {
@@ -2008,12 +2008,228 @@ function normalizeMarkingForBreed(marking, breed) {
   return pick(MARKINGS.filter((m) => m !== 'Rabicano'));
 }
 
+const GENE_KEYS = ['extension', 'agouti', 'cream', 'dun', 'gray', 'champagne', 'pearl', 'roan', 'appaloosa', 'tobiano', 'overo', 'splash', 'sabino'];
+
+function randomAlleles(dominant, recessive, opts = {}) {
+  const chanceDominant = opts.chanceDominant ?? 22;
+  const chanceHomoDominant = opts.chanceHomoDominant ?? 4;
+  const roll = rnd(1, 100);
+  if (roll <= chanceHomoDominant) return `${dominant}/${dominant}`;
+  if (roll <= chanceDominant) return rnd(1, 100) <= 50 ? `${dominant}/${recessive}` : `${recessive}/${dominant}`;
+  return `${recessive}/${recessive}`;
+}
+
+function randomGenetics() {
+  return {
+    extension: randomAlleles('E', 'e', { chanceDominant: 76, chanceHomoDominant: 24 }),
+    agouti: randomAlleles('A', 'a', { chanceDominant: 68, chanceHomoDominant: 20 }),
+    cream: randomAlleles('Cr', 'n', { chanceDominant: 30, chanceHomoDominant: 5 }),
+    dun: randomAlleles('D', 'n', { chanceDominant: 18, chanceHomoDominant: 3 }),
+    gray: randomAlleles('G', 'n', { chanceDominant: 16, chanceHomoDominant: 4 }),
+    champagne: randomAlleles('Ch', 'n', { chanceDominant: 12, chanceHomoDominant: 2 }),
+    pearl: randomAlleles('Prl', 'n', { chanceDominant: 9, chanceHomoDominant: 2 }),
+    roan: randomAlleles('Rn', 'n', { chanceDominant: 20, chanceHomoDominant: 4 }),
+    appaloosa: randomAlleles('Lp', 'n', { chanceDominant: 18, chanceHomoDominant: 4 }),
+    tobiano: randomAlleles('TO', 'n', { chanceDominant: 24, chanceHomoDominant: 6 }),
+    overo: randomAlleles('O', 'n', { chanceDominant: 16, chanceHomoDominant: 2 }),
+    splash: randomAlleles('SW', 'n', { chanceDominant: 13, chanceHomoDominant: 2 }),
+    sabino: randomAlleles('Sb', 'n', { chanceDominant: 16, chanceHomoDominant: 3 })
+  };
+}
+
+function splitGenePair(pair, fallbackA, fallbackB) {
+  if (!pair || typeof pair !== 'string') return [fallbackA, fallbackB];
+  if (pair.includes('/')) {
+    const [left, right] = pair.split('/');
+    return [left || fallbackA, right || fallbackB];
+  }
+  const normalized = pair.trim();
+  if (normalized.length === 2) return [normalized[0], normalized[1]];
+  const parsed = normalized.match(/(Cr|Prl|Lp|TO|SW|Sb|Ch|Rn|[A-Za-z])/g);
+  if (!parsed || parsed.length < 2) return [fallbackA, fallbackB];
+  return [parsed[0], parsed[1]];
+}
+
+function isPresent(pair, allele) {
+  const [a, b] = splitGenePair(pair, 'n', 'n');
+  return a === allele || b === allele;
+}
+
+function countAllele(pair, allele) {
+  const [a, b] = splitGenePair(pair, 'n', 'n');
+  return (a === allele ? 1 : 0) + (b === allele ? 1 : 0);
+}
+
+function randomCoatShade(base) {
+  if (base === 'Chestnut') return pick(['Light Chestnut', 'Chestnut', 'Dark Chestnut', 'Liver Chestnut']);
+  if (base === 'Black') return pick(['Light Black', 'Bluish Black', 'True Black']);
+  return pick(['Light Bay', 'Bay', 'Dark Bay', 'Blood Bay', 'Seal Bay']);
+}
+
+function determineBaseCoat(genetics) {
+  const isChestnut = countAllele(genetics.extension, 'e') === 2;
+  if (isChestnut) return 'Chestnut';
+  const hasAgouti = isPresent(genetics.agouti, 'A');
+  return hasAgouti ? 'Bay' : 'Black';
+}
+
+function applyCream(base, genetics) {
+  const creamCount = countAllele(genetics.cream, 'Cr');
+  if (!creamCount) return base;
+  if (base === 'Chestnut') return creamCount === 2 ? 'Cremello' : 'Palomino';
+  if (base === 'Bay') return creamCount === 2 ? 'Perlino' : 'Buckskin';
+  return creamCount === 2 ? 'Smoky Cream' : 'Smoky Black';
+}
+
+function applyDun(color, base, genetics) {
+  if (!isPresent(genetics.dun, 'D')) return color;
+  if (color === 'Palomino') return 'Dunalino';
+  if (color === 'Buckskin') return 'Dunskin';
+  if (base === 'Chestnut') return 'Red Dun';
+  if (base === 'Black') return 'Grullo';
+  return 'Bay Dun';
+}
+
+function applyChampagne(color, base, genetics) {
+  if (!isPresent(genetics.champagne, 'Ch')) return color;
+  if (base === 'Chestnut') return 'Gold Champagne';
+  if (base === 'Black') return 'Classic Champagne';
+  return 'Amber Champagne';
+}
+
+function applyPearl(color, base, genetics) {
+  const pearlCount = countAllele(genetics.pearl, 'Prl');
+  const creamCount = countAllele(genetics.cream, 'Cr');
+  const activates = pearlCount === 2 || (pearlCount >= 1 && creamCount >= 1);
+  if (!activates) return color;
+  if (color.includes('Palomino')) return 'Palomino Pearl';
+  if (color.includes('Buckskin')) return 'Buckskin Pearl';
+  if (base === 'Chestnut' && creamCount >= 1) return 'Palomino Pearl';
+  if (base === 'Bay' && creamCount >= 1) return 'Buckskin Pearl';
+  return 'Pearl';
+}
+
+function applyGray(color, genetics) {
+  if (!isPresent(genetics.gray, 'G')) return color;
+  const family = pick(['Grey', 'Dapple Grey', 'Flea-bitten Grey']);
+  const depth = pick(['Light', 'Medium', 'Dark']);
+  return `${family} (${depth})`;
+}
+
+function randomIntensity() {
+  const roll = rnd(1, 100);
+  if (roll <= 30) return 'Light';
+  if (roll <= 70) return 'Medium';
+  return 'Intense';
+}
+
+function randomModifierPack() {
+  return {
+    sooty: pick(['None', 'Light', 'Medium', 'Heavy']),
+    brindle: pick(['None', 'Subtle', 'Defined', 'Intense']),
+    rabicano: pick(['None', 'Light', 'Medium', 'Heavy']),
+    birdcatcher: pick(['None', 'Few', 'Moderate', 'Many']),
+    pangare: pick(['None', 'Light', 'Medium', 'Strong']),
+    dapples: pick(['None', 'Light', 'Defined', 'High Contrast']),
+    bendOrSpots: pick(['None', 'Light', 'Medium', 'Intense'])
+  };
+}
+
+function randomLegMarkings() {
+  const legs = ['FR', 'FL', 'BR', 'BL'];
+  const out = {};
+  legs.forEach((leg) => {
+    out[leg] = pick(SOCKS);
+  });
+  return out;
+}
+
+function socksFromLegMarkings(legs) {
+  if (!legs) return 'FR:None / FL:None / BR:None / BL:None';
+  return `FR:${legs.FR || 'None'} / FL:${legs.FL || 'None'} / BR:${legs.BR || 'None'} / BL:${legs.BL || 'None'}`;
+}
+
+function resolveWhitePattern(genetics) {
+  const patterns = [];
+  if (isPresent(genetics.appaloosa, 'Lp')) {
+    const lpCount = countAllele(genetics.appaloosa, 'Lp');
+    const appaloosaType = pick(['Leopard', 'Fewspot', 'Snowcap', 'Blanket', 'Spotted Blanket', 'Varnish Roan']);
+    const intensity = lpCount === 2 ? 'Intense' : randomIntensity();
+    patterns.push(`${appaloosaType} (${intensity})`);
+  }
+  if (isPresent(genetics.tobiano, 'TO')) patterns.push('Tobiano');
+  if (isPresent(genetics.overo, 'O')) patterns.push('Frame Overo');
+  if (isPresent(genetics.splash, 'SW')) patterns.push('Splash');
+  if (isPresent(genetics.sabino, 'Sb')) patterns.push('Sabino');
+  if (isPresent(genetics.roan, 'Rn')) {
+    patterns.push(pick(['Red Roan', 'Bay Roan', 'Blue Roan']));
+  }
+  return patterns;
+}
+
+function resolvePhenotypeFromGenetics(genetics, breed = '') {
+  const base = determineBaseCoat(genetics);
+  let color = randomCoatShade(base);
+  color = applyCream(base, genetics);
+  color = applyDun(color, base, genetics);
+  color = applyChampagne(color, base, genetics);
+  color = applyPearl(color, base, genetics);
+  color = applyGray(color, genetics);
+
+  const patternList = resolveWhitePattern(genetics);
+  const breedLower = String(breed || '').toLowerCase();
+  const marking = breedLower.includes('friesian') ? 'None' : (patternList[0] || 'None');
+  const marking2 = pick(['None', 'Bend-Or Spots (Light)', 'Bend-Or Spots (Medium)', 'Bend-Or Spots (Intense)']);
+  const face = pick(FACE_MARKINGS);
+  const legs = randomLegMarkings();
+  const modifiers = randomModifierPack();
+  return {
+    coat: color,
+    marking,
+    marking2,
+    faceMarking: face,
+    legMarkings: legs,
+    socks: socksFromLegMarkings(legs),
+    modifiers
+  };
+}
+
+function inheritGenePair(parentA, parentB, fallbackA, fallbackB) {
+  const [a1, a2] = splitGenePair(parentA, fallbackA, fallbackB);
+  const [b1, b2] = splitGenePair(parentB, fallbackA, fallbackB);
+  return `${pick([a1, a2])}/${pick([b1, b2])}`;
+}
+
+function foalGeneticsFromParents(dam, sire) {
+  const damGen = dam?.genetics || randomGenetics();
+  const sireGen = sire?.genetics || randomGenetics();
+  return {
+    extension: inheritGenePair(damGen.extension, sireGen.extension, 'E', 'e'),
+    agouti: inheritGenePair(damGen.agouti, sireGen.agouti, 'A', 'a'),
+    cream: inheritGenePair(damGen.cream, sireGen.cream, 'Cr', 'n'),
+    dun: inheritGenePair(damGen.dun, sireGen.dun, 'D', 'n'),
+    gray: inheritGenePair(damGen.gray, sireGen.gray, 'G', 'n'),
+    champagne: inheritGenePair(damGen.champagne, sireGen.champagne, 'Ch', 'n'),
+    pearl: inheritGenePair(damGen.pearl, sireGen.pearl, 'Prl', 'n'),
+    roan: inheritGenePair(damGen.roan, sireGen.roan, 'Rn', 'n'),
+    appaloosa: inheritGenePair(damGen.appaloosa, sireGen.appaloosa, 'Lp', 'n'),
+    tobiano: inheritGenePair(damGen.tobiano, sireGen.tobiano, 'TO', 'n'),
+    overo: inheritGenePair(damGen.overo, sireGen.overo, 'O', 'n'),
+    splash: inheritGenePair(damGen.splash, sireGen.splash, 'SW', 'n'),
+    sabino: inheritGenePair(damGen.sabino, sireGen.sabino, 'Sb', 'n')
+  };
+}
+
 function randomMarking(breed, opts = {}) {
   const roll = rnd(1, 100);
-  const isDraft = String(breed || '').toLowerCase().includes('draft');
+  const breedLower = String(breed || '').toLowerCase();
+  const isDraft = breedLower.includes('draft');
+  const isFriesian = breedLower.includes('friesian');
+  const isWarmblood = breedLower.includes('warmblood');
   const colorMarkings = RARE_MARKINGS.filter((m) => ['Overo', 'Sabino', 'Tobiano', 'Appaloosa', 'Leopard'].some((tag) => m.includes(tag)));
-  const salesMarketBonus = opts.salesMarketBoost && isDraft ? 45 : 0;
-  const chance = clamp((isDraft ? 25 : 7) + salesMarketBonus, 0, 100);
+  const salesMarketBonus = opts.salesMarketBoost && isDraft ? 10 : 0;
+  const baseChance = isFriesian ? 1 : isDraft ? 65 : isWarmblood ? 40 : 20;
+  const chance = clamp(baseChance + salesMarketBonus, 0, 100);
   const marking = roll <= chance ? pick(isDraft ? colorMarkings : RARE_MARKINGS) : 'None';
   return normalizeMarkingForBreed(marking, breed);
 }
@@ -2814,9 +3030,18 @@ function hydrateFromSave(data) {
   ensureBarnState();
 
   app.horses.forEach((h) => {
-    h.socks = h.socks || pick(SOCKS);
-    h.faceMarking = h.faceMarking || pick(FACE_MARKINGS);
-    h.marking = normalizeMarkingForBreed(h.marking || 'None', h.breed);
+    h.genetics = h.genetics && typeof h.genetics === 'object' ? h.genetics : randomGenetics();
+    GENE_KEYS.forEach((key) => {
+      if (!h.genetics[key]) h.genetics[key] = randomGenetics()[key];
+    });
+    const phenotype = resolvePhenotypeFromGenetics(h.genetics, h.breed);
+    h.coat = h.coat || phenotype.coat;
+    h.socks = h.socks || phenotype.socks;
+    h.faceMarking = h.faceMarking || phenotype.faceMarking;
+    h.marking = normalizeMarkingForBreed(h.marking || phenotype.marking || 'None', h.breed);
+    h.marking2 = h.marking2 || phenotype.marking2 || 'None';
+    h.legMarkings = h.legMarkings || phenotype.legMarkings;
+    h.modifiers = h.modifiers || phenotype.modifiers;
     h.personality = h.personality || rolledPersonality(h.gender);
     h.behavior = Number.isFinite(h.behavior) ? h.behavior : 0;
     h.extraPotential = h.extraPotential === true;
@@ -3577,7 +3802,11 @@ function baseHorse(type = 'trained', origin = 'player') {
     coat: pick(COATS),
     socks: pick(SOCKS),
     marking: 'None',
+    marking2: 'None',
     faceMarking: pick(FACE_MARKINGS),
+    legMarkings: null,
+    modifiers: null,
+    genetics: null,
     personality: '',
     behavior: 0,
     controlability: 50,
@@ -3706,6 +3935,15 @@ function baseHorse(type = 'trained', origin = 'player') {
   horse.height = heightFromBreed(horse.breed);
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
+  horse.genetics = randomGenetics();
+  const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
+  horse.coat = phenotype.coat;
+  horse.marking = phenotype.marking;
+  horse.marking2 = phenotype.marking2;
+  horse.faceMarking = phenotype.faceMarking;
+  horse.legMarkings = phenotype.legMarkings;
+  horse.socks = phenotype.socks;
+  horse.modifiers = phenotype.modifiers;
   if (origin === 'npc') {
     const { sireBreed, damBreed, sirePercent, damPercent } = pedigreeBaseFromBreed(horse.breed);
     horse.pedigree.sire = { name: randomPedigreeName('Sire', sireBreed), breed: sireBreed, coat: pick(COATS), percent: sirePercent };
@@ -3718,7 +3956,6 @@ function baseHorse(type = 'trained', origin = 'player') {
       horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
     });
   }
-  horse.marking = randomMarking(horse.breed);
   return horse;
 }
 
@@ -3785,7 +4022,23 @@ function processPregnancy(mare, newborns) {
   foal.breed = mare.breed || sire?.breed || pick(BREEDS);
   foal.conformation = foalConformationFromParents(mare, sire || {});
   foal.height = heightFromBreed(foal.breed);
-  foal.marking = randomMarking(foal.breed);
+  foal.genetics = foalGeneticsFromParents(mare, sire || {});
+  if (countAllele(foal.genetics.overo, 'O') === 2) {
+    pushReport(`${mare.name} lost a foal due to lethal frame overo (OO).`);
+    delete mare.pregnantBy;
+    delete mare.pregnantEmbryo;
+    mare.gestation = 0;
+    mare.foalDue = 0;
+    return;
+  }
+  const foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
+  foal.coat = foalPhenotype.coat;
+  foal.marking = foalPhenotype.marking;
+  foal.marking2 = foalPhenotype.marking2;
+  foal.faceMarking = foalPhenotype.faceMarking;
+  foal.legMarkings = foalPhenotype.legMarkings;
+  foal.socks = foalPhenotype.socks;
+  foal.modifiers = foalPhenotype.modifiers;
   foal.potential = foalPotential(mare, sire || {});
   foal.extraPotential = inheritExtraPotential(mare, sire || {});
   if (foal.extraPotential) {
@@ -4187,7 +4440,8 @@ function createHorseCard(horse) {
   titleEl.textContent = titleLabel || '';
   const socks = horse.socks || 'None';
   const face = horse.faceMarking || 'Faint';
-  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${socks} | ${horse.marking} | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
+  const marking2 = horse.marking2 || 'None';
+  node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${horse.marking || 'None'} | ${marking2} | Socks (${socks}) | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
   node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
