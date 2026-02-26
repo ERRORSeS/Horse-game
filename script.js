@@ -2486,22 +2486,29 @@ function genderPronouns(horse) {
   };
 }
 
-function recommendedFeedForHorse(horse) {
+function recommendedFeedForHorse(horse, options = {}) {
+  const { ignoreWeightStatus = false } = options;
   if (horse.illnesses.some((i) => i.active)) return 'Recovery';
   if ((horse.injuryCountYear || 0) > 3) return 'Joint Support';
   if (horse.pregnantBy || horse.pregnantEmbryo || horse.retiredToBreeding) return 'Brood-mare Feed';
   if (horse.age <= 5) return 'Youngster Feed';
   if (horse.age >= 15) return 'Old Horse Feed';
-  if (['Overweight', 'Fleshy'].includes(horse.weightStatus)) return 'Diet Feed';
-  if (['Very Underweight', 'Underweight'].includes(horse.weightStatus)) return 'Weight Gain';
+  if (!ignoreWeightStatus && ['Overweight', 'Fleshy'].includes(horse.weightStatus)) return 'Diet Feed';
+  if (!ignoreWeightStatus && ['Very Underweight', 'Underweight'].includes(horse.weightStatus)) return 'Weight Gain';
   return 'Basic Feed';
 }
 
 function stablehandFeedPlanForHorse(horse) {
   const [feedMin, feedMax] = feedRangeBounds(horse);
   const targetGrams = clamp(Math.round((feedMin + feedMax) / 2), 50, 250);
-  const preferredFeed = recommendedFeedForHorse(horse);
-  return [{ type: preferredFeed, grams: targetGrams }];
+  const preferredFeed = recommendedFeedForHorse(horse, { ignoreWeightStatus: true });
+  let managedFeed = preferredFeed;
+  if (['Overweight', 'Fleshy'].includes(horse.weightStatus)) {
+    managedFeed = 'Diet Feed';
+  } else if (['Very Underweight', 'Underweight'].includes(horse.weightStatus)) {
+    managedFeed = 'Weight Gain';
+  }
+  return [{ type: managedFeed, grams: targetGrams }];
 }
 
 function applyStablehandCare(horse) {
@@ -7575,7 +7582,18 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
     const scoreRaw = (mood * 0.24) + (conf * 0.29) + (weight * 0.22) + (personality * 0.08) + (qol * 0.15) + randomLight;
     const score = clamp(Number(scoreRaw.toFixed(2)), 1, 10);
     const fieldSize = entry.slots || rnd(8, 10);
-    const placing = score >= (8.9 * showType.difficulty) ? 1 : score >= (8.1 * showType.difficulty) ? 2 : score >= (7.4 * showType.difficulty) ? 3 : rnd(4, fieldSize);
+    let placing;
+    if (entry.type === 'silver' && score > 8.0) {
+      placing = rnd(1, 3);
+    } else if (entry.type === 'golden' && score > 8.5) {
+      placing = rnd(1, 3);
+    } else if (entry.type === 'hoy' && score > 9.3) {
+      placing = 1;
+    } else if (entry.type === 'hoy' && score > 9.0) {
+      placing = rnd(2, 3);
+    } else {
+      placing = score >= (8.9 * showType.difficulty) ? 1 : score >= (8.1 * showType.difficulty) ? 2 : score >= (7.4 * showType.difficulty) ? 3 : rnd(4, fieldSize);
+    }
     const breedKey = `${app.year}-${app.month}-${horse.breed}`;
     const breedPlacedAlready = monthlyBreedPlaced.has(breedKey);
     const earnedBreedPlace = !breedPlacedAlready && placing <= 3;
@@ -7585,14 +7603,22 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
       app.money += prize;
       horse.earnings += prize;
     }
+    if (placing <= 3) {
+      let valueRange = [0, 0];
+      if (entry.type === 'bronze') valueRange = [5000, 7000];
+      if (entry.type === 'silver') valueRange = [10000, 15000];
+      if (entry.type === 'golden') valueRange = [30000, 45000];
+      if (entry.type === 'hoy') valueRange = [250000, 300000];
+      const valueMultiplier = placing === 1 ? 1 : placing === 2 ? 0.5 : 0.25;
+      const valueBoost = Math.round(rnd(valueRange[0], valueRange[1]) * valueMultiplier);
+      horse.earnings += valueBoost;
+    }
     if (placing === 1) {
       horse.topWins.mareFilly += 1;
       horse.topWins.overall += 1;
       if (earnedBreedPlace) horse.topWins.breed += 1;
       if (entry.type === 'golden') horse.conformationWins.goldenFirsts += 1;
       if (entry.type === 'hoy') {
-        const valueBoost = rnd(80000, 120000);
-        horse.earnings += valueBoost;
         horse.titles = Array.isArray(horse.titles) ? horse.titles : [];
         if (!horse.titles.includes('Global Beauty')) horse.titles.push('Global Beauty');
       }
