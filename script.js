@@ -3368,6 +3368,137 @@ function eligibleForPhTest(mare) {
   return isPregnantMare(mare) && (mare.pregnancyDays || 0) >= 320;
 }
 
+const WATCH_MARE_CALM_PROMPT = 'Mare is calm.';
+const WATCH_MARE_PRELABOR_PROMPTS = [
+  'She keeps circling her stall and glancing at her flank.',
+  'Your mare refuses her evening hay and pins her ears at the walls.',
+  'You notice beads of sweat forming despite the cool air.',
+  'She lies down… gets up… lies down again.',
+  'Her tail lifts repeatedly, and she seems irritated.',
+  'Milk droplets appear on her teats.',
+  'She stares at you longer than usual, breathing deeply.',
+  'The foal alarm flickers… then goes silent.',
+  'Her belly tightens visibly — contractions are starting.',
+  'She paws aggressively and shifts her weight.'
+];
+const WATCH_MARE_LABOR_PHASE2_PROMPTS = [
+  'Her breathing becomes heavy and rhythmic.',
+  'She lies flat on her side — this is it.',
+  'A small white hoof becomes visible.',
+  'Two hooves appear — perfectly aligned.',
+  'She strains harder, muscles trembling.',
+  'The amniotic sac begins to show.',
+  'She whinnies sharply, then goes silent.',
+  'The stall grows tense as she pushes again.',
+  'The foal shifts — progress is steady.',
+  'The head begins to appear after the forelegs.'
+];
+const WATCH_MARE_SUCCESS_PROMPTS = [
+  'With one final push, the foal slides onto the bedding.',
+  'The newborn lies still for a moment — then flicks an ear.',
+  'The foal takes its first shaky breath.',
+  'Tiny legs stretch awkwardly against the straw.',
+  'Your mare immediately turns to nuzzle her baby.',
+  'A soft nickering fills the stall.',
+  'The foal blinks, confused but alive.',
+  'Within minutes, it attempts to lift its head.',
+  'The umbilical cord breaks naturally as the foal shifts.',
+  'The barn feels suddenly quiet — and full of life.'
+];
+const WATCH_MARE_MINOR_COMP_PROMPTS = [
+  'The delivery seems slower than expected.',
+  'Your mare looks exhausted after the final push.',
+  'The foal doesn’t move immediately.',
+  'Something feels slightly off.',
+  'The placenta hasn’t passed yet.',
+  'Your mare remains lying down longer than usual.',
+  'The foal’s breathing is delayed by a few seconds.',
+  'You hesitate — should you step in?',
+  'The hooves appeared slightly uneven before birth.',
+  'The mare’s pulse is elevated.'
+];
+const WATCH_MARE_RARE_EVENT_PROMPTS = {
+  twins: 'You realize there are four tiny hooves.',
+  heightTall: 'The foal is unusually large.',
+  rareCoatA: 'The coat color looks… unexpected.',
+  rareCoatB: 'A distinctive marking catches your eye instantly.',
+  heightSmall: 'The foal looks smaller than usual.',
+  early: 'Suddenly, there is a foal.',
+  potential: 'The foal nickers almost immediately.'
+};
+
+function currentDayKey() {
+  return ((app.year * 12 + app.month) * 31) + app.day;
+}
+
+function mareFoalingProfile(mare) {
+  const personality = String(mare?.personality || '').toLowerCase();
+  const preference = String(mare?.trainingPreference || '').toLowerCase();
+  const mood = String(mare?.mood || '').toLowerCase();
+  let fakeLaborChance = 15;
+  let perfectDeliveryChance = 38;
+  let minorComplicationChance = 10;
+
+  if (personality.includes('spooky') || personality.includes('excitable') || personality.includes('hot-blooded')) {
+    fakeLaborChance += 18;
+    perfectDeliveryChance -= 6;
+    minorComplicationChance += 5;
+  }
+  if (personality.includes('bomb-proof') || personality.includes('easy-going')) {
+    fakeLaborChance -= 6;
+    perfectDeliveryChance += 4;
+    minorComplicationChance -= 2;
+  }
+  if (preference.includes('high')) {
+    fakeLaborChance += 8;
+    minorComplicationChance += 3;
+  }
+  if (preference.includes('low')) {
+    fakeLaborChance -= 3;
+    perfectDeliveryChance += 2;
+  }
+  if (mood.includes('stressed') || mood.includes('frisky')) fakeLaborChance += 5;
+
+  return {
+    fakeLaborChance: clamp(Math.round(fakeLaborChance), 15, 50),
+    perfectDeliveryChance: clamp(Math.round(perfectDeliveryChance), 15, 45),
+    minorComplicationChance: clamp(Math.round(minorComplicationChance), 3, 35)
+  };
+}
+
+function getDailyFoalingState(mare) {
+  if (!mare || !eligibleForPhTest(mare)) return null;
+  const dayKey = currentDayKey();
+  if (mare.dailyFoalingState?.dayKey === dayKey) return mare.dailyFoalingState;
+  const ph = phReadingForMare(mare);
+  const profile = mareFoalingProfile(mare);
+
+  let foalingChance = 0;
+  if (ph >= 7.2 && ph <= 7.8) foalingChance = 5;
+  else if (ph >= 6.0 && ph <= 6.3) foalingChance = rnd(10, 25);
+  else if (ph >= 5.8 && ph <= 5.9) foalingChance = rnd(72, 96);
+  else if (ph >= 6.4 && ph <= 6.7) foalingChance = 16;
+  else if (ph >= 6.8 && ph <= 7.1) foalingChance = 10;
+
+  const laborLikely = rnd(1, 100) <= foalingChance;
+  const fakeLabor = laborLikely && rnd(1, 100) <= profile.fakeLaborChance;
+  const state = {
+    dayKey,
+    ph,
+    laborLikely,
+    fakeLabor,
+    watchPrompt: laborLikely ? pick(WATCH_MARE_PRELABOR_PROMPTS) : WATCH_MARE_CALM_PROMPT
+  };
+  mare.dailyFoalingState = state;
+  return state;
+}
+
+function mareHasVisibleOveroMarking(horse) {
+  const markingA = String(horse?.marking || '').toLowerCase();
+  const markingB = String(horse?.marking2 || '').toLowerCase();
+  return markingA.includes('overo') || markingB.includes('overo');
+}
+
 function phReadingForMare(mare) {
   if (!eligibleForPhTest(mare)) return null;
   ensurePregnancyState(mare);
@@ -4102,11 +4233,19 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   ensurePregnancyState(mare);
   mare.pregnancyDays += Math.max(0, Number(dayAdvance) || 0);
 
-  if (mare.pregnancyDays < (mare.gestationLengthDays || 340)) {
+  if (mare.pregnancyDays < 320) {
     if (mare.pregnancyDays >= 210) mare.weightStatus = 'Overweight';
     else if (mare.pregnancyDays >= 90) mare.weightStatus = pick(['Moderate', 'Fleshy']);
     return;
   }
+
+  const daily = getDailyFoalingState(mare);
+  if (!daily) return;
+  if (!daily.laborLikely || daily.fakeLabor) return;
+  const dayKey = currentDayKey();
+  app.lastFoalingDayKey = app.lastFoalingDayKey || 0;
+  app.foalsBornToday = app.lastFoalingDayKey === dayKey ? (app.foalsBornToday || 0) : 0;
+  if (app.foalsBornToday > 0 && rnd(1, 1000) > 1) return;
 
   const embryo = mare.pregnantEmbryo || null;
   const sire = embryo?.sireId
@@ -4122,7 +4261,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   foal.conformation = foalConformationFromParents(mare, sire || {});
   foal.height = heightFromBreed(foal.breed);
   foal.genetics = foalGeneticsFromParents(mare, sire || {});
-  if (countAllele(foal.genetics.overo, 'O') === 2) {
+  const lethalOveroRisk = mareHasVisibleOveroMarking(mare) && mareHasVisibleOveroMarking(sire || {});
+  if (lethalOveroRisk && countAllele(foal.genetics.overo, 'O') === 2) {
     pushReport(`${mare.name} lost a foal due to lethal frame overo (OO).`);
     delete mare.pregnantBy;
     delete mare.pregnantEmbryo;
@@ -4147,12 +4287,67 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   }
 
   const rare = [];
-  if (rnd(1, 10000) <= 100) rare.push('Twins (high risk)');
-  if (rnd(1, 10000) <= 200) rare.push('Premature foal');
-  if (rnd(1, 10000) <= 150) rare.push('Extra tall genetic spike');
-  if (rnd(1, 10000) <= 50) rare.push('Color mutation');
+  const dramaticEvents = {
+    rareCoat: rnd(1, 100) <= 1,
+    earlyFoal: rnd(1, 100) <= 2,
+    twinBirth: rnd(1, 100) <= 1,
+    heightSurprise: rnd(1, 100) <= 3,
+    potentialSpike: rnd(1, 100) <= 5
+  };
+  if (dramaticEvents.twinBirth) rare.push('Twin birth');
+  if (dramaticEvents.earlyFoal) rare.push('Surprise early foal');
+  if (dramaticEvents.heightSurprise) rare.push('Height surprise');
+  if (dramaticEvents.rareCoat) rare.push('Rare coat');
+  if (dramaticEvents.potentialSpike) rare.push('Potential spike');
+
+  const profile = mareFoalingProfile(mare);
+  const laborLine = pick(WATCH_MARE_LABOR_PHASE2_PROMPTS);
+  pushReport(`${mare.name}: ${laborLine}`);
+
+  let outcome = 'Normal Delivery';
+  if (rnd(1, 100) <= profile.minorComplicationChance) {
+    outcome = 'Minor Complication';
+    const compPrompt = pick(WATCH_MARE_MINOR_COMP_PROMPTS);
+    pushReport(`${mare.name}: ${compPrompt}`);
+    foal.foalWeakUntilDay = 7;
+    if (rnd(1, 100) <= 10) {
+      const debuff = pick(['conformation', 'height', 'health', 'trainability']);
+      if (debuff === 'conformation') foal.conformation = pick(['Bad', 'Acceptable']);
+      if (debuff === 'height') foal.height = rnd(1, 100) <= 50 ? Math.max(12.0, Number(foal.height || 14) - 1.0) : Math.min(19.0, Number(foal.height || 14) + 1.0);
+      if (debuff === 'health') foal.soundnessYears = Math.max(0.5, (foal.soundnessYears || 6) - 2);
+      if (debuff === 'trainability') foal.behavior = Math.max(0, (foal.behavior || 500) - 120);
+      rare.push(`Weak foal debuff: ${debuff}`);
+    }
+  } else if (rnd(1, 100) <= profile.perfectDeliveryChance) {
+    outcome = 'Perfect Delivery';
+    mare.bond = clamp((mare.bond || 0) + 2, -100, 100);
+    pushReport(`${mare.name}: 🌟 PERFECT DELIVERY`);
+    pushReport(`${mare.name}: ${pick(WATCH_MARE_SUCCESS_PROMPTS)}`);
+  } else {
+    pushReport(`${mare.name}: Normal delivery.`);
+  }
+
+  if (dramaticEvents.rareCoat) {
+    foal.coat = pick(COATS.filter((c) => c !== mare.coat && c !== (sire?.coat || '')) || COATS);
+    pushReport(`${mare.name}: ${rnd(1, 100) <= 50 ? WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatA : WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatB}`);
+  }
+  if (dramaticEvents.earlyFoal) {
+    foal.soundnessYears = Math.max(0.5, (foal.soundnessYears || 6) - 1.5);
+    pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.early}`);
+  }
+  if (dramaticEvents.heightSurprise) {
+    const tall = rnd(1, 100) <= 50;
+    foal.height = tall ? Number(rnd(183, 194) / 10).toFixed(1) : Number(rnd(130, 152) / 10).toFixed(1);
+    foal.height = Number(foal.height);
+    pushReport(`${mare.name}: ${tall ? WATCH_MARE_RARE_EVENT_PROMPTS.heightTall : WATCH_MARE_RARE_EVENT_PROMPTS.heightSmall}`);
+  }
+  if (dramaticEvents.potentialSpike) {
+    const skill = pick(Object.keys(foal.potential || { jumping: 100 }));
+    foal.potential[skill] = 110;
+    pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.potential}`);
+  }
   foal.foalVitality = {
-    score: rnd(0, 100),
+    score: outcome === 'Perfect Delivery' ? rnd(60, 100) : outcome === 'Minor Complication' ? rnd(15, 70) : rnd(35, 95),
     shownUntilDay: 180,
     ageDays: 0,
     rareEvents: rare
@@ -4176,12 +4371,51 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   }
 
   newborns.push(foal);
+  if (dramaticEvents.twinBirth) {
+    const twin = baseHorse('untrained', 'player');
+    twin.age = 0;
+    twin.owner = 'Your Stable';
+    twin.gender = pick(['Mare', 'Stallion']);
+    twin.breed = foal.breed;
+    twin.conformation = foalConformationFromParents(mare, sire || {});
+    twin.height = Number((Number(foal.height || heightFromBreed(foal.breed)) + ((Math.random() * 0.6) - 0.3)).toFixed(1));
+    twin.genetics = foalGeneticsFromParents(mare, sire || {});
+    const twinPhenotype = resolvePhenotypeFromGenetics(twin.genetics, twin.breed);
+    twin.coat = twinPhenotype.coat;
+    twin.marking = twinPhenotype.marking;
+    twin.marking2 = twinPhenotype.marking2;
+    twin.faceMarking = twinPhenotype.faceMarking;
+    twin.legMarkings = twinPhenotype.legMarkings;
+    twin.socks = twinPhenotype.socks;
+    twin.modifiers = twinPhenotype.modifiers;
+    if (rnd(1, 100) <= 55) {
+      twin.coat = foal.coat;
+      twin.marking = foal.marking;
+      twin.marking2 = foal.marking2;
+    }
+    twin.potential = foalPotential(mare, sire || {});
+    twin.foalVitality = { score: rnd(10, 75), shownUntilDay: 180, ageDays: 0, rareEvents: ['Twin birth'] };
+    twin.pedigree = twin.pedigree || {};
+    twin.pedigree.dam = { name: mare.name, breed: mare.breed, coat: mare.coat };
+    twin.pedigree.sire = { name: sireName, breed: sire?.breed || embryo?.sireBreed || 'Unknown', coat: sire?.coat || 'Unknown' };
+    ensurePedigreeBase(twin);
+    mare.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
+    if (sire) {
+      sire.offspring = Array.isArray(sire.offspring) ? sire.offspring : [];
+      sire.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
+    }
+    pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.twins}`);
+    newborns.push(twin);
+  }
   pushReport(`${mare.name} foaled ${foal.name} (${foal.gender}) by ${sireName}.`);
+  app.lastFoalingDayKey = dayKey;
+  app.foalsBornToday = (app.foalsBornToday || 0) + 1;
 
   delete mare.pregnantBy;
   delete mare.pregnantEmbryo;
   mare.pregnancyDays = 0;
   mare.gestationLengthDays = 0;
+  mare.dailyFoalingState = null;
 }
 
 
@@ -7752,7 +7986,25 @@ function renderBreeding() {
       <h3>Pregnancy List</h3>
       ${pregnant.length ? pregnant.map((mare) => {
         const daysPregnant = Math.max(0, Math.round(Number(mare.pregnancyDays) || 0));
-        return `<p>${horseDisplayName(mare)}: ${daysPregnant} Days</p>`;
+        const phAction = eligibleForPhTest(mare)
+          ? `<button data-breeding-ph='${mare.id}'>Test pH</button>`
+          : `<span class='small'>pH test available at 320+ days</span>`;
+        const phResult = mare.lastPhReading != null
+          ? `<span class='small'>pH: ${mare.lastPhReading}</span>`
+          : `<span class='small'>pH: --</span>`;
+        const watchButton = eligibleForPhTest(mare)
+          ? `<button data-watch-mare='${mare.id}'>Watch mare</button>`
+          : '';
+        const watchPrompt = mare.lastWatchMarePrompt ? `<span class='small'>${mare.lastWatchMarePrompt}</span>` : '';
+        return `
+          <div class='inline'>
+            <p>${horseDisplayName(mare)}: ${daysPregnant} Days</p>
+            ${phAction}
+            ${phResult}
+            ${watchButton}
+            ${watchPrompt}
+          </div>
+        `;
       }).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
@@ -7760,6 +8012,39 @@ function renderBreeding() {
   if (vetBtn) vetBtn.onclick = () => changeTab('vet');
   const freezerBtn = document.getElementById('breeding-open-freezer');
   if (freezerBtn) freezerBtn.onclick = () => changeTab('freezer');
+  document.querySelectorAll('[data-breeding-ph]').forEach((btn) => {
+    btn.onclick = () => {
+      const mare = app.horses.find((h) => h.id === btn.dataset.breedingPh);
+      if (!mare) return;
+      if (!eligibleForPhTest(mare)) {
+        alert('pH test is only available for mares over 320 pregnancy days.');
+        return;
+      }
+      const reading = phReadingForMare(mare);
+      mare.lastPhReading = reading;
+      vetNote(mare, `${mare.name} milk pH reading: ${reading}.`);
+      renderBreeding();
+      saveGame(false);
+    };
+  });
+  document.querySelectorAll('[data-watch-mare]').forEach((btn) => {
+    btn.onclick = () => {
+      const mare = app.horses.find((h) => h.id === btn.dataset.watchMare);
+      if (!mare) return;
+      if (!eligibleForPhTest(mare)) {
+        mare.lastWatchMarePrompt = WATCH_MARE_CALM_PROMPT;
+        renderBreeding();
+        return;
+      }
+      const daily = getDailyFoalingState(mare);
+      mare.lastWatchMarePrompt = daily?.watchPrompt || WATCH_MARE_CALM_PROMPT;
+      if (daily?.laborLikely && daily?.fakeLabor) {
+        mare.lastWatchMarePrompt = `${daily.watchPrompt} (False alarm)`;
+      }
+      renderBreeding();
+      saveGame(false);
+    };
+  });
 }
 
 function renderSettings() {
