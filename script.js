@@ -143,6 +143,7 @@ const app = {
   npcStuds: [],
   reports: [],
   competitionReports: [],
+  dashboardNewsTab: 'all',
   rescueHorses: [],
   currentBarn: null,
   barnCatalog: [],
@@ -3021,6 +3022,7 @@ function hydrateFromSave(data) {
   app.npcStuds = Array.isArray(data.npcStuds) ? data.npcStuds : [];
   app.reports = Array.isArray(data.reports) ? data.reports : [];
   app.competitionReports = Array.isArray(data.competitionReports) ? data.competitionReports : [];
+  app.dashboardNewsTab = ['all', 'results', 'events', 'breeding', 'payments'].includes(data.dashboardNewsTab) ? data.dashboardNewsTab : 'all';
   app.rescueHorses = Array.isArray(data.rescueHorses) ? data.rescueHorses : [];
   app.currentBarn = data.currentBarn && typeof data.currentBarn === 'object' ? data.currentBarn : null;
   app.barnCatalog = Array.isArray(data.barnCatalog) ? data.barnCatalog : [];
@@ -3262,6 +3264,7 @@ function resetGame() {
   app.npcStuds = [];
   app.reports = [];
   app.competitionReports = [];
+  app.dashboardNewsTab = 'all';
   app.rescueHorses = [];
   app.currentBarn = null;
   app.barnCatalog = [];
@@ -3323,7 +3326,16 @@ function loadGame(manual = true) {
 }
 
 function pushReport(text) {
-  app.reports.push({ date: dateLabel(), text });
+  app.reports.push({ date: dateLabel(), text, category: inferNewsCategory(text) });
+}
+
+function inferNewsCategory(text) {
+  const normalized = (text || '').toLowerCase();
+  if (!normalized) return 'events';
+  if (/(placed|inspection result|show result|competition simulation|won \$|won )/.test(normalized)) return 'results';
+  if (/(foal|foaled|pregnan|semen|straw|embryo|mare|stallion|breeding|delivery|twins)/.test(normalized)) return 'breeding';
+  if (/(bought|buy|sold|sell|paid|fees|price|money|board|lease fee|lease|adopted|purchased|cost|won \$|\$)/.test(normalized)) return 'payments';
+  return 'events';
 }
 
 function pushCompetitionReport(report) {
@@ -4685,7 +4697,20 @@ function buildTabs() {
 function renderDashboard() {
   const reminders = activeRemindersForCurrentMonth();
   const sick = app.horses.filter((h) => h.illnesses.some((i) => i.active)).length;
-  const competitionReports = app.competitionReports.slice(-6).reverse().map((report) => `
+  const newsTabs = [
+    { key: 'all', label: 'All' },
+    { key: 'results', label: 'Results' },
+    { key: 'events', label: 'Events' },
+    { key: 'breeding', label: 'Breeding' },
+    { key: 'payments', label: 'Payments' }
+  ];
+  const activeNewsTab = newsTabs.some((tab) => tab.key === app.dashboardNewsTab) ? app.dashboardNewsTab : 'all';
+  app.dashboardNewsTab = activeNewsTab;
+  const filteredReports = app.reports
+    .filter((report) => activeNewsTab === 'all' || ((report.category || inferNewsCategory(report.text)) === activeNewsTab))
+    .slice(-8)
+    .reverse();
+  const competitionReports = app.competitionReports.slice().reverse().map((report) => `
     <details class='report'>
       <summary>${report.horseName} — ${cap(report.discipline)} ${report.level} (#${report.placing}/${report.fieldSize})</summary>
       <div class='box'>
@@ -4718,7 +4743,10 @@ function renderDashboard() {
       </div>
       <div class="box">
         <h2>Latest Reports</h2>
-        ${app.reports.slice(-8).reverse().map((r) => `<p class='small'>${r.date}: ${r.text}</p>`).join('') || '<p class="small">No reports yet.</p>'}
+        <div class='inline dashboard-news-tabs'>
+          ${newsTabs.map((tab) => `<button type='button' data-news-tab='${tab.key}' class='${activeNewsTab === tab.key ? 'active' : ''}'>${tab.label}</button>`).join('')}
+        </div>
+        ${filteredReports.map((r) => `<p class='small'>${r.date}: ${r.text}</p>`).join('') || '<p class="small">No reports in this tab yet.</p>'}
       </div>
     </div>
     <div class="box">
@@ -4732,6 +4760,13 @@ function renderDashboard() {
       app.closedReminderIds = Array.isArray(app.closedReminderIds) ? app.closedReminderIds : [];
       if (!app.closedReminderIds.includes(btn.dataset.remClose)) app.closedReminderIds.push(btn.dataset.remClose);
       renderDashboard();
+    };
+  });
+  document.querySelectorAll('[data-news-tab]').forEach((btn) => {
+    btn.onclick = () => {
+      app.dashboardNewsTab = btn.dataset.newsTab || 'all';
+      renderDashboard();
+      saveGame(false);
     };
   });
   const clearBtn = document.getElementById('clear-competition-reports');
