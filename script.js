@@ -4337,7 +4337,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   }
   if (dramaticEvents.heightSurprise) {
     const tall = rnd(1, 100) <= 50;
-    foal.height = tall ? Math.min(19.0, Number(foal.height || 14) + 1.2) : Math.max(11.0, Number(foal.height || 14) - 1.2);
+    foal.height = tall ? Number(rnd(183, 194) / 10).toFixed(1) : Number(rnd(130, 152) / 10).toFixed(1);
+    foal.height = Number(foal.height);
     pushReport(`${mare.name}: ${tall ? WATCH_MARE_RARE_EVENT_PROMPTS.heightTall : WATCH_MARE_RARE_EVENT_PROMPTS.heightSmall}`);
   }
   if (dramaticEvents.potentialSpike) {
@@ -4377,7 +4378,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     twin.gender = pick(['Mare', 'Stallion']);
     twin.breed = foal.breed;
     twin.conformation = foalConformationFromParents(mare, sire || {});
-    twin.height = Math.max(11.0, Number(foal.height || heightFromBreed(foal.breed)) - 0.3);
+    twin.height = Number((Number(foal.height || heightFromBreed(foal.breed)) + ((Math.random() * 0.6) - 0.3)).toFixed(1));
     twin.genetics = foalGeneticsFromParents(mare, sire || {});
     const twinPhenotype = resolvePhenotypeFromGenetics(twin.genetics, twin.breed);
     twin.coat = twinPhenotype.coat;
@@ -4387,9 +4388,22 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     twin.legMarkings = twinPhenotype.legMarkings;
     twin.socks = twinPhenotype.socks;
     twin.modifiers = twinPhenotype.modifiers;
+    if (rnd(1, 100) <= 55) {
+      twin.coat = foal.coat;
+      twin.marking = foal.marking;
+      twin.marking2 = foal.marking2;
+    }
     twin.potential = foalPotential(mare, sire || {});
     twin.foalVitality = { score: rnd(10, 75), shownUntilDay: 180, ageDays: 0, rareEvents: ['Twin birth'] };
+    twin.pedigree = twin.pedigree || {};
+    twin.pedigree.dam = { name: mare.name, breed: mare.breed, coat: mare.coat };
+    twin.pedigree.sire = { name: sireName, breed: sire?.breed || embryo?.sireBreed || 'Unknown', coat: sire?.coat || 'Unknown' };
     ensurePedigreeBase(twin);
+    mare.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
+    if (sire) {
+      sire.offspring = Array.isArray(sire.offspring) ? sire.offspring : [];
+      sire.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
+    }
     pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.twins}`);
     newborns.push(twin);
   }
