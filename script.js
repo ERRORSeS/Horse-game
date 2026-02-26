@@ -7752,7 +7752,19 @@ function renderBreeding() {
       <h3>Pregnancy List</h3>
       ${pregnant.length ? pregnant.map((mare) => {
         const daysPregnant = Math.max(0, Math.round(Number(mare.pregnancyDays) || 0));
-        return `<p>${horseDisplayName(mare)}: ${daysPregnant} Days</p>`;
+        const phAction = eligibleForPhTest(mare)
+          ? `<button data-breeding-ph='${mare.id}'>Test pH</button>`
+          : `<span class='small'>pH test available at 320+ days</span>`;
+        const phResult = mare.lastPhReading != null
+          ? `<span class='small'>pH: ${mare.lastPhReading}</span>`
+          : `<span class='small'>pH: --</span>`;
+        return `
+          <div class='inline'>
+            <p>${horseDisplayName(mare)}: ${daysPregnant} Days</p>
+            ${phAction}
+            ${phResult}
+          </div>
+        `;
       }).join('') : '<p class="small">No active pregnancies right now.</p>'}
     </div>
   `;
@@ -7760,6 +7772,21 @@ function renderBreeding() {
   if (vetBtn) vetBtn.onclick = () => changeTab('vet');
   const freezerBtn = document.getElementById('breeding-open-freezer');
   if (freezerBtn) freezerBtn.onclick = () => changeTab('freezer');
+  document.querySelectorAll('[data-breeding-ph]').forEach((btn) => {
+    btn.onclick = () => {
+      const mare = app.horses.find((h) => h.id === btn.dataset.breedingPh);
+      if (!mare) return;
+      if (!eligibleForPhTest(mare)) {
+        alert('pH test is only available for mares over 320 pregnancy days.');
+        return;
+      }
+      const reading = phReadingForMare(mare);
+      mare.lastPhReading = reading;
+      vetNote(mare, `${mare.name} milk pH reading: ${reading}.`);
+      renderBreeding();
+      saveGame(false);
+    };
+  });
 }
 
 function renderSettings() {
