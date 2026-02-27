@@ -177,6 +177,7 @@ const app = {
   barnLessonSelectionId: '',
   barnHorseSelectionId: '',
   marketSelections: {},
+  salesStudFilters: { gender: 'Any', breed: 'Any', age: 'Any' },
   stablehandHired: false
 };
 
@@ -5319,12 +5320,33 @@ function renderMarket() {
 
 function renderSales() {
   const el = document.getElementById('sales');
+  app.salesStudFilters = app.salesStudFilters || { gender: 'Any', breed: 'Any', age: 'Any' };
+  const studGenderOptions = ['Any', ...new Set(app.npcStuds.map((h) => h.gender).filter(Boolean))];
+  const studBreedOptions = ['Any', ...new Set(app.npcStuds.map((h) => h.breed).filter(Boolean))];
+  const studAgeOptions = ['Any', ...new Set(app.npcStuds.map((h) => Number(h.age)).filter((age) => Number.isFinite(age)).sort((a, b) => a - b).map(String))];
+
   el.innerHTML = `
     <h2>Sales Barn</h2>
     <div class='cards' id='player-sales'></div>
     <h2>NPC Sales Ads</h2>
     <div class='cards' id='npc-sales'></div>
     <h2>NPC Stud Ads</h2>
+    <div class='box'>
+      <div class='grid three'>
+        <div>
+          <label>Gender</label>
+          <select id='stud-filter-gender'>${studGenderOptions.map((g) => `<option value='${g}' ${app.salesStudFilters.gender === g ? 'selected' : ''}>${g}</option>`).join('')}</select>
+        </div>
+        <div>
+          <label>Breed</label>
+          <select id='stud-filter-breed'>${studBreedOptions.map((b) => `<option value='${b}' ${app.salesStudFilters.breed === b ? 'selected' : ''}>${b}</option>`).join('')}</select>
+        </div>
+        <div>
+          <label>Age</label>
+          <select id='stud-filter-age'>${studAgeOptions.map((a) => `<option value='${a}' ${app.salesStudFilters.age === a ? 'selected' : ''}>${a}</option>`).join('')}</select>
+        </div>
+      </div>
+    </div>
     <div class='cards' id='npc-studs'></div>
   `;
   const cards = el.querySelector('#player-sales');
@@ -5361,7 +5383,18 @@ function renderSales() {
     npcCards.append(b);
   });
 
-  app.npcStuds.forEach((h) => {
+  const filteredStuds = app.npcStuds.filter((h) => {
+    const genderMatch = app.salesStudFilters.gender === 'Any' || h.gender === app.salesStudFilters.gender;
+    const breedMatch = app.salesStudFilters.breed === 'Any' || h.breed === app.salesStudFilters.breed;
+    const ageMatch = app.salesStudFilters.age === 'Any' || String(h.age) === app.salesStudFilters.age;
+    return genderMatch && breedMatch && ageMatch;
+  }).sort((a, b) => {
+    if (a.gender !== b.gender) return String(a.gender).localeCompare(String(b.gender));
+    if (a.breed !== b.breed) return String(a.breed).localeCompare(String(b.breed));
+    return (Number(a.age) || 0) - (Number(b.age) || 0);
+  });
+
+  filteredStuds.forEach((h) => {
     const b = document.createElement('div');
     b.className = 'box';
     b.innerHTML = `<h3>${horseDisplayName(h)}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>Stud Fee: ${money(h.fee)}</p><p class='small'>Stud: ${h.owner}</p><details><summary>View Profile</summary>${horseProfileMarkup(h)}</details><button data-stud='${h.studId}'>Purchase Straw</button>`;
@@ -5372,6 +5405,20 @@ function renderSales() {
       render();
     };
     studCards.append(b);
+  });
+  if (!filteredStuds.length) studCards.innerHTML = "<p class='small'>No stud ads match the selected filters.</p>";
+
+  const syncStudFilters = () => {
+    app.salesStudFilters = {
+      gender: document.getElementById('stud-filter-gender')?.value || 'Any',
+      breed: document.getElementById('stud-filter-breed')?.value || 'Any',
+      age: document.getElementById('stud-filter-age')?.value || 'Any'
+    };
+    renderSales();
+  };
+  ['stud-filter-gender', 'stud-filter-breed', 'stud-filter-age'].forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) node.onchange = syncStudFilters;
   });
 }
 
@@ -6618,9 +6665,10 @@ function renderVet() {
         <button id='vet-heal'>Treat Active Illness ($750)</button>
       </div>
       <div class='box'>
-        <h3>Reproduction</h3><p class='small'>Stallion: semen only. Mare: AI/flush/transfer. Gelding: no repro services.</p>
+        <h3>Reproduction</h3><p class='small'>Stallion: semen or live cover. Mares retired to breeding can do AI/flush, while active or retired mares can receive embryo transfers. Gelding: no repro services.</p>
         <label>Stallion for collection</label><select id='vet-stallion'>${stallions.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
         <button id='vet-collect'>Semen Collection ($500)</button>
+        <button id='vet-live-cover'>Live Cover ($900)</button>
         <label>Mare for breeding</label><select id='vet-mare'>${mares.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
         <label>Use Straw</label><select id='vet-straw'>${app.semenStraws.map((s) => `<option value='${s.id}'>${s.stallionName} (${s.id})</option>`).join('')}</select>
         <button id='vet-ai'>Artificial Insemination ($200)</button>
@@ -6737,6 +6785,26 @@ function renderVet() {
     render();
   };
 
+  document.getElementById('vet-live-cover').onclick = () => {
+    const mare = selectedMare();
+    const stallion = selectedStallion();
+    if (!mare || !stallion || !tryCharge(900)) return;
+    if (!mare.retiredToBreeding) {
+      app.money += 900;
+      return alert('Mare must be retired to breeding for live cover.');
+    }
+    const success = rnd(1, 100) > 25;
+    if (success) {
+      mare.pregnantBy = stallion.name;
+      mare.pregnancyDays = 0;
+      mare.gestationLengthDays = rnd(320, 360);
+      vetNote(mare, `Live cover success for ${mare.name} with ${stallion.name}. Pregnancy started at day 0.`);
+    } else {
+      vetNote(mare, `Live cover attempt failed for ${mare.name} with ${stallion.name}.`);
+    }
+    render();
+  };
+
   document.getElementById('vet-ai').onclick = () => {
     const mare = selectedMare();
     const strawId = document.getElementById('vet-straw').value;
@@ -6782,7 +6850,7 @@ function renderVet() {
     const embryoId = document.getElementById('vet-embryo').value;
     const embryoIndex = app.embryos.findIndex((e) => e.id === embryoId);
     if (!mare || embryoIndex < 0 || !tryCharge(1000)) return;
-    if (!mare.retiredToBreeding) { app.money += 1000; return alert('Recipient mare must be retired to breeding for embryo transfer.'); }
+    if (mare.retiredForever) { app.money += 1000; return alert('Retired mares cannot receive embryo transfers.'); }
     const embryo = app.embryos[embryoIndex];
     const success = rnd(1, 100) > 35;
     if (success) {
