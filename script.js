@@ -6826,7 +6826,6 @@ function renderVet() {
     const strawId = document.getElementById('vet-straw').value;
     const straw = app.semenStraws.find((s) => s.id === strawId);
     if (!mare || !straw || !tryCharge(1000)) return;
-    if (!mare.retiredToBreeding) { app.money += 1000; return alert('Mare must be retired to breeding for embryo flush.'); }
     app.semenStraws = app.semenStraws.filter((x) => x.id !== straw.id);
     const n = rnd(0, 2);
     for (let i = 0; i < n; i++) {
