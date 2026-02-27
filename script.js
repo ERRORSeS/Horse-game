@@ -7527,7 +7527,7 @@ function processAgingAndMortality(horse) {
   if (horse.age < 25) return false;
   const chance = horse.age === 25 ? 8 : horse.age === 26 ? 14 : horse.age === 27 ? 24 : horse.age === 28 ? 35 : horse.age === 29 ? 55 : 85;
   if (rnd(1, 100) <= chance) {
-    pushReport(`${horse.name} passed away from old age at ${horse.age}.`);
+    pushReport(`${horse.name} has passed away from Old Age at the age of ${horse.age}.`);
     return true;
   }
   return false;
