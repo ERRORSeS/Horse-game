@@ -3087,9 +3087,13 @@ function hydrateFromSave(data) {
     h.modifiers = h.modifiers || phenotype.modifiers;
     if (isPregnantMare(h)) {
       if (!Number.isFinite(h.pregnancyDays) && Number.isFinite(h.gestation)) h.pregnancyDays = Math.max(0, Math.round(h.gestation * 30));
-      if (!Number.isFinite(h.gestationLengthDays)) h.gestationLengthDays = Number.isFinite(h.foalDue) ? Math.round(h.foalDue * 30) : rnd(320, 360);
+      ensureMareGestationProfile(h);
+      if (!Number.isFinite(h.gestationLengthDays)) {
+        h.gestationLengthDays = Number.isFinite(h.foalDue) ? Math.round(h.foalDue * 30) : gestationLengthForMare(h);
+      }
       ensurePregnancyState(h);
     } else {
+      ensureMareGestationProfile(h);
       h.pregnancyDays = Number.isFinite(h.pregnancyDays) ? h.pregnancyDays : 0;
       h.gestationLengthDays = Number.isFinite(h.gestationLengthDays) ? h.gestationLengthDays : 0;
     }
@@ -3368,8 +3372,31 @@ function isPregnantMare(horse) {
 
 function ensurePregnancyState(mare) {
   if (!mare) return;
+  ensureMareGestationProfile(mare);
   if (!Number.isFinite(mare.pregnancyDays)) mare.pregnancyDays = 0;
-  if (!Number.isFinite(mare.gestationLengthDays)) mare.gestationLengthDays = rnd(320, 360);
+  if (!Number.isFinite(mare.gestationLengthDays)) mare.gestationLengthDays = gestationLengthForMare(mare);
+}
+
+function ensureMareGestationProfile(mare) {
+  if (!mare) return;
+  if (!Number.isFinite(mare.gestationPrefMinDays) || !Number.isFinite(mare.gestationPrefMaxDays)) {
+    const prefMin = rnd(322, 348);
+    const prefMax = Math.min(358, prefMin + rnd(6, 14));
+    mare.gestationPrefMinDays = prefMin;
+    mare.gestationPrefMaxDays = Math.max(prefMin + 4, prefMax);
+  }
+}
+
+function gestationLengthForMare(mare) {
+  ensureMareGestationProfile(mare);
+  const prefMin = clamp(Math.round(mare.gestationPrefMinDays || 330), 320, 358);
+  const prefMax = clamp(Math.round(mare.gestationPrefMaxDays || 344), prefMin + 1, 360);
+  const outlierRoll = rnd(1, 100);
+  if (outlierRoll <= 84) return rnd(prefMin, prefMax);
+  const earlyOutlierMin = Math.max(320, prefMin - rnd(2, 10));
+  const lateOutlierMax = Math.min(360, prefMax + rnd(2, 10));
+  if (rnd(0, 1) === 0) return rnd(earlyOutlierMin, prefMin);
+  return rnd(prefMax, lateOutlierMax);
 }
 
 function pregnancyStage(horse) {
@@ -3540,6 +3567,15 @@ function phReadingForMare(mare) {
   const actual = minPh + Math.random() * (maxPh - minPh);
   const reading = clamp(actual + ((Math.random() * 0.4) - 0.2), 5.8, 7.8);
   return Number(reading.toFixed(2));
+}
+
+function phReadingInterpretation(reading) {
+  if (!Number.isFinite(reading)) return 'Result invalid. Retest milk pH.';
+  if (reading >= 7.2) return 'Foaling is not expected anytime soon.';
+  if (reading >= 6.8) return 'Still likely several days away from foaling.';
+  if (reading >= 6.4) return 'Foaling could be within a couple of days.';
+  if (reading >= 6.0) return 'Foaling is likely approaching very soon.';
+  return 'Foaling appears imminent.';
 }
 
 function canCompeteUnderSaddle(horse) {
@@ -4171,7 +4207,9 @@ function baseHorse(type = 'trained', origin = 'player') {
       sireDam: null,
       damSire: null,
       damDam: null
-    }
+    },
+    gestationPrefMinDays: 0,
+    gestationPrefMaxDays: 0
   };
   horse.personality = rolledPersonality(horse.gender);
   const [prefMin, prefMax] = trainingSessionBounds(horse.trainingPreference);
@@ -4179,6 +4217,7 @@ function baseHorse(type = 'trained', origin = 'player') {
   horse.height = heightFromBreed(horse.breed);
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
+  ensureMareGestationProfile(horse);
   horse.genetics = randomGenetics();
   const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
   horse.coat = phenotype.coat;
@@ -4899,7 +4938,7 @@ function createHorseCard(horse) {
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
-    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: Confirmed (timeline hidden — use pH testing only).</p>` : ''}
+    ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: Confirmed (timeline hidden — each mare has a hidden preferred gestation window with occasional outliers, so use pH testing only).</p>` : ''}
     ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
     ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
     <button data-action='save-turnout'>Save Turn-out</button>
@@ -5035,7 +5074,7 @@ function createHorseCard(horse) {
         }
         const reading = phReadingForMare(horse);
         horse.lastPhReading = reading;
-        vetNote(horse, `${horse.name} milk pH reading: ${reading}.`);
+        vetNote(horse, `${horse.name} milk pH reading: ${reading}. ${phReadingInterpretation(reading)} Gestation length can vary normally between mares.`);
       }
       if (action === 'save-turnout') {
         if (horse.leaseLocked) {
@@ -6669,7 +6708,7 @@ function renderVet() {
     if (success) {
       mare.pregnantBy = straw.stallionName;
       mare.pregnancyDays = 0;
-      mare.gestationLengthDays = rnd(320, 360);
+      mare.gestationLengthDays = gestationLengthForMare(mare);
       vetNote(mare, `AI success for ${mare.name} using ${straw.stallionName}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `AI attempt failed for ${mare.name} using ${straw.stallionName}.`);
@@ -6711,7 +6750,7 @@ function renderVet() {
       app.embryos.splice(embryoIndex, 1);
       mare.pregnantEmbryo = embryo;
       mare.pregnancyDays = 0;
-      mare.gestationLengthDays = rnd(320, 360);
+      mare.gestationLengthDays = gestationLengthForMare(mare);
       vetNote(mare, `Embryo transfer successful for ${mare.name}. Pregnancy started at day 0.`);
     } else {
       vetNote(mare, `Embryo transfer failed for ${mare.name}.`);
