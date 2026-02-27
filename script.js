@@ -193,6 +193,16 @@ const dateLabel = () => `Y${app.year}M${app.month}`;
 const cap = (t) => t[0].toUpperCase() + t.slice(1);
 const starText = (n) => '★'.repeat(clamp(Number(n) || 1, 1, 5));
 
+function randomFocusToleranceMonths() {
+  const group = pick([
+    [2, 3],
+    [4, 6],
+    [6, 8],
+    [10, 12]
+  ]);
+  return rnd(group[0], group[1]);
+}
+
 function shuffledIndices(size) {
   const indexes = Array.from({ length: Math.max(0, size) }, (_, i) => i);
   for (let i = indexes.length - 1; i > 0; i -= 1) {
@@ -2773,8 +2783,7 @@ function conformationMovementScore(horse) {
 
 function ensureFocusProfile(horse) {
   if (Number.isFinite(horse.focusToleranceMonths)) return;
-  const options = [rnd(2, 3), rnd(4, 6), rnd(6, 8), rnd(10, 12)];
-  horse.focusToleranceMonths = pick(options);
+  horse.focusToleranceMonths = randomFocusToleranceMonths();
 }
 
 function updateRingPerformance(horse) {
@@ -3199,7 +3208,7 @@ function hydrateFromSave(data) {
     h.confidenceFlat = Number.isFinite(h.confidenceFlat) ? h.confidenceFlat : 50;
     h.fatigue = Number.isFinite(h.fatigue) ? h.fatigue : 0;
     h.focus = Number.isFinite(h.focus) ? h.focus : 50;
-    h.focusToleranceMonths = Number.isFinite(h.focusToleranceMonths) ? h.focusToleranceMonths : rnd(2, 12);
+    h.focusToleranceMonths = Number.isFinite(h.focusToleranceMonths) ? h.focusToleranceMonths : randomFocusToleranceMonths();
     h.ringPerformance = Number.isFinite(h.ringPerformance) ? h.ringPerformance : 100;
     h.lastShowMonthIndex = Number.isFinite(h.lastShowMonthIndex) ? h.lastShowMonthIndex : currentMonthIndex();
     h.postFoalingRecoveryMonths = Number.isFinite(h.postFoalingRecoveryMonths) ? h.postFoalingRecoveryMonths : 0;
@@ -4114,7 +4123,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     confidenceFlat: 50,
     fatigue: 0,
     focus: 50,
-    focusToleranceMonths: rnd(2, 12),
+    focusToleranceMonths: randomFocusToleranceMonths(),
     ringPerformance: 100,
     lastShowMonthIndex: currentMonthIndex(),
     postFoalingRecoveryMonths: 0,
@@ -4896,7 +4905,11 @@ function createHorseCard(horse) {
   const face = horse.faceMarking || 'Faint';
   const marking2 = horse.marking2 || 'None';
   node.querySelector('.subline').textContent = `${horse.height} | ${horse.coat} | ${horse.marking || 'None'} | ${marking2} | Socks (${socks}) | Face: ${face} | ${horse.age} | ${horse.gender} | ${horseLifeStage(horse)}`;
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
+  const experience = conformationExperienceTier(horse);
+  const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
+  horse.focusToleranceMonths = focusTolerance;
+  const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${v}</li>`; });
@@ -5160,6 +5173,9 @@ function horseProfileMarkup(horse) {
   const titlesLine = titles ? `<p class='small'>Titles: ${titles}</p>` : '';
   const record = showRecordSummary(horse);
   const showRecordLine = `<p class='small'>Show record: ${record.total} (${record.first}-${record.second}-${record.third})</p>`;
+  const experience = conformationExperienceTier(horse);
+  const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
+  const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
   const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
   const visible = visibleIllnesses(horse, revealAll);
   const hiddenCount = (horse.illnesses || []).length - visible.length;
@@ -5175,6 +5191,7 @@ function horseProfileMarkup(horse) {
       <div><h4>Dressage Training</h4><ul class='stats'>${dressage}</ul></div>
     </div>
     <p class='small'>Wins: Championships ${horse.championships}, Reserves ${horse.reserves}, Total Points ${horse.totalPoints}, Best of breed ${horse.topWins?.breed || 0}.</p>
+    <p class='small'>Experience: ${experience.label} • Focus tolerance: ${focusTolerance} month(s) • Ring Performance: ${ringPerformancePercent}%</p>
     ${leaseLine}
     ${showRecordLine}
     ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — #${latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
@@ -7643,7 +7660,7 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
     const qol = clamp((horse.qualityOfLife || 65) / 10, 1, 10);
     const movement = conformationMovementScore(horse);
     const dedication = clamp((((horse.bond || 0) + 100) / 20) + ((horse.trainingSessionsThisMonth || 0) * 0.35) + (horse.manualTrainingThisMonth ? 0.7 : 0) + ((horse.managed?.fed ? 0.4 : 0) + (horse.managed?.vet ? 0.4 : 0) + (horse.managed?.farrier ? 0.4 : 0)), 1, 10);
-    const experience = conformationExperienceTier(horse);
+  const experience = conformationExperienceTier(horse);
     const ringPerformance = clamp((horse.ringPerformance || 100) / 10, 1, 10);
     const ringScore = clamp(ringPerformance + experience.bonus, 1, 10);
     const performanceRollPercent = rnd(-3, 3) / 100;
@@ -7695,6 +7712,9 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
     }
     horse.showResults = Array.isArray(horse.showResults) ? horse.showResults : [];
     horse.showResults.push({ date: dateLabel(), discipline: 'conformation', level: entry.label, score, placing, prize, resultText: `${score.toFixed(2)}/10` });
+    const ringBehaviorPrompts = ringScore >= 7.2
+      ? ['Horse stands square', 'Horse reacts to handler well', 'Horse is focused']
+      : ['Horse is distracted', 'Horse ignores signals', 'Horse is overly excited'];
     pushCompetitionReport({
       horseName: horseDisplayName(horse),
       horseBreed: horse.breed,
@@ -7707,6 +7727,7 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
       timeScoreText: `${score.toFixed(2)}/10`,
       date: dateLabel(),
       highlights: [
+        ...ringBehaviorPrompts,
         `Mood ${mood.toFixed(1)}/10`,
         `Type ${conf.toFixed(1)}/10`,
         `Body ${weight.toFixed(1)}/10`,
