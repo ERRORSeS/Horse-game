@@ -6665,10 +6665,10 @@ function renderVet() {
         <button id='vet-heal'>Treat Active Illness ($750)</button>
       </div>
       <div class='box'>
-        <h3>Reproduction</h3><p class='small'>Stallion: semen or live cover. Mares retired to breeding can do AI/flush, while active or retired mares can receive embryo transfers. Gelding: no repro services.</p>
+        <h3>Reproduction</h3><p class='small'>Stallion: semen or live cover. Live cover and AI/flush require mares retired to breeding. Embryo transfer recipients do not need to be retired to breeding. Gelding: no repro services.</p>
         <label>Stallion for collection</label><select id='vet-stallion'>${stallions.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
         <button id='vet-collect'>Semen Collection ($500)</button>
-        <button id='vet-live-cover'>Live Cover ($900)</button>
+        <button id='vet-live-cover'>Live Cover (No Fee)</button>
         <label>Mare for breeding</label><select id='vet-mare'>${mares.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
         <label>Use Straw</label><select id='vet-straw'>${app.semenStraws.map((s) => `<option value='${s.id}'>${s.stallionName} (${s.id})</option>`).join('')}</select>
         <button id='vet-ai'>Artificial Insemination ($200)</button>
@@ -6788,11 +6788,8 @@ function renderVet() {
   document.getElementById('vet-live-cover').onclick = () => {
     const mare = selectedMare();
     const stallion = selectedStallion();
-    if (!mare || !stallion || !tryCharge(900)) return;
-    if (!mare.retiredToBreeding) {
-      app.money += 900;
-      return alert('Mare must be retired to breeding for live cover.');
-    }
+    if (!mare || !stallion) return;
+    if (!mare.retiredToBreeding) return alert('Mare must be retired to breeding for live cover.');
     const success = rnd(1, 100) > 25;
     if (success) {
       mare.pregnantBy = stallion.name;
