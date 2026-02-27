@@ -2725,8 +2725,10 @@ function evaluateFeedEffects(horse) {
   if (hasInjury && hasCalmFeed && hasRecoveryFeed && weightDelta > 0) {
     weightDelta = 0;
   }
+  const usingWeightGainFeed = (horse.feedPlan || []).some((f) => f.type === 'Weight Gain');
+  const usingDietFeed = (horse.feedPlan || []).some((f) => f.type === 'Diet Feed');
   const feedMatchesHorse = !wrongFeedUsed && (!moodOverride || !NEGATIVE_MOODS.includes(moodOverride));
-  if (feedMatchesHorse) {
+  if (feedMatchesHorse && !usingWeightGainFeed && !usingDietFeed) {
     weightDelta = 0;
   }
   if (wrongFeedUsed) {
@@ -2740,6 +2742,56 @@ function evaluateFeedEffects(horse) {
   horse.trainingBoost = trainingBoost;
   horse.competitionBoost = competitionBoost;
   horse.healingBoost = healingBoost;
+}
+
+function applyPostFoalingRecovery(horse) {
+  if (!horse || !Number.isFinite(horse.postFoalingRecoveryMonths)) return;
+  if (horse.postFoalingRecoveryMonths <= 0) return;
+  horse.postFoalingRecoveryMonths -= 1;
+  if (horse.postFoalingRecoveryMonths <= 0) {
+    horse.weightStatus = 'Moderate';
+    pushReport(`${horse.name} has recovered post-foaling and returned to Moderate weight naturally.`);
+  }
+}
+
+function conformationExperienceTier(horse) {
+  const count = (horse.showResults || []).length;
+  if (count >= 35) return { label: 'Pro', bonus: 1.5 };
+  if (count >= 20) return { label: 'Very Experienced', bonus: 1.0 };
+  if (count >= 10) return { label: 'Experienced', bonus: 0.5 };
+  if (count >= 6) return { label: 'Mild Experience', bonus: 0 };
+  return { label: 'Poor Experience', bonus: -(rnd(5, 10) / 10) };
+}
+
+function conformationMovementScore(horse) {
+  const mood = conformationMoodScore(horse);
+  const personality = conformationPersonalityScore(horse);
+  const baseline = ((mood * 0.6) + (personality * 0.4));
+  const moodAdjust = POSITIVE_MOODS.includes(horse.mood) ? 0.8 : NEGATIVE_MOODS.includes(horse.mood) ? -1.2 : 0;
+  return clamp(baseline + moodAdjust, 1, 10);
+}
+
+function ensureFocusProfile(horse) {
+  if (Number.isFinite(horse.focusToleranceMonths)) return;
+  const options = [rnd(2, 3), rnd(4, 6), rnd(6, 8), rnd(10, 12)];
+  horse.focusToleranceMonths = pick(options);
+}
+
+function updateRingPerformance(horse) {
+  ensureFocusProfile(horse);
+  const monthIdx = currentMonthIndex();
+  if (!Number.isFinite(horse.lastShowMonthIndex)) horse.lastShowMonthIndex = monthIdx;
+  if (!Number.isFinite(horse.ringPerformance)) horse.ringPerformance = 100;
+  const monthsOff = Math.max(0, monthIdx - horse.lastShowMonthIndex);
+  const overPreferred = monthsOff - Math.max(1, horse.focusToleranceMonths || 1);
+  if (overPreferred >= 1) {
+    const drop = 15 + ((overPreferred - 1) * 5);
+    horse.ringPerformance = clamp((horse.ringPerformance || 100) - drop, 0, 100);
+  }
+  if ((horse.showEntriesThisMonth || 0) > 0) {
+    horse.lastShowMonthIndex = monthIdx;
+    horse.ringPerformance = clamp((horse.ringPerformance || 100) + 10, 0, 100);
+  }
 }
 
 function applyAutoTraining(horse) {
@@ -3147,6 +3199,10 @@ function hydrateFromSave(data) {
     h.confidenceFlat = Number.isFinite(h.confidenceFlat) ? h.confidenceFlat : 50;
     h.fatigue = Number.isFinite(h.fatigue) ? h.fatigue : 0;
     h.focus = Number.isFinite(h.focus) ? h.focus : 50;
+    h.focusToleranceMonths = Number.isFinite(h.focusToleranceMonths) ? h.focusToleranceMonths : rnd(2, 12);
+    h.ringPerformance = Number.isFinite(h.ringPerformance) ? h.ringPerformance : 100;
+    h.lastShowMonthIndex = Number.isFinite(h.lastShowMonthIndex) ? h.lastShowMonthIndex : currentMonthIndex();
+    h.postFoalingRecoveryMonths = Number.isFinite(h.postFoalingRecoveryMonths) ? h.postFoalingRecoveryMonths : 0;
     h.tack = typeof h.tack === 'object' && h.tack ? h.tack : {};
     h.tack.bridle = h.tack.bridle || 'Snaffle Bridle';
     h.tack.bit = h.tack.bit || 'Loose Ring Snaffle';
@@ -4058,6 +4114,10 @@ function baseHorse(type = 'trained', origin = 'player') {
     confidenceFlat: 50,
     fatigue: 0,
     focus: 50,
+    focusToleranceMonths: rnd(2, 12),
+    ringPerformance: 100,
+    lastShowMonthIndex: currentMonthIndex(),
+    postFoalingRecoveryMonths: 0,
     extraPotential: false,
     healthGenetics: pick(['Low', 'Medium', 'High']),
     injuryProtection: {},
@@ -4435,6 +4495,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   mare.pregnancyDays = 0;
   mare.gestationLengthDays = 0;
   mare.dailyFoalingState = null;
+  mare.postFoalingRecoveryMonths = 2;
 }
 
 
@@ -4724,7 +4785,7 @@ function renderDashboard() {
         <p><strong>Competition:</strong> ${report.competitionName}</p>
         <p><strong>Penalties:</strong> ${report.penaltiesText || '-'}</p>
         <p><strong>Time/Score:</strong> ${report.timeScoreText || '-'}</p>
-        ${report.conformationBreakdown ? `<p><strong>Conformation Score Breakdown:</strong> Mood ${report.conformationBreakdown.mood}, Type ${report.conformationBreakdown.type}, Body ${report.conformationBreakdown.body}, Personality ${report.conformationBreakdown.personality}, QOL ${report.conformationBreakdown.qualityOfLife}, Random ${report.conformationBreakdown.random >= 0 ? '+' : ''}${report.conformationBreakdown.random}</p>` : ''}
+        ${report.conformationBreakdown ? `<p><strong>Conformation Score Breakdown:</strong> Mood ${report.conformationBreakdown.mood}, Type ${report.conformationBreakdown.type}, Body ${report.conformationBreakdown.body}, Personality ${report.conformationBreakdown.personality}, Movement ${report.conformationBreakdown.movement ?? 'N/A'}, Ring ${report.conformationBreakdown.ringPerformance ?? 'N/A'}, Dedication ${report.conformationBreakdown.dedication ?? 'N/A'}, QOL ${report.conformationBreakdown.qualityOfLife}, Roll ${report.conformationBreakdown.performanceRollPercent >= 0 ? '+' : ''}${report.conformationBreakdown.performanceRollPercent ?? 0}%</p>` : ''}
         <p><strong>Horse Name:</strong> ${report.horseName}</p>
         <p><strong>Horse Breed:</strong> ${report.horseBreed}</p>
         <p><strong>Date:</strong> ${report.date}</p>
@@ -7395,6 +7456,7 @@ function monthlyProgress() {
   const conformationBreedPlacings = new Set();
   app.horses.forEach((h) => {
     processPregnancy(h, newborns);
+    applyPostFoalingRecovery(h);
     if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 30;
     applyStablehandCare(h);
     maybeAddRandomIllness(h);
@@ -7430,6 +7492,7 @@ function monthlyProgress() {
     applyStablehandCare(h);
     resolvePendingCompetitions(h);
     resolvePendingConformationShows(h, conformationBreedPlacings);
+    updateRingPerformance(h);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
         const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
@@ -7578,8 +7641,15 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
     const weight = conformationBodyScore(horse);
     const personality = conformationPersonalityScore(horse);
     const qol = clamp((horse.qualityOfLife || 65) / 10, 1, 10);
-    const randomLight = rnd(-3, 3) / 10;
-    const scoreRaw = (mood * 0.24) + (conf * 0.29) + (weight * 0.22) + (personality * 0.08) + (qol * 0.15) + randomLight;
+    const movement = conformationMovementScore(horse);
+    const dedication = clamp((((horse.bond || 0) + 100) / 20) + ((horse.trainingSessionsThisMonth || 0) * 0.35) + (horse.manualTrainingThisMonth ? 0.7 : 0) + ((horse.managed?.fed ? 0.4 : 0) + (horse.managed?.vet ? 0.4 : 0) + (horse.managed?.farrier ? 0.4 : 0)), 1, 10);
+    const experience = conformationExperienceTier(horse);
+    const ringPerformance = clamp((horse.ringPerformance || 100) / 10, 1, 10);
+    const ringScore = clamp(ringPerformance + experience.bonus, 1, 10);
+    const performanceRollPercent = rnd(-3, 3) / 100;
+    const scoreBase = (mood * 0.2) + (conf * 0.2) + (weight * 0.1) + (personality * 0.1) + (qol * 0.15) + (dedication * 0.1) + (movement * 0.15);
+    const scoreWithRing = scoreBase * (0.85 + (ringScore / 10 * 0.15));
+    const scoreRaw = scoreWithRing * (1 + performanceRollPercent);
     const score = clamp(Number(scoreRaw.toFixed(2)), 1, 10);
     const fieldSize = entry.slots || rnd(8, 10);
     let placing;
@@ -7641,7 +7711,10 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
         `Type ${conf.toFixed(1)}/10`,
         `Body ${weight.toFixed(1)}/10`,
         `Personality ${personality.toFixed(1)}/10`,
-        `Quality of life ${qol.toFixed(1)}/10`
+        `Movement ${movement.toFixed(1)}/10`,
+        `Ring performance ${ringScore.toFixed(1)}/10 (${experience.label})`,
+        `Quality of life ${qol.toFixed(1)}/10`,
+        `${performanceRollPercent >= 0 ? '+' : ''}${(performanceRollPercent * 100).toFixed(1)}% performance roll`
       ],
       comment: `Overall conformation score: ${score.toFixed(2)}/10.`,
       suggestion: 'Keep quality of life and body condition stable to maintain strong conformation placements.',
@@ -7651,7 +7724,11 @@ function resolvePendingConformationShows(horse, monthlyBreedPlaced) {
         body: Number(weight.toFixed(1)),
         personality: Number(personality.toFixed(1)),
         qualityOfLife: Number(qol.toFixed(1)),
-        random: Number(randomLight.toFixed(1))
+        dedication: Number(dedication.toFixed(1)),
+        movement: Number(movement.toFixed(1)),
+        ringPerformance: Number(ringScore.toFixed(1)),
+        experienceTier: experience.label,
+        performanceRollPercent: Number((performanceRollPercent * 100).toFixed(1))
       }
     });
     pushReport(`${horse.name} ${entry.label}: placed #${placing}/${fieldSize} with ${score.toFixed(2)}. ${prize ? `Won ${money(prize)}.` : 'No prize this time.'}`);
