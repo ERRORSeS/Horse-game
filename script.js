@@ -3091,7 +3091,7 @@ function hydrateFromSave(data) {
   app.npcStuds = Array.isArray(data.npcStuds) ? data.npcStuds : [];
   app.reports = Array.isArray(data.reports) ? data.reports : [];
   app.competitionReports = Array.isArray(data.competitionReports) ? data.competitionReports : [];
-  app.dashboardNewsTab = ['all', 'results', 'events', 'breeding', 'payments'].includes(data.dashboardNewsTab) ? data.dashboardNewsTab : 'all';
+  app.dashboardNewsTab = ['all', 'results', 'events', 'breeding', 'payments', 'health'].includes(data.dashboardNewsTab) ? data.dashboardNewsTab : 'all';
   app.rescueHorses = Array.isArray(data.rescueHorses) ? data.rescueHorses : [];
   app.currentBarn = data.currentBarn && typeof data.currentBarn === 'object' ? data.currentBarn : null;
   app.barnCatalog = Array.isArray(data.barnCatalog) ? data.barnCatalog : [];
@@ -3409,6 +3409,7 @@ function inferNewsCategory(text) {
   if (!normalized) return 'events';
   if (/(placed|inspection result|show result|competition simulation|won \$|won )/.test(normalized)) return 'results';
   if (/(foal|foaled|pregnan|semen|straw|embryo|mare|stallion|breeding|delivery|twins)/.test(normalized)) return 'breeding';
+  if (/(passed away|developed|injury|illness|sick|diagnosed|recovered|strain|sore|soundness|unridable|kissing spines|vet)/.test(normalized)) return 'health';
   if (/(bought|buy|sold|sell|paid|fees|price|money|board|lease fee|lease|adopted|purchased|cost|won \$|\$)/.test(normalized)) return 'payments';
   return 'events';
 }
@@ -4784,7 +4785,8 @@ function renderDashboard() {
     { key: 'results', label: 'Results' },
     { key: 'events', label: 'Events' },
     { key: 'breeding', label: 'Breeding' },
-    { key: 'payments', label: 'Payments' }
+    { key: 'payments', label: 'Payments' },
+    { key: 'health', label: 'Health' }
   ];
   const activeNewsTab = newsTabs.some((tab) => tab.key === app.dashboardNewsTab) ? app.dashboardNewsTab : 'all';
   app.dashboardNewsTab = activeNewsTab;
@@ -7527,7 +7529,7 @@ function processAgingAndMortality(horse) {
   if (horse.age < 25) return false;
   const chance = horse.age === 25 ? 8 : horse.age === 26 ? 14 : horse.age === 27 ? 24 : horse.age === 28 ? 35 : horse.age === 29 ? 55 : 85;
   if (rnd(1, 100) <= chance) {
-    pushReport(`${horse.name} passed away from old age at ${horse.age}.`);
+    pushReport(`${horse.name} has passed away from Old Age at the age of ${horse.age}.`);
     return true;
   }
   return false;
