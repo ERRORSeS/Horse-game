@@ -3270,6 +3270,8 @@ function hydrateFromSave(data) {
     h.soundnessExpiredMonths = Number.isFinite(h.soundnessExpiredMonths) ? h.soundnessExpiredMonths : 0;
     h.lastSoundnessIssueMonth = Number.isFinite(h.lastSoundnessIssueMonth) ? h.lastSoundnessIssueMonth : 0;
     h.unridable = h.unridable || false;
+    h.inRecovery = Boolean(h.inRecovery);
+    h.recoveryReturnTab = h.recoveryReturnTab === 'retiredBreeding' ? 'retiredBreeding' : 'active';
     h.illnesses = Array.isArray(h.illnesses) ? h.illnesses : [];
     h.illnesses.forEach((ill) => {
       ill.remaining = Number.isFinite(ill.remaining) ? ill.remaining : 0;
@@ -4208,6 +4210,8 @@ function baseHorse(type = 'trained', origin = 'player') {
     owner: 'Your Stable',
     bredBy: origin === 'npc' ? pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']) : 'Unknown',
     retiredToBreeding: false,
+    inRecovery: false,
+    recoveryReturnTab: 'active',
     retiredForever: false,
     managed: { fed: false, vet: false, farrier: false, showEntry: false, breedersEntry: false, trained: false },
     due: { checkup: true, farrier: false },
@@ -4878,7 +4882,7 @@ function createHorseCard(horse) {
       return article;
     })();
   const activeIssue = (horse.illnesses || []).find((i) => i.active);
-  const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name}` : '';
+  const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name} (${activeIssue.severity || 'Unknown'})` : '';
   const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
   const visible = visibleIllnesses(horse, revealAll);
   const hiddenCount = Math.max(0, (horse.illnesses || []).length - visible.length);
@@ -4943,6 +4947,11 @@ function createHorseCard(horse) {
     <label>Rename horse</label><input type='text' value='${horse.name}' />
     <button data-action='rename'>Save Name</button>
     <button data-action='retire-breeding'>${horse.retiredToBreeding ? 'Return to Competition' : 'Retire to Breeding'}</button>
+    ${(horse.inRecovery && !horse.retiredForever)
+    ? "<button data-action='return-recovery'>Return from Recovery</button>"
+    : (!horse.retiredForever && (horse.age >= 3 || horse.retiredToBreeding)
+      ? "<button data-action='send-recovery'>Send to Recovery</button>"
+      : '')}
     <button data-action='retire-forever'>Retire to Greener Pastures</button>
     <button data-action='list-sale'>List in Sale Barn ($)</button>
     <button data-action='npc-sell'>Sell to NPC (${money(horseWorth(horse))})</button>
@@ -5060,6 +5069,17 @@ function createHorseCard(horse) {
         } else {
           horse.retiredToBreeding = !horse.retiredToBreeding;
         }
+        if (horse.inRecovery && !horse.retiredToBreeding) {
+          horse.recoveryReturnTab = 'active';
+        }
+      }
+      if (action === 'send-recovery') {
+        horse.inRecovery = true;
+        horse.recoveryReturnTab = horse.retiredToBreeding ? 'retiredBreeding' : 'active';
+      }
+      if (action === 'return-recovery') {
+        horse.inRecovery = false;
+        horse.retiredToBreeding = horse.recoveryReturnTab === 'retiredBreeding';
       }
       if (action === 'retire-forever') horse.retiredForever = true;
       if (action === 'list-sale') {
@@ -5160,7 +5180,7 @@ function createHorseCard(horse) {
 
 function horseProfileMarkup(horse) {
   const activeIssue = horse.illnesses?.find((i) => i.active);
-  const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name}` : '';
+  const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name} (${activeIssue.severity || 'Unknown'})` : '';
   const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
   const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
   const latest = horse.showResults?.length ? horse.showResults[horse.showResults.length - 1] : null;
@@ -5204,11 +5224,12 @@ function renderHorses() {
   const el = document.getElementById('horses');
   const playerHorses = app.horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
   const foals = playerHorses.filter((h) => h.age < 3);
-  const retiredBreeding = playerHorses.filter((h) => h.retiredToBreeding && !h.retiredForever);
+  const retiredBreeding = playerHorses.filter((h) => h.retiredToBreeding && !h.retiredForever && !h.inRecovery);
+  const recovery = playerHorses.filter((h) => h.inRecovery && !h.retiredForever);
   const retired = playerHorses.filter((h) => h.retiredForever);
-  const active = playerHorses.filter((h) => h.age >= 3 && !h.retiredToBreeding && !h.retiredForever);
+  const active = playerHorses.filter((h) => h.age >= 3 && !h.retiredToBreeding && !h.retiredForever && !h.inRecovery);
 
-  const allHorses = [...active, ...retiredBreeding, ...retired, ...foals];
+  const allHorses = [...active, ...retiredBreeding, ...recovery, ...retired, ...foals];
   if (!app.selectedHorseId && allHorses.length) {
     app.selectedHorseId = allHorses[0].id;
   }
@@ -5249,6 +5270,7 @@ function renderHorses() {
     <h2>Your Horses</h2>
     ${tableSection('Active Horses', active, true)}
     ${tableSection('Retired for Breeding', retiredBreeding)}
+    ${tableSection('Recovery', recovery)}
     ${tableSection('Retired', retired)}
     ${tableSection('Foals & Young Horses', foals)}
     <div id='horse-profile' class='horse-profile'></div>
@@ -6665,7 +6687,7 @@ function renderVet() {
         <button id='vet-heal'>Treat Active Illness ($750)</button>
       </div>
       <div class='box'>
-        <h3>Reproduction</h3><p class='small'>Stallion: semen or live cover. Live cover and AI/flush require mares retired to breeding. Embryo transfer recipients do not need to be retired to breeding. Gelding: no repro services.</p>
+        <h3>Reproduction</h3><p class='small'>Stallion: semen or live cover. Live cover and AI require mares retired to breeding. Embryo flush can be done on any mare. Embryo transfer recipients do not need to be retired to breeding. Gelding: no repro services.</p>
         <label>Stallion for collection</label><select id='vet-stallion'>${stallions.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('')}</select>
         <button id='vet-collect'>Semen Collection ($500)</button>
         <button id='vet-live-cover'>Live Cover (No Fee)</button>
@@ -7988,13 +8010,20 @@ function renderFreezer() {
       </div>
       <div class='box'>
         <h3>Embryos (${app.embryos.length})</h3>
-        ${app.embryos.length ? app.embryos.map((e) => `<p>${e.donor} × ${e.sire} <span class='small'>(${e.id})</span></p>`).join('') : '<p class="small">No embryos stored.</p>'}
+        ${app.embryos.length ? app.embryos.map((e) => `<p>${e.donor} × ${e.sire} <span class='small'>(${e.id})</span> <button data-remove-embryo='${e.id}'>Remove</button></p>`).join('') : '<p class="small">No embryos stored.</p>'}
       </div>
     </div>
   `;
   panel.querySelectorAll('[data-remove-straw]').forEach((btn) => {
     btn.onclick = () => {
       app.semenStraws = app.semenStraws.filter((s) => s.id !== btn.dataset.removeStraw);
+      renderFreezer();
+      saveGame(false);
+    };
+  });
+  panel.querySelectorAll('[data-remove-embryo]').forEach((btn) => {
+    btn.onclick = () => {
+      app.embryos = app.embryos.filter((e) => e.id !== btn.dataset.removeEmbryo);
       renderFreezer();
       saveGame(false);
     };
