@@ -183,6 +183,8 @@ const app = {
 
 const options = {};
 const SAVE_KEY = 'horse_game_save_v1';
+const SAVE_SLOTS_KEY = 'horse_game_saves_v2';
+const DEFAULT_SAVE_SLOT = 'Main Save';
 const tabs = ['dashboard', 'horses', 'barn', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -3371,10 +3373,67 @@ function resetGame() {
   saveGame(false);
 }
 
-function saveGame(manual = true) {
+function readSaveSlotsStore() {
   try {
+    const raw = localStorage.getItem(SAVE_SLOTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === 'object' && parsed.slots && typeof parsed.slots === 'object') {
+      return {
+        activeSlot: typeof parsed.activeSlot === 'string' ? parsed.activeSlot : '',
+        slots: parsed.slots
+      };
+    }
+  } catch (error) {
+    console.error('Failed to read save slots', error);
+  }
+  return { activeSlot: '', slots: {} };
+}
+
+function writeSaveSlotsStore(store) {
+  localStorage.setItem(SAVE_SLOTS_KEY, JSON.stringify({
+    version: 1,
+    activeSlot: store.activeSlot || '',
+    slots: store.slots || {}
+  }));
+}
+
+function saveSlotNames() {
+  const store = readSaveSlotsStore();
+  return Object.keys(store.slots || {}).sort((a, b) => a.localeCompare(b));
+}
+
+function resolveSelectedSaveName() {
+  const select = document.getElementById('saveSlotSelect');
+  const input = document.getElementById('saveNameInput');
+  const fromInput = (input?.value || '').trim();
+  const fromSelect = (select?.value || '').trim();
+  return fromInput || fromSelect || DEFAULT_SAVE_SLOT;
+}
+
+function refreshSaveSlotsUi(selectedName = '') {
+  const select = document.getElementById('saveSlotSelect');
+  if (!select) return;
+  const names = saveSlotNames();
+  const next = selectedName || names[0] || '';
+  select.innerHTML = names.length
+    ? names.map((name) => `<option value="${name}">${name}</option>`).join('')
+    : '<option value="">No saves yet</option>';
+  if (next && names.includes(next)) select.value = next;
+}
+
+function saveGame(manual = true, saveName = '') {
+  try {
+    const slotName = (saveName || resolveSelectedSaveName()).trim() || DEFAULT_SAVE_SLOT;
+    const store = readSaveSlotsStore();
+    store.slots[slotName] = {
+      updatedAt: new Date().toISOString(),
+      payload: serializeAppState()
+    };
+    store.activeSlot = slotName;
+    writeSaveSlotsStore(store);
     localStorage.setItem(SAVE_KEY, serializeAppState());
-    if (manual) pushReport('Game saved successfully.');
+    refreshSaveSlotsUi(slotName);
+    if (manual) pushReport(`Game saved to "${slotName}".`);
     return true;
   } catch (error) {
     if (manual) alert('Unable to save game in this browser/environment.');
@@ -3383,21 +3442,44 @@ function saveGame(manual = true) {
   }
 }
 
-function loadGame(manual = true) {
+function loadGame(manual = true, saveName = '') {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const store = readSaveSlotsStore();
+    const slotName = (saveName || resolveSelectedSaveName() || store.activeSlot || '').trim();
+    const slot = slotName ? store.slots?.[slotName] : null;
+    let raw = slot?.payload || '';
+    if (!raw) raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
       if (manual) alert('No saved game found yet.');
       return false;
     }
     hydrateFromSave(JSON.parse(raw));
-    if (manual) pushReport('Game loaded successfully.');
+    if (slotName) {
+      store.activeSlot = slotName;
+      writeSaveSlotsStore(store);
+      refreshSaveSlotsUi(slotName);
+    }
+    if (manual) pushReport(`Game loaded${slotName ? ` from "${slotName}"` : ''} successfully.`);
     return true;
   } catch (error) {
     if (manual) alert('Failed to load saved game data.');
     console.error('Load failed', error);
     return false;
   }
+}
+
+function deleteSaveSlot(saveName = '') {
+  const slotName = (saveName || resolveSelectedSaveName()).trim();
+  if (!slotName) return false;
+  const store = readSaveSlotsStore();
+  if (!store.slots?.[slotName]) return false;
+  delete store.slots[slotName];
+  if (store.activeSlot === slotName) {
+    store.activeSlot = Object.keys(store.slots)[0] || '';
+  }
+  writeSaveSlotsStore(store);
+  refreshSaveSlotsUi(store.activeSlot);
+  return true;
 }
 
 function pushReport(text) {
@@ -8385,6 +8467,9 @@ const skipHourBtn = document.getElementById('skipHourBtn');
 const addMoneyBtn = document.getElementById('addMoneyBtn');
 const saveGameBtn = document.getElementById('saveGameBtn');
 const loadGameBtn = document.getElementById('loadGameBtn');
+const deleteSaveBtn = document.getElementById('deleteSaveBtn');
+const saveNameInput = document.getElementById('saveNameInput');
+const saveSlotSelect = document.getElementById('saveSlotSelect');
 const resetGameBtn = document.getElementById('resetGameBtn');
 const moneyLabel = document.getElementById('moneyLabel');
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
@@ -8412,11 +8497,32 @@ if (moneyLabel) {
     saveGame(false);
   };
 }
-if (saveGameBtn) saveGameBtn.onclick = () => { if (saveGame(true)) render(); };
-if (loadGameBtn) loadGameBtn.onclick = () => { if (loadGame(true)) render(); };
+if (saveGameBtn) saveGameBtn.onclick = () => {
+  const saveName = resolveSelectedSaveName();
+  if (saveGame(true, saveName)) render();
+};
+if (loadGameBtn) loadGameBtn.onclick = () => {
+  const saveName = resolveSelectedSaveName();
+  if (loadGame(true, saveName)) render();
+};
+if (deleteSaveBtn) deleteSaveBtn.onclick = () => {
+  const saveName = resolveSelectedSaveName();
+  if (!saveName) return;
+  if (!confirm(`Delete saved game "${saveName}"?`)) return;
+  if (deleteSaveSlot(saveName)) pushReport(`Deleted save "${saveName}".`);
+  render();
+};
+if (saveSlotSelect) saveSlotSelect.onchange = () => {
+  if (saveNameInput) saveNameInput.value = '';
+};
 if (resetGameBtn) resetGameBtn.onclick = () => {
   if (!confirm('Reset game? This clears saved progress and starts fresh.')) return;
-  try { localStorage.removeItem(SAVE_KEY); } catch (error) { console.error('Reset save failed', error); }
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(SAVE_SLOTS_KEY);
+  } catch (error) {
+    console.error('Reset save failed', error);
+  }
   resetGame();
   render();
 };
@@ -8440,6 +8546,8 @@ function bootstrap() {
     loadGame(false);
     ensurePanels();
     buildTabs();
+    const store = readSaveSlotsStore();
+    refreshSaveSlotsUi(store.activeSlot || saveSlotNames()[0] || '');
     render();
   } catch (error) {
     console.error('Startup failed', error);
