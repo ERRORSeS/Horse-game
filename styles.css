@@ -26,6 +26,11 @@ body {
 }
 .topbar h1 { margin: 0 0 .5rem; font-size: 1.5rem; }
 .status { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+#saveNameInput,
+#saveSlotSelect {
+  width: 180px;
+  margin: 0;
+}
 .tabs {
   display: flex;
   flex-wrap: wrap;
