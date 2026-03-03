@@ -3410,6 +3410,14 @@ function resolveSelectedSaveName() {
   return fromInput || fromSelect || '';
 }
 
+function resolveLoadSaveName() {
+  const select = document.getElementById('saveSlotSelect');
+  const input = document.getElementById('saveNameInput');
+  const fromSelect = (select?.value || '').trim();
+  const fromInput = (input?.value || '').trim();
+  return fromSelect || fromInput || '';
+}
+
 function refreshSaveSlotsUi(selectedName = '') {
   const select = document.getElementById('saveSlotSelect');
   if (!select) return;
@@ -3448,7 +3456,11 @@ function loadGame(manual = true, saveName = '') {
     const slotName = (saveName || resolveSelectedSaveName() || store.activeSlot || '').trim();
     const slot = slotName ? store.slots?.[slotName] : null;
     let raw = slot?.payload || '';
-    if (!raw) raw = localStorage.getItem(SAVE_KEY);
+    if (!raw && !slotName) raw = localStorage.getItem(SAVE_KEY);
+    if (!raw && slotName) {
+      if (manual) alert(`Saved game "${slotName}" was not found.`);
+      return false;
+    }
     if (!raw) {
       if (manual) alert('No saved game found yet.');
       return false;
@@ -8515,7 +8527,7 @@ if (saveGameBtn) saveGameBtn.onclick = () => {
   }
 };
 if (loadGameBtn) loadGameBtn.onclick = () => {
-  const saveName = resolveSelectedSaveName();
+  const saveName = resolveLoadSaveName();
   if (loadGame(true, saveName)) render();
 };
 if (deleteSaveBtn) deleteSaveBtn.onclick = () => {
