@@ -2300,7 +2300,29 @@ function injuryRecoveryMonths(severity) {
   if (severity === 'Medium') return rnd(2, 4);
   if (severity === 'More Than Medium') return rnd(4, 7);
   if (severity === 'Severe') return rnd(8, 12);
-  return rnd(12, 16);
+  return rnd(12, 20);
+}
+
+function hasRecoveryFeed(horse) {
+  return (horse.feedPlan || []).some((f) => f.type === 'Recovery' && Number(f.grams) > 0);
+}
+
+function applyLastingInjuryCareerLimit(horse, severity) {
+  if (!horse || !['Severe', 'Very Severe'].includes(severity)) return;
+  const chance = severity === 'Very Severe' ? 55 : 25;
+  if (rnd(1, 100) > chance) return;
+  const capByDiscipline = {
+    jumping: 6,
+    dressage: 5,
+    hunter: 6,
+    eventing: 5
+  };
+  horse.careerLevelCaps = horse.careerLevelCaps || {};
+  Object.entries(capByDiscipline).forEach(([discipline, capIdx]) => {
+    const current = Number.isFinite(horse.careerLevelCaps[discipline]) ? horse.careerLevelCaps[discipline] : capIdx;
+    horse.careerLevelCaps[discipline] = Math.min(current, capIdx);
+  });
+  pushReport(`${horse.name} has lingering damage after ${severity.toLowerCase()} injury recovery and can no longer compete at the most serious upper levels.`);
 }
 
 function soundnessLossRange(severity) {
@@ -2752,6 +2774,10 @@ function evaluateFeedEffects(horse) {
   if (moodOverride) horse.mood = moodOverride;
   horse.lastFeedMoodOverride = moodOverride || '';
   horse.lastFeedIssue = feedIssue;
+  if (hasInjury && !hasRecoveryFeed(horse)) {
+    trainingBoost -= 3;
+    competitionBoost -= 6;
+  }
   horse.trainingBoost = trainingBoost;
   horse.competitionBoost = competitionBoost;
   horse.healingBoost = healingBoost;
@@ -3250,6 +3276,7 @@ function hydrateFromSave(data) {
     h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
     h.handTrainingSessionsThisMonth = Number.isFinite(h.handTrainingSessionsThisMonth) ? h.handTrainingSessionsThisMonth : 0;
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
+    h.careerLevelCaps = h.careerLevelCaps && typeof h.careerLevelCaps === 'object' ? h.careerLevelCaps : {};
     h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
     h.hasJointSupport = h.hasJointSupport || false;
     h.bond = Number.isFinite(h.bond) ? h.bond : 0;
@@ -3708,7 +3735,8 @@ function phReadingForMare(mare) {
 function canCompeteUnderSaddle(horse) {
   if (horse?.isLessonHorse && !horse?.barnAvailable) return false;
   const pregnancy = pregnancyStage(horse);
-  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete;
+  const hasActiveIllness = (horse?.illnesses || []).some((i) => i.active);
+  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete && !hasActiveIllness;
 }
 
 function horseLifeStage(horse) {
@@ -4099,7 +4127,9 @@ function requiredSkillBand(discipline, level) {
 function effectiveDisciplineSkill(horse, discipline) {
   const raw = horseDisciplineAverage(horse, discipline);
   const talentBoost = horse.extraPotential ? 3 : 0;
-  return Math.min(raw + talentBoost, horse.potential[discipline] || 100);
+  const activeImpact = (horse.illnesses || []).filter((i) => i.active).reduce((sum, i) => sum + (Number(i.impact) || 0), 0);
+  const injuryDebuff = Math.round(activeImpact * 0.5);
+  return Math.max(0, Math.min(raw + talentBoost - injuryDebuff, horse.potential[discipline] || 100));
 }
 
 function horseSkillScore(horse) {
@@ -4174,6 +4204,9 @@ function highestAllowedLevelIndex(horse, discipline) {
     const [minNeeded] = requiredSkillBand(discipline, lvl);
     if (score >= minNeeded) maxIdx = idx;
   });
+  if (horse.careerLevelCaps && Number.isFinite(horse.careerLevelCaps[discipline])) {
+    maxIdx = Math.min(maxIdx, horse.careerLevelCaps[discipline]);
+  }
   return maxIdx;
 }
 
@@ -7663,10 +7696,17 @@ function monthlyProgress() {
       return;
     }
     h.illnesses.forEach((i) => {
-      if (i.active && i.remaining > 0) i.remaining -= 1;
-      if (i.active && i.remaining > 0 && h.healingBoost) i.remaining -= 1;
+      if (i.active && i.remaining > 0) {
+        if (!hasRecoveryFeed(h)) {
+          pushReport(`${h.name} is still recovering from ${i.name}. Recovery feed is required before healing progresses.`);
+        } else {
+          i.remaining -= 1;
+          if (i.remaining > 0 && h.healingBoost) i.remaining -= 1;
+        }
+      }
       if (i.active && i.remaining <= 0) {
         i.active = false;
+        applyLastingInjuryCareerLimit(h, i.severity);
         if (i.retirementRisk && rnd(1, 100) <= i.retirementRisk) {
           h.retiredToBreeding = true;
           pushReport(`${h.name} recovered from ${i.name} but was retired to breeding due to lasting issues.`);
