@@ -3407,7 +3407,7 @@ function resolveSelectedSaveName() {
   const input = document.getElementById('saveNameInput');
   const fromInput = (input?.value || '').trim();
   const fromSelect = (select?.value || '').trim();
-  return fromInput || fromSelect || DEFAULT_SAVE_SLOT;
+  return fromInput || fromSelect || '';
 }
 
 function refreshSaveSlotsUi(selectedName = '') {
@@ -8470,8 +8470,18 @@ const loadGameBtn = document.getElementById('loadGameBtn');
 const deleteSaveBtn = document.getElementById('deleteSaveBtn');
 const saveNameInput = document.getElementById('saveNameInput');
 const saveSlotSelect = document.getElementById('saveSlotSelect');
+const toggleSavePanelBtn = document.getElementById('toggleSavePanelBtn');
+const savePanel = document.getElementById('savePanel');
 const resetGameBtn = document.getElementById('resetGameBtn');
 const moneyLabel = document.getElementById('moneyLabel');
+
+function setSavePanelOpen(isOpen) {
+  if (!savePanel || !toggleSavePanelBtn) return;
+  savePanel.classList.toggle('hidden', !isOpen);
+  savePanel.setAttribute('aria-hidden', String(!isOpen));
+  toggleSavePanelBtn.setAttribute('aria-expanded', String(isOpen));
+  toggleSavePanelBtn.textContent = isOpen ? 'Save/Load ▴' : 'Save/Load ▾';
+}
 if (skipBtn) skipBtn.onclick = () => { monthlyProgress(); render(); saveGame(false); };
 if (skipDayBtn) skipDayBtn.onclick = () => { advanceOneDay(); render(); saveGame(false); };
 if (skipHourBtn) skipHourBtn.onclick = () => {
@@ -8499,7 +8509,10 @@ if (moneyLabel) {
 }
 if (saveGameBtn) saveGameBtn.onclick = () => {
   const saveName = resolveSelectedSaveName();
-  if (saveGame(true, saveName)) render();
+  if (saveGame(true, saveName)) {
+    if (saveNameInput) saveNameInput.value = '';
+    render();
+  }
 };
 if (loadGameBtn) loadGameBtn.onclick = () => {
   const saveName = resolveSelectedSaveName();
@@ -8515,6 +8528,13 @@ if (deleteSaveBtn) deleteSaveBtn.onclick = () => {
 if (saveSlotSelect) saveSlotSelect.onchange = () => {
   if (saveNameInput) saveNameInput.value = '';
 };
+if (toggleSavePanelBtn) {
+  toggleSavePanelBtn.onclick = () => {
+    const isOpen = toggleSavePanelBtn.getAttribute('aria-expanded') === 'true';
+    setSavePanelOpen(!isOpen);
+  };
+}
+
 if (resetGameBtn) resetGameBtn.onclick = () => {
   if (!confirm('Reset game? This clears saved progress and starts fresh.')) return;
   try {
@@ -8548,6 +8568,7 @@ function bootstrap() {
     buildTabs();
     const store = readSaveSlotsStore();
     refreshSaveSlotsUi(store.activeSlot || saveSlotNames()[0] || '');
+    setSavePanelOpen(false);
     render();
   } catch (error) {
     console.error('Startup failed', error);
