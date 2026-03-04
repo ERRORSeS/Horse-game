@@ -1934,7 +1934,7 @@ function buildTrainingRpgSteps(discipline, config) {
   return steps;
 }
 
-function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConfig) {
+function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConfig, exercise = '') {
   app.trainingRpgFeedback = '';
   app.trainingRpgSummary = null;
   const steps = buildTrainingRpgSteps(discipline, config);
@@ -1945,6 +1945,7 @@ function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConf
   return {
     horseId: horse.id,
     discipline,
+    exercise,
     action,
     variant,
     steps,
@@ -7191,13 +7192,16 @@ function renderTraining() {
           failChance: chanceEntry.failChance
         } : null);
         const d = session.discipline;
-        let gain = result.outcome === 'success' ? rnd(Math.max(1, result.skillBase), Math.max(2, result.skillBase + 2)) : result.outcome === 'neutral' ? Math.max(0, result.skillBase - 1) : 0;
+        let gain = result.outcome === 'success' ? rnd(6, 9) : result.outcome === 'neutral' ? rnd(3, 5) : rnd(1, 2);
         if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
           gain = 0;
           horse.mood = 'No energy';
         }
         if (gain > 0) {
-          const skill = pick(EXERCISE_MENU[d] || EXERCISE_MENU.jumping);
+          const selectedSkill = session.exercise || exerciseSelect.value;
+          const defaultSkill = (EXERCISE_MENU[d] || EXERCISE_MENU.jumping)[0];
+          const skillPool = EXERCISE_MENU[d] || EXERCISE_MENU.jumping;
+          const skill = skillPool.includes(selectedSkill) ? selectedSkill : defaultSkill;
           if (d === 'dressage') horse.stats.dressage[skill] = clampSkill(horse, d, (horse.stats.dressage[skill] || 0) + gain);
           else if (d === 'jumping' || d === 'hunter') horse.stats.jumping[skill] = clampSkill(horse, d, (horse.stats.jumping[skill] || 0) + gain);
           else if (d === 'eventing') {
@@ -7405,7 +7409,7 @@ function renderTraining() {
       render();
       return;
     }
-    app.trainingRpg = buildTrainingRpgSession(h, d, app.trainingRpgConfig);
+    app.trainingRpg = buildTrainingRpgSession(h, d, app.trainingRpgConfig, exerciseSelect.value);
     renderTraining();
   };
 
