@@ -7231,18 +7231,18 @@ function renderTraining() {
           failChance: chanceEntry.failChance
         } : null);
         const d = session.discipline;
-        let gain = result.outcome === 'success' ? rnd(6, 9) : result.outcome === 'neutral' ? rnd(3, 5) : rnd(1, 2);
+        let gainRoll = result.outcome === 'success' ? rnd(7, 9) : result.outcome === 'neutral' ? rnd(4, 6) : rnd(1, 3);
         if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
-          gain = 0;
+          gainRoll = 0;
           horse.mood = 'No energy';
         }
-        const selectedSkill = session.exercise || exerciseSelect.value;
-        const gainResult = applyRpgSkillGain(horse, d, selectedSkill, gain);
+        const selectedSkill = session.exercise || (app.trainingSelection?.exercise || '');
         horse.managed.trained = true;
         const outcomeLabel = result.outcome === 'success' ? 'Success' : result.outcome === 'neutral' ? 'Partial' : 'Fail';
-        const summary = session.summary || { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '', trainedSkill: gainResult.skill };
-        summary.skill += gainResult.actualGain;
-        summary.trainedSkill = gainResult.skill || summary.trainedSkill || '';
+        const summary = session.summary || { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '', trainedSkill: selectedSkill, skillRollTotal: 0, skillRollCount: 0 };
+        summary.trainedSkill = selectedSkill || summary.trainedSkill || '';
+        summary.skillRollTotal = (summary.skillRollTotal || 0) + gainRoll;
+        summary.skillRollCount = (summary.skillRollCount || 0) + 1;
         summary.confidence += result.confidenceDelta;
         summary.bond += result.bondDelta + (session.pendingEvent?.bondBonus || 0);
         summary.fatigue += result.fatigueGain;
@@ -7253,6 +7253,10 @@ function renderTraining() {
         pushReport(`${horse.name} interactive ${actionLabel(session.action)}: ${outcomeLabel}.`);
         app.trainingRpg = advanceTrainingRpgSession(session, horse);
         if (!app.trainingRpg) {
+          const averagedGain = summary.skillRollCount ? clamp(Math.round(summary.skillRollTotal / summary.skillRollCount), 1, 9) : 0;
+          const gainResult = applyRpgSkillGain(horse, d, summary.trainedSkill, averagedGain);
+          summary.skill = gainResult.actualGain;
+          summary.trainedSkill = gainResult.skill || summary.trainedSkill || '';
           app.trainingRpgSummary = {
             horseName: horse.name,
             discipline: d,
