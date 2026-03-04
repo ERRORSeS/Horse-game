@@ -2618,7 +2618,7 @@ function evaluateFeedEffects(horse) {
   const totalGrams = (horse.feedPlan || []).reduce((sum, f) => sum + f.grams, 0);
   const hasSportsFeed = (horse.feedPlan || []).some((f) => f.type === 'Sports Feed');
   const hasCalmFeed = (horse.feedPlan || []).some((f) => f.type === 'Calm nd Ez');
-  const hasRecoveryFeed = (horse.feedPlan || []).some((f) => f.type === 'Recovery');
+  const hasRecoveryFeedInPlan = (horse.feedPlan || []).some((f) => f.type === 'Recovery');
   const hasOldHorseFeed = (horse.feedPlan || []).some((f) => f.type === 'Old Horse Feed');
   const hasJointSupport = (horse.feedPlan || []).some((f) => f.type === 'Joint Support');
   const pref = horse.preferredFeedGrams || 150;
@@ -2757,7 +2757,7 @@ function evaluateFeedEffects(horse) {
   if ((horse.age >= 20 || horse.retiredToBreeding || horse.retiredForever) && !hasOldHorseFeed) {
     weightDelta -= 1;
   }
-  if (hasInjury && hasCalmFeed && hasRecoveryFeed && weightDelta > 0) {
+  if (hasInjury && hasCalmFeed && hasRecoveryFeedInPlan && weightDelta > 0) {
     weightDelta = 0;
   }
   const usingWeightGainFeed = (horse.feedPlan || []).some((f) => f.type === 'Weight Gain');
@@ -2774,7 +2774,7 @@ function evaluateFeedEffects(horse) {
   if (moodOverride) horse.mood = moodOverride;
   horse.lastFeedMoodOverride = moodOverride || '';
   horse.lastFeedIssue = feedIssue;
-  if (hasInjury && !hasRecoveryFeed(horse)) {
+  if (hasInjury && !hasRecoveryFeedInPlan) {
     trainingBoost -= 3;
     competitionBoost -= 6;
   }
