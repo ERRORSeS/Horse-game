@@ -6025,6 +6025,33 @@ function applyNormalTrainingSession(horse, discipline, exercise) {
   pushReport(`${horse.name} completed normal training in ${cap(discipline)} (${exercise}) and gained +${gain} skill.`);
 }
 
+function applyRpgSkillGain(horse, discipline, exercise, gain) {
+  if (!gain) return { actualGain: 0, skill: exercise || '' };
+  const skillPool = EXERCISE_MENU[discipline] || EXERCISE_MENU.jumping;
+  const fallbackSkill = skillPool[0];
+  const skill = skillPool.includes(exercise) ? exercise : fallbackSkill;
+
+  const applyInto = (bucket, skillName) => {
+    if (!bucket || bucket[skillName] == null) return 0;
+    const before = bucket[skillName] || 0;
+    const after = clampSkill(horse, discipline, before + gain);
+    bucket[skillName] = after;
+    return Math.max(0, after - before);
+  };
+
+  if (discipline === 'dressage') {
+    return { actualGain: applyInto(horse.stats.dressage, skill), skill };
+  }
+  if (discipline === 'jumping' || discipline === 'hunter') {
+    return { actualGain: applyInto(horse.stats.jumping, skill), skill };
+  }
+
+  let actualGain = 0;
+  if (horse.stats.dressage[skill] != null) actualGain += applyInto(horse.stats.dressage, skill);
+  if (horse.stats.jumping[skill] != null) actualGain += applyInto(horse.stats.jumping, skill);
+  return { actualGain, skill };
+}
+
 function competitionWarmupReadinessBonus(session) {
   const st = session.warmupState || { tension: 50, focus: 50, confidence: 50, energy: 50, timing: 50 };
   const quality = Math.round((st.focus + st.confidence + st.energy + st.timing - st.tension) / 4);
@@ -7197,22 +7224,13 @@ function renderTraining() {
           gain = 0;
           horse.mood = 'No energy';
         }
-        if (gain > 0) {
-          const selectedSkill = session.exercise || exerciseSelect.value;
-          const defaultSkill = (EXERCISE_MENU[d] || EXERCISE_MENU.jumping)[0];
-          const skillPool = EXERCISE_MENU[d] || EXERCISE_MENU.jumping;
-          const skill = skillPool.includes(selectedSkill) ? selectedSkill : defaultSkill;
-          if (d === 'dressage') horse.stats.dressage[skill] = clampSkill(horse, d, (horse.stats.dressage[skill] || 0) + gain);
-          else if (d === 'jumping' || d === 'hunter') horse.stats.jumping[skill] = clampSkill(horse, d, (horse.stats.jumping[skill] || 0) + gain);
-          else if (d === 'eventing') {
-            if (horse.stats.dressage[skill] != null) horse.stats.dressage[skill] = clampSkill(horse, d, horse.stats.dressage[skill] + gain);
-            if (horse.stats.jumping[skill] != null) horse.stats.jumping[skill] = clampSkill(horse, d, horse.stats.jumping[skill] + gain);
-          }
-        }
+        const selectedSkill = session.exercise || exerciseSelect.value;
+        const gainResult = applyRpgSkillGain(horse, d, selectedSkill, gain);
         horse.managed.trained = true;
         const outcomeLabel = result.outcome === 'success' ? 'Success' : result.outcome === 'neutral' ? 'Partial' : 'Fail';
-        const summary = session.summary || { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '' };
-        summary.skill += gain;
+        const summary = session.summary || { skill: 0, confidence: 0, bond: 0, fatigue: 0, notableEvent: '', trainedSkill: gainResult.skill };
+        summary.skill += gainResult.actualGain;
+        summary.trainedSkill = gainResult.skill || summary.trainedSkill || '';
         summary.confidence += result.confidenceDelta;
         summary.bond += result.bondDelta + (session.pendingEvent?.bondBonus || 0);
         summary.fatigue += result.fatigueGain;
@@ -7227,6 +7245,7 @@ function renderTraining() {
             horseName: horse.name,
             discipline: d,
             skill: summary.skill,
+            trainedSkill: summary.trainedSkill,
             confidence: summary.confidence,
             bond: summary.bond,
             fatigue: summary.fatigue,
@@ -7273,7 +7292,7 @@ function renderTraining() {
     </div>
     ${app.trainingRpgSummary ? `<div class='box'><h3>Session Summary</h3>
       <p><strong>${app.trainingRpgSummary.horseName}</strong> — ${cap(app.trainingRpgSummary.discipline)}</p>
-      <p>Skill change: ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
+      <p>Skill change (${app.trainingRpgSummary.trainedSkill || 'selected skill'}): ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
       <p>Notable event: ${app.trainingRpgSummary.notableEvent}</p>
       <p class='small'>${app.trainingRpgSummary.reflection}</p>
     </div>` : ''}
