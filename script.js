@@ -1973,28 +1973,87 @@ function advanceTrainingRpgSession(session, horse) {
   };
 }
 
-function resolveRpgOption(option, horse, session) {
+function stableTextHash(text) {
+  const source = String(text || '');
+  let hash = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash << 5) - hash) + source.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function trainingOptionChances(option, horse, session, optionIndex = 0) {
   const moodBonus = option.moodMod?.[horse.mood] || 0;
   const personalityBonus = option.personalityMod?.[horse.personality] || 0;
-  const bondBonus = Math.round(((horse.bond || 0) - 40) * 0.25);
-  const qualityBonus = Math.round((calculateHorseQualityOfLife(horse) - 55) * 0.3);
-  const controlBonus = Math.round(((horse.controlability || 50) - 50) * 0.18);
+  const bondBonus = Math.round(((horse.bond || 0) - 50) * 0.14);
+  const qualityOfLife = calculateHorseQualityOfLife(horse);
+  const baseSuccess = qualityOfLife >= 60 ? 50 : 40;
+  const controlBonus = Math.round(((horse.controlability || 50) - 50) * 0.1);
   const confidenceField = disciplineConfidenceField(session.discipline);
-  const confidenceBonus = Math.round(((horse[confidenceField] ?? 50) - 50) * 0.2);
-  const skillBonus = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.22);
+  const confidenceBonus = Math.round(((horse[confidenceField] ?? 50) - 50) * 0.12);
+  const skillBonus = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.14);
+  const optionBias = Math.round(((option.success || 0) - (option.fail || 0)) * 0.05);
+  const promptSeed = stableTextHash(`${horse.id}|${session.action}|${session.stepIndex}|${session.variant?.id || 0}|${option.intent || option.label}|${optionIndex}`);
+  const promptBias = (promptSeed % 9) - 4;
   const environmentPenalty = session.environment && ['Gusty', 'Unexpected loud sounds', 'Slightly slick in spots', 'Choppy and uneven', 'Crowded schooling ring'].some((hazard) => Object.values(session.environment).includes(hazard)) ? -4 : 0;
   const successChance = clamp(
-    Math.round(option.success * 0.25) + moodBonus + personalityBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.6) + bondBonus + qualityBonus + controlBonus + confidenceBonus + skillBonus + environmentPenalty,
-    5,
+    Math.round(baseSuccess + moodBonus + personalityBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.8) + bondBonus + controlBonus + confidenceBonus + skillBonus + optionBias + promptBias + environmentPenalty),
+    baseSuccess,
     95
   );
-  const neutralChance = clamp(option.neutral, 0, 95 - successChance);
+  const neutralChance = clamp(option.neutral + Math.round((-moodOutcomeModifier(horse.mood) * 0.25) - (promptBias * 0.2)), 0, 95 - successChance);
   const failChance = Math.max(0, 100 - successChance - neutralChance);
+  return { successChance, neutralChance, failChance, baseSuccess };
+}
+
+function trainingOptionFinalChances(session, horse, options) {
+  const entries = (options || []).map((option, index) => {
+    const computed = trainingOptionChances(option, horse, session, index);
+    return { option, index, computed, successChance: computed.successChance };
+  });
+
+  const used = new Set();
+  entries.forEach((entry) => {
+    let target = entry.successChance;
+    if (!used.has(target)) {
+      used.add(target);
+    } else {
+      const min = entry.computed.baseSuccess;
+      const max = 95;
+      for (let distance = 1; distance <= (max - min); distance += 1) {
+        const up = target + distance;
+        if (up <= max && !used.has(up)) {
+          target = up;
+          break;
+        }
+        const down = target - distance;
+        if (down >= min && !used.has(down)) {
+          target = down;
+          break;
+        }
+      }
+      used.add(target);
+    }
+    entry.successChance = target;
+    entry.neutralChance = clamp(entry.computed.neutralChance, 0, 99 - entry.successChance);
+    entry.failChance = Math.max(0, 100 - entry.successChance - entry.neutralChance);
+  });
+
+  return entries;
+}
+
+function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedChance = null) {
+  const chanceProfile = precomputedChance || trainingOptionChances(option, horse, session, optionIndex);
+  const successChance = chanceProfile.successChance;
+  const neutralChance = chanceProfile.neutralChance;
+  const failChance = chanceProfile.failChance;
   const roll = rnd(1, 100);
   let outcome = 'fail';
   if (roll <= successChance) outcome = 'success';
   else if (roll <= successChance + neutralChance) outcome = 'neutral';
 
+  const confidenceField = disciplineConfidenceField(session.discipline);
   const skillBase = option.effects?.skill || 0;
   const bondDelta = option.effects?.bond || 0;
   const fatigueGain = outcome === 'success' ? rnd(2, 4) : outcome === 'neutral' ? rnd(3, 5) : rnd(4, 7);
@@ -7096,19 +7155,20 @@ function renderTraining() {
         <p><strong>ACTION:</strong> ${actionLabel(session.action)} — Variant ${variant.id || '?'}</p>
         <p><strong>Scene:</strong> ${sceneText}</p>
         ${app.trainingRpgFeedback ? `<p><strong>Last choice result:</strong> ${app.trainingRpgFeedback}</p>` : ''}
-        <p class='small'><strong>TRAINING/SHOW NOTE:</strong> Percentage starts from a small base, then is adjusted by Bond (high impact), Skills (slight impact), Quality of Life (medium impact), controlability, and tack.</p>
+        <p class='small'><strong>TRAINING/SHOW NOTE:</strong> Base success is 50% when Quality of Life is 60%+ and 40% when it is below 60%, then each choice is adjusted by mood, personality, bond, skill, and prompt context.</p>
         <div id='rpg-options'></div>
         <button id='rpg-exit'>End Interactive Session</button>
       </div>
     `;
     const wrap = document.getElementById('rpg-options');
-    variant.options.forEach((opt, idx) => {
+    const optionProjections = trainingOptionFinalChances(session, horse, variant.options);
+    optionProjections.forEach((entry) => {
+      const { option: opt, index: idx } = entry;
       const line = document.createElement('div');
       line.className = 'box';
-      const projected = resolveRpgOption(opt, { ...horse }, { ...session, pendingEvent: null });
       line.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        <p class='small'>Final chance: success ${projected.successChance}% / partial ${projected.neutralChance}% / fail ${projected.failChance}%</p>
+        <p class='small'>Final chance: success ${entry.successChance}% / partial ${entry.neutralChance}% / fail ${entry.failChance}%</p>
         <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
         <button data-rpg='${idx}'>Choose</button>
       `;
@@ -7116,14 +7176,20 @@ function renderTraining() {
     });
     panel.querySelectorAll('[data-rpg]').forEach((btn) => {
       btn.onclick = () => {
-        const opt = variant.options[Number(btn.dataset.rpg)];
+        const idx = Number(btn.dataset.rpg);
+        const opt = variant.options[idx];
+        const chanceEntry = trainingOptionFinalChances(session, horse, variant.options).find((entry) => entry.index === idx);
         session.actionsSinceEvent = (session.actionsSinceEvent || 0) + 1;
         if (!session.pendingEvent && session.actionsSinceEvent >= (session.nextEventAt || 3)) {
           session.pendingEvent = randomTrainingEvent();
           session.actionsSinceEvent = 0;
           session.nextEventAt = rnd(2, 4);
         }
-        const result = resolveRpgOption(opt, horse, session);
+        const result = resolveRpgOption(opt, horse, session, idx, chanceEntry ? {
+          successChance: chanceEntry.successChance,
+          neutralChance: chanceEntry.neutralChance,
+          failChance: chanceEntry.failChance
+        } : null);
         const d = session.discipline;
         let gain = result.outcome === 'success' ? rnd(Math.max(1, result.skillBase), Math.max(2, result.skillBase + 2)) : result.outcome === 'neutral' ? Math.max(0, result.skillBase - 1) : 0;
         if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
