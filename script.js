@@ -1935,16 +1935,17 @@ function buildTrainingRpgSteps(discipline, config) {
 }
 
 function buildTrainingRpgSession(horse, discipline, config = app.trainingRpgConfig, exercise = '') {
+  const disciplineKey = normalizeTrainingDisciplineKey(discipline);
   app.trainingRpgFeedback = '';
   app.trainingRpgSummary = null;
-  const steps = buildTrainingRpgSteps(discipline, config);
+  const steps = buildTrainingRpgSteps(disciplineKey, config);
   const stepIndex = 0;
   const action = steps[stepIndex];
   const environment = generateTrainingEnvironment();
   const variant = pickTrainingVariant(action, horse, environment);
   return {
     horseId: horse.id,
-    discipline,
+    discipline: disciplineKey,
     exercise,
     action,
     variant,
@@ -6009,40 +6010,51 @@ function competitionModeLabel() {
   return app.settings?.competitionMode === 'normal' ? 'Normal (spam click)' : 'RPG';
 }
 
+function normalizeTrainingDisciplineKey(discipline) {
+  const normalized = String(discipline || '').trim().toLowerCase();
+  if (['showjumping', 'show-jumping', 'show jumping', 'sj', 'jumping'].includes(normalized)) return 'jumping';
+  if (['dressage'].includes(normalized)) return 'dressage';
+  if (['hunter', 'hunters'].includes(normalized)) return 'hunter';
+  if (['eventing'].includes(normalized)) return 'eventing';
+  return 'jumping';
+}
+
 function applyNormalTrainingSession(horse, discipline, exercise) {
+  const disciplineKey = normalizeTrainingDisciplineKey(discipline);
   const gain = rnd(1, 4);
   const confidenceGain = rnd(0, 2);
-  if (discipline === 'dressage') {
-    horse.stats.dressage[exercise] = clampSkill(horse, discipline, (horse.stats.dressage[exercise] || 0) + gain);
-  } else if (discipline === 'jumping' || discipline === 'hunter') {
-    horse.stats.jumping[exercise] = clampSkill(horse, discipline, (horse.stats.jumping[exercise] || 0) + gain);
+  if (disciplineKey === 'dressage') {
+    horse.stats.dressage[exercise] = clampSkill(horse, disciplineKey, (horse.stats.dressage[exercise] || 0) + gain);
+  } else if (disciplineKey === 'jumping' || disciplineKey === 'hunter') {
+    horse.stats.jumping[exercise] = clampSkill(horse, disciplineKey, (horse.stats.jumping[exercise] || 0) + gain);
   } else {
-    if (horse.stats.dressage[exercise] != null) horse.stats.dressage[exercise] = clampSkill(horse, discipline, horse.stats.dressage[exercise] + gain);
-    if (horse.stats.jumping[exercise] != null) horse.stats.jumping[exercise] = clampSkill(horse, discipline, horse.stats.jumping[exercise] + gain);
+    if (horse.stats.dressage[exercise] != null) horse.stats.dressage[exercise] = clampSkill(horse, disciplineKey, horse.stats.dressage[exercise] + gain);
+    if (horse.stats.jumping[exercise] != null) horse.stats.jumping[exercise] = clampSkill(horse, disciplineKey, horse.stats.jumping[exercise] + gain);
   }
-  const confidenceField = discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
+  const confidenceField = disciplineKey === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
   horse[confidenceField] = clamp((horse[confidenceField] || 50) + confidenceGain, 0, 100);
-  pushReport(`${horse.name} completed normal training in ${cap(discipline)} (${exercise}) and gained +${gain} skill.`);
+  pushReport(`${horse.name} completed normal training in ${cap(disciplineKey)} (${exercise}) and gained +${gain} skill.`);
 }
 
 function applyRpgSkillGain(horse, discipline, exercise, gain) {
   if (!gain) return { actualGain: 0, skill: exercise || '' };
-  const skillPool = EXERCISE_MENU[discipline] || EXERCISE_MENU.jumping;
+  const disciplineKey = normalizeTrainingDisciplineKey(discipline);
+  const skillPool = EXERCISE_MENU[disciplineKey] || EXERCISE_MENU.jumping;
   const fallbackSkill = skillPool[0];
   const skill = skillPool.includes(exercise) ? exercise : fallbackSkill;
 
   const applyInto = (bucket, skillName) => {
     if (!bucket || bucket[skillName] == null) return 0;
     const before = bucket[skillName] || 0;
-    const after = clampSkill(horse, discipline, before + gain);
+    const after = clampSkill(horse, disciplineKey, before + gain);
     bucket[skillName] = after;
     return Math.max(0, after - before);
   };
 
-  if (discipline === 'dressage') {
+  if (disciplineKey === 'dressage') {
     return { actualGain: applyInto(horse.stats.dressage, skill), skill };
   }
-  if (discipline === 'jumping' || discipline === 'hunter') {
+  if (disciplineKey === 'jumping' || disciplineKey === 'hunter') {
     return { actualGain: applyInto(horse.stats.jumping, skill), skill };
   }
 
