@@ -246,9 +246,32 @@ function currentDayAbsolute() {
   return ((app.year - 1) * 360) + ((app.month - 1) * 30) + app.day;
 }
 
+function currentHourAbsolute() {
+  return (currentDayAbsolute() * 24) + app.hour;
+}
+
+function pickNegativeMoodExcludingNoEnergy() {
+  const pool = NEGATIVE_MOODS.filter((m) => m !== 'No energy');
+  return pick(pool.length ? pool : NEGATIVE_MOODS);
+}
+
 function resetTrainingWindow(horse) {
   if (!horse) return;
   horse.trainingSessionsSinceReset = 0;
+}
+
+function applyScheduledMoodShift(horse, force = false) {
+  if (!horse || horse.mood === 'No energy') return;
+  const currentHour = currentHourAbsolute();
+  if (!Number.isFinite(horse.lastMoodShiftHourAbsolute)) {
+    horse.lastMoodShiftHourAbsolute = currentHour;
+    if (!force) return;
+  }
+  if (!force && currentHour - horse.lastMoodShiftHourAbsolute < 12) return;
+  let nextMood = applyMonthlyMoodShift(horse);
+  if (nextMood === 'No energy') nextMood = pickNegativeMoodExcludingNoEnergy();
+  horse.mood = nextMood;
+  horse.lastMoodShiftHourAbsolute = currentHour;
 }
 
 function applyDailyRolloverToHorse(horse, newborns) {
@@ -257,6 +280,7 @@ function applyDailyRolloverToHorse(horse, newborns) {
   if (isPregnantMare(horse)) processPregnancy(horse, newborns, 1);
   applyStablehandCare(horse);
   applyDailyPregnancyUpdates(horse);
+  applyScheduledMoodShift(horse, true);
   resolvePendingCompetitions(horse);
   resetTrainingWindow(horse);
   horse.fatigue = 0;
@@ -2620,7 +2644,7 @@ function weightPerformanceDelta(weight) {
 function applyMonthlyMoodShift(horse) {
   const preferred = horse.preferredMood;
   if (horse.isRescue && (horse.bond || 0) <= 0) {
-    return rnd(1, 100) <= 95 ? pick(['Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy']) : preferred;
+    return rnd(1, 100) <= 95 ? pick(['Uncomfortable', 'Distress', 'Overly-Active', 'Bad moods', 'Grumpy']) : preferred;
   }
   const bond = horse.bond || 0;
   if (bond >= 45 && rnd(1, 100) <= 40) {
@@ -3175,7 +3199,7 @@ function updateMonthlyCare(horse) {
   const careStars = app.currentBarn?.careStars || 3;
   if (careStars === 1 && !horse.managed?.fed) {
     horse.qualityOfLife = clamp(horse.qualityOfLife - 2, 0, 100);
-    if (rnd(1, 100) <= 35) horse.mood = pick(NEGATIVE_MOODS);
+    if (rnd(1, 100) <= 35) horse.mood = pickNegativeMoodExcludingNoEnergy();
   } else if (careStars === 5) {
     horse.qualityOfLife = clamp(horse.qualityOfLife + 2, 0, 100);
     if (NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 40) horse.mood = pick(POSITIVE_MOODS);
@@ -3396,6 +3420,7 @@ function hydrateFromSave(data) {
     h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
     h.handTrainingSessionsThisMonth = Number.isFinite(h.handTrainingSessionsThisMonth) ? h.handTrainingSessionsThisMonth : 0;
     h.trainingSessionsSinceReset = Number.isFinite(h.trainingSessionsSinceReset) ? h.trainingSessionsSinceReset : 0;
+    h.lastMoodShiftHourAbsolute = Number.isFinite(h.lastMoodShiftHourAbsolute) ? h.lastMoodShiftHourAbsolute : currentHourAbsolute();
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
     h.careerLevelCaps = h.careerLevelCaps && typeof h.careerLevelCaps === 'object' ? h.careerLevelCaps : {};
     h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
@@ -3954,7 +3979,7 @@ function updateBondMonthly(horse) {
   if ((horse.bond || 0) >= 45 && rnd(1, 100) <= 40) {
     horse.mood = pick(POSITIVE_MOODS);
   } else if ((horse.bond || 0) < 15 && rnd(1, 100) <= 45) {
-    horse.mood = pick(NEGATIVE_MOODS);
+    horse.mood = pickNegativeMoodExcludingNoEnergy();
   }
   horse.manualTrainingThisMonth = false;
   horse.farrierThisMonth = false;
@@ -6609,6 +6634,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
     date: dateLabel(),
     monthIndex: currentMonthIndex(),
     dayIndex: currentDayAbsolute(),
+    hourIndex: currentHourAbsolute(),
     interaction
   };
   horse.pendingCompetitions = horse.pendingCompetitions || [];
@@ -6616,7 +6642,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
   const opener = interaction.phases[0] || { phase: 'round start', outcome: 'partial', eventText: 'steady opening' };
   pushReport(`${horse.name} registered for ${cap(session.discipline)} ${session.level} in ${competitionModeLabel()} mode.`);
-  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next day/month skip.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next hour/day/month skip.`);
   app.competitionRpg = null;
   saveGame(false);
 }
@@ -6657,6 +6683,7 @@ function registerShowEntry(horse, discipline, level) {
     date: dateLabel(),
     monthIndex: currentMonthIndex(),
     dayIndex: currentDayAbsolute(),
+    hourIndex: currentHourAbsolute(),
     interaction
   };
   horse.pendingCompetitions = horse.pendingCompetitions || [];
@@ -6664,15 +6691,17 @@ function registerShowEntry(horse, discipline, level) {
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
   const opener = interaction.phases[0];
   pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Controls: steer ${interaction.controls.steer}, jump/action ${interaction.controls.jump}, pace ${interaction.controls.pace}.`);
-  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next day/month skip.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next hour/day/month skip.`);
   saveGame(false);
 }
 
 function resolvePendingCompetitions(horse) {
   const currentMonth = currentMonthIndex();
   const currentDay = currentDayAbsolute();
+  const currentHour = currentHourAbsolute();
   const pending = Array.isArray(horse.pendingCompetitions) ? horse.pendingCompetitions : [];
   const due = pending.filter((entry) => {
+    if (Number.isFinite(entry.hourIndex)) return entry.hourIndex < currentHour;
     if (Number.isFinite(entry.dayIndex)) return entry.dayIndex < currentDay;
     return Number.isFinite(entry.monthIndex) && entry.monthIndex < currentMonth;
   });
@@ -6713,6 +6742,14 @@ function resolvePendingCompetitions(horse) {
       suggestion: result.suggestion
     });
     pushReport(`${horse.name} in ${entry.discipline} (${entry.level}) placed #${result.placing} with ${result.resultText} and won ${money(result.prize)}.`);
+  });
+}
+
+function resolveAllPendingCompetitions() {
+  app.horses.forEach((h) => resolvePendingCompetitions(h));
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    roster.forEach((h) => resolvePendingCompetitions(h));
   });
 }
 
@@ -6780,7 +6817,18 @@ function advanceOneDay() {
 
 function advanceOneHour() {
   app.hour += 1;
-  if (app.hour >= 24) advanceOneDay();
+  if (app.hour >= 24) {
+    advanceOneDay();
+    return;
+  }
+  if (app.hour % 12 === 0) {
+    app.horses.forEach((h) => applyScheduledMoodShift(h, true));
+    Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+      if (!Array.isArray(roster)) return;
+      roster.forEach((h) => applyScheduledMoodShift(h, true));
+    });
+  }
+  resolveAllPendingCompetitions();
 }
 
 function canSkipHour() {
@@ -6929,7 +6977,7 @@ function renderShows() {
         <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
         ${showHorsePool.length ? '' : '<p class="small">No eligible horses for this filter.</p>'}
         <button id='enter-${s.key}' ${showHorsePool.length ? '' : 'disabled'}>Register Show Entry</button>
-        <p class='small'>Results are delivered after the next day/month skip.</p>
+        <p class='small'>Results are delivered after the next hour/day/month skip.</p>
       </div>
     `).join('')}
   `;
@@ -8413,7 +8461,7 @@ function renderRescue() {
       if (horse.unridable) {
         pushReport(`${horse.name} has Kissing Spines and is currently unridable. This horse is unridable.`);
       }
-      horse.mood = rnd(1, 100) <= 95 ? pick(NEGATIVE_MOODS) : horse.mood;
+      horse.mood = rnd(1, 100) <= 95 ? pickNegativeMoodExcludingNoEnergy() : horse.mood;
       horse.bond = -50;
       app.horses.push(horse);
       app.rescueHorses = app.rescueHorses.filter((h) => h.id !== rescueTemplate.id);
