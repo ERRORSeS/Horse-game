@@ -242,6 +242,26 @@ function currentMonthAbsolute() {
   return app.year * 12 + app.month;
 }
 
+function currentDayAbsolute() {
+  return ((app.year - 1) * 360) + ((app.month - 1) * 30) + app.day;
+}
+
+function resetTrainingWindow(horse) {
+  if (!horse) return;
+  horse.trainingSessionsSinceReset = 0;
+}
+
+function applyDailyRolloverToHorse(horse, newborns) {
+  if (!horse) return;
+  if (horse.foalVitality && Number.isFinite(horse.foalVitality.ageDays)) horse.foalVitality.ageDays += 1;
+  if (isPregnantMare(horse)) processPregnancy(horse, newborns, 1);
+  applyStablehandCare(horse);
+  applyDailyPregnancyUpdates(horse);
+  resolvePendingCompetitions(horse);
+  resetTrainingWindow(horse);
+  horse.fatigue = 0;
+}
+
 function transportCost(fromCountry, toCountry) {
   if (!fromCountry || !toCountry || fromCountry === toCountry) return rnd(1000, 2000);
   return rnd(20000, 40000);
@@ -434,7 +454,9 @@ function createBarnShowEvent(options = {}) {
     month: options.month ?? app.month,
     year: options.year ?? app.year,
     isUpcomingEvent: options.isUpcomingEvent === true,
-    monthsUntilStart: Number.isFinite(options.monthsUntilStart) ? Math.max(0, Math.floor(options.monthsUntilStart)) : 0
+    daysUntilStart: Number.isFinite(options.daysUntilStart)
+      ? Math.max(0, Math.floor(options.daysUntilStart))
+      : (Number.isFinite(options.monthsUntilStart) ? Math.max(0, Math.floor(options.monthsUntilStart * 30)) : 0)
   };
 }
 
@@ -444,7 +466,7 @@ function ensureUpcomingEventsPool(target = 6) {
     const event = createBarnShowEvent({
       maxSkill: rnd(75, 100),
       isUpcomingEvent: true,
-      monthsUntilStart: rnd(1, 6)
+      daysUntilStart: rnd(2, 70)
     });
     if (!event) break;
     app.upcomingEvents.push(event);
@@ -1920,7 +1942,8 @@ function preferredTrainingSessionLimit(horse) {
 function markTrainingSession(horse, count = 1) {
   const sessionCount = Math.max(1, Math.round(Number(count) || 1));
   horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + sessionCount;
-  if (horse.trainingSessionsThisMonth > preferredTrainingSessionLimit(horse)) {
+  horse.trainingSessionsSinceReset = (horse.trainingSessionsSinceReset || 0) + sessionCount;
+  if (horse.trainingSessionsSinceReset > preferredTrainingSessionLimit(horse)) {
     horse.mood = 'No energy';
   }
 }
@@ -3102,16 +3125,17 @@ function updateMonthlyCare(horse) {
   const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
   horse.preferredTrainingSessions = clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
   const sessions = horse.trainingSessionsThisMonth || 0;
+  const sessionsInCurrentWindow = horse.trainingSessionsSinceReset || 0;
   const shows = horse.showEntriesThisMonth || 0;
   horse.lastTrainingSessions = sessions;
   horse.lastShowEntries = shows;
-  if (sessions > horse.preferredTrainingSessions || shows > 3) {
+  if (sessionsInCurrentWindow > horse.preferredTrainingSessions || shows > 3) {
     horse.lastTrainingIssue = 'high';
     horse.overTrainingCountYear = (horse.overTrainingCountYear || 0) + 1;
     if ([4, 8].includes(horse.overTrainingCountYear)) {
       horse.pendingOvertrainingInjury = true;
     }
-  } else if (sessions < minTrainingSessions) {
+  } else if (sessionsInCurrentWindow < minTrainingSessions) {
     horse.lastTrainingIssue = 'low';
   }
 
@@ -3371,6 +3395,7 @@ function hydrateFromSave(data) {
     h.overTrainingCountYear = Number.isFinite(h.overTrainingCountYear) ? h.overTrainingCountYear : 0;
     h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
     h.handTrainingSessionsThisMonth = Number.isFinite(h.handTrainingSessionsThisMonth) ? h.handTrainingSessionsThisMonth : 0;
+    h.trainingSessionsSinceReset = Number.isFinite(h.trainingSessionsSinceReset) ? h.trainingSessionsSinceReset : 0;
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
     h.careerLevelCaps = h.careerLevelCaps && typeof h.careerLevelCaps === 'object' ? h.careerLevelCaps : {};
     h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
@@ -3441,11 +3466,16 @@ function hydrateFromSave(data) {
     h.leaseDurationMonths = Number.isFinite(h.leaseDurationMonths) ? Math.max(0, Math.floor(h.leaseDurationMonths)) : h.leaseMonthsRemaining;
     h.leaseMonthlyCost = Number.isFinite(h.leaseMonthlyCost) ? Math.max(0, Math.round(h.leaseMonthlyCost)) : 0;
   });
-  app.upcomingEvents = app.upcomingEvents.map((event) => ({
-    ...event,
-    isUpcomingEvent: true,
-    monthsUntilStart: Number.isFinite(event.monthsUntilStart) ? Math.max(0, Math.floor(event.monthsUntilStart)) : rnd(1, 4)
-  })).filter((event) => event.monthsUntilStart > 0);
+  app.upcomingEvents = app.upcomingEvents.map((event) => {
+    const days = Number.isFinite(event.daysUntilStart)
+      ? Math.max(0, Math.floor(event.daysUntilStart))
+      : (Number.isFinite(event.monthsUntilStart) ? Math.max(0, Math.floor(event.monthsUntilStart * 30)) : rnd(2, 70));
+    return {
+      ...event,
+      isUpcomingEvent: true,
+      daysUntilStart: days
+    };
+  }).filter((event) => event.daysUntilStart > 0);
   refreshRescueHorses();
 }
 
@@ -6578,6 +6608,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
     level: session.level,
     date: dateLabel(),
     monthIndex: currentMonthIndex(),
+    dayIndex: currentDayAbsolute(),
     interaction
   };
   horse.pendingCompetitions = horse.pendingCompetitions || [];
@@ -6585,7 +6616,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
   const opener = interaction.phases[0] || { phase: 'round start', outcome: 'partial', eventText: 'steady opening' };
   pushReport(`${horse.name} registered for ${cap(session.discipline)} ${session.level} in ${competitionModeLabel()} mode.`);
-  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive next month.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next day/month skip.`);
   app.competitionRpg = null;
   saveGame(false);
 }
@@ -6625,6 +6656,7 @@ function registerShowEntry(horse, discipline, level) {
     level,
     date: dateLabel(),
     monthIndex: currentMonthIndex(),
+    dayIndex: currentDayAbsolute(),
     interaction
   };
   horse.pendingCompetitions = horse.pendingCompetitions || [];
@@ -6632,15 +6664,19 @@ function registerShowEntry(horse, discipline, level) {
   horse.showEntriesThisMonth = (horse.showEntriesThisMonth || 0) + 1;
   const opener = interaction.phases[0];
   pushReport(`${horse.name} registered for ${cap(discipline)} ${level}. Controls: steer ${interaction.controls.steer}, jump/action ${interaction.controls.jump}, pace ${interaction.controls.pace}.`);
-  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive next month.`);
+  pushReport(`${horse.name} competition simulation (${opener.phase}): ${opener.outcome.toUpperCase()} — ${opener.eventText} Results will arrive after the next day/month skip.`);
   saveGame(false);
 }
 
 function resolvePendingCompetitions(horse) {
-  const currentIndex = currentMonthIndex();
+  const currentMonth = currentMonthIndex();
+  const currentDay = currentDayAbsolute();
   const pending = Array.isArray(horse.pendingCompetitions) ? horse.pendingCompetitions : [];
-  const due = pending.filter((entry) => entry.monthIndex < currentIndex);
-  horse.pendingCompetitions = pending.filter((entry) => entry.monthIndex >= currentIndex);
+  const due = pending.filter((entry) => {
+    if (Number.isFinite(entry.dayIndex)) return entry.dayIndex < currentDay;
+    return Number.isFinite(entry.monthIndex) && entry.monthIndex < currentMonth;
+  });
+  horse.pendingCompetitions = pending.filter((entry) => !due.includes(entry));
   if (!due.length) return;
   due.forEach((entry) => {
     const result = calculateCompetitionResult(horse, entry.discipline, entry.level, entry.interaction);
@@ -6689,21 +6725,57 @@ function applyDailyPregnancyUpdates(horse) {
   if (stage.label === '210-320 days' || stage.label === '320+ days') horse.weightStatus = 'Overweight';
 }
 
+function progressUpcomingEventsByDays(days) {
+  const dayCount = Math.max(1, Math.floor(Number(days) || 1));
+  app.upcomingEvents = (app.upcomingEvents || []).map((event) => ({
+    ...event,
+    isUpcomingEvent: true,
+    daysUntilStart: Math.max(0, (Number(event.daysUntilStart) || 0) - dayCount)
+  }));
+  const eventsHappeningNow = app.upcomingEvents.filter((event) => event.daysUntilStart <= 0).map((event) => ({
+    ...event,
+    id: uid(),
+    isUpcomingEvent: false,
+    month: app.month,
+    year: app.year
+  }));
+  if (eventsHappeningNow.length) {
+    eventsHappeningNow.forEach((event) => {
+      pushReport(`Upcoming event is now live: ${cap(event.discipline)} ${event.level} at ${event.barnName}.`);
+    });
+    const targetShowCount = rnd(3, 10);
+    app.barnShows = [...eventsHappeningNow, ...(app.barnShows || [])].slice(0, targetShowCount);
+    while (app.barnShows.length < 3) {
+      const fallbackShow = createBarnShowEvent({ maxSkill: 100 });
+      if (!fallbackShow) break;
+      app.barnShows.push(fallbackShow);
+    }
+  }
+  app.upcomingEvents = app.upcomingEvents.filter((event) => event.daysUntilStart > 0);
+  ensureUpcomingEventsPool();
+}
+
 function advanceOneDay() {
-  const newborns = [];
-  app.horses.forEach((h) => {
-    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 1;
-    if (isPregnantMare(h)) processPregnancy(h, newborns, 1);
-    applyStablehandCare(h);
-    applyDailyPregnancyUpdates(h);
-    h.fatigue = 0;
-  });
-  if (newborns.length) app.horses = app.horses.concat(newborns);
   app.hour = 0;
   app.day += 1;
   if (app.day > 30) {
     monthlyProgress();
+    return;
   }
+  const newborns = [];
+  app.horses.forEach((h) => {
+    applyDailyRolloverToHorse(h, newborns);
+  });
+  if (newborns.length) app.horses = app.horses.concat(newborns);
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    roster.forEach((h) => {
+      resolvePendingCompetitions(h);
+      resetTrainingWindow(h);
+      h.fatigue = 0;
+    });
+  });
+  progressUpcomingEventsByDays(1);
 }
 
 function advanceOneHour() {
@@ -6857,7 +6929,7 @@ function renderShows() {
         <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
         ${showHorsePool.length ? '' : '<p class="small">No eligible horses for this filter.</p>'}
         <button id='enter-${s.key}' ${showHorsePool.length ? '' : 'disabled'}>Register Show Entry</button>
-        <p class='small'>Results are delivered after the next month skip.</p>
+        <p class='small'>Results are delivered after the next day/month skip.</p>
       </div>
     `).join('')}
   `;
@@ -7876,6 +7948,7 @@ function monthlyProgress() {
     resolvePendingCompetitions(h);
     resolvePendingConformationShows(h, conformationBreedPlacings);
     updateRingPerformance(h);
+    resetTrainingWindow(h);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
         const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
@@ -7907,6 +7980,7 @@ function monthlyProgress() {
       h.trainingSessionsThisMonth = 0;
       h.handTrainingSessionsThisMonth = 0;
       h.showEntriesThisMonth = 0;
+      resetTrainingWindow(h);
     });
   });
   const boardedHorses = app.horses.filter((h) => !h.retiredForever).length;
@@ -7915,33 +7989,8 @@ function monthlyProgress() {
     app.money -= monthlyBoard;
     pushReport(`Monthly board paid at ${app.currentBarn.name}: ${money(monthlyBoard)} (${boardedHorses} horse(s)).`);
   }
-  app.upcomingEvents = (app.upcomingEvents || []).map((event) => ({
-    ...event,
-    isUpcomingEvent: true,
-    monthsUntilStart: Math.max(0, (Number(event.monthsUntilStart) || 0) - 1)
-  }));
-  const eventsHappeningNow = app.upcomingEvents.filter((event) => event.monthsUntilStart <= 0).map((event) => ({
-    ...event,
-    id: uid(),
-    isUpcomingEvent: false,
-    month: app.month,
-    year: app.year
-  }));
-  if (eventsHappeningNow.length) {
-    eventsHappeningNow.forEach((event) => {
-      pushReport(`Upcoming event is now live: ${cap(event.discipline)} ${event.level} at ${event.barnName}.`);
-    });
-  }
-  app.upcomingEvents = app.upcomingEvents.filter((event) => event.monthsUntilStart > 0);
   refreshBarnShows();
-  const targetShowCount = rnd(3, 10);
-  app.barnShows = [...eventsHappeningNow, ...(app.barnShows || [])].slice(0, targetShowCount);
-  while (app.barnShows.length < 3) {
-    const fallbackShow = createBarnShowEvent({ maxSkill: 100 });
-    if (!fallbackShow) break;
-    app.barnShows.push(fallbackShow);
-  }
-  ensureUpcomingEventsPool();
+  progressUpcomingEventsByDays(30);
   ensureLessonRosterForBarn(app.currentBarn, true);
   app.closedReminderIds = [];
   refreshNpcAds();
@@ -8379,7 +8428,7 @@ function renderCalendar() {
   ensureBarnState();
   const reminders = app.calendarReminders || [];
   const shows = app.barnShows || [];
-  const upcomingEvents = (app.upcomingEvents || []).slice().sort((a, b) => (a.monthsUntilStart || 0) - (b.monthsUntilStart || 0));
+  const upcomingEvents = (app.upcomingEvents || []).slice().sort((a, b) => (a.daysUntilStart || 0) - (b.daysUntilStart || 0));
   const conformationTypes = CONFORMATION_SHOW_TYPES.filter((t) => !t.specialMonth || t.specialMonth === app.month);
   const conformationEntries = app.horses.flatMap((h) => (h.pendingConformationShows || []).filter((e) => e.monthIndex === currentMonthIndex()).map((e) => `${horseDisplayName(h)} — ${e.label}`));
   document.getElementById('calendar').innerHTML = `
@@ -8431,7 +8480,7 @@ function renderCalendar() {
       ${upcomingEvents.map((show) => `<div class='box'>
         <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
         <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Level:</strong> ${show.level}</p>
-        <p class='small'><strong>Date:</strong> Hidden (${show.monthsUntilStart} month(s) remaining)</p>
+        <p class='small'><strong>Date:</strong> Hidden (${show.daysUntilStart} day(s) remaining)</p>
       </div>`).join('') || '<p class="small">No high-level upcoming events currently listed.</p>'}
     </div>
   `;
