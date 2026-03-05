@@ -6807,6 +6807,7 @@ function advanceOneDay() {
   Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
     if (!Array.isArray(roster)) return;
     roster.forEach((h) => {
+      applyScheduledMoodShift(h, true);
       resolvePendingCompetitions(h);
       resetTrainingWindow(h);
       h.fatigue = 0;
@@ -6820,13 +6821,6 @@ function advanceOneHour() {
   if (app.hour >= 24) {
     advanceOneDay();
     return;
-  }
-  if (app.hour % 12 === 0) {
-    app.horses.forEach((h) => applyScheduledMoodShift(h, true));
-    Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
-      if (!Array.isArray(roster)) return;
-      roster.forEach((h) => applyScheduledMoodShift(h, true));
-    });
   }
   resolveAllPendingCompetitions();
 }
