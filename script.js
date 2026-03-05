@@ -1876,6 +1876,7 @@ function moodOutcomeModifier(mood) {
 }
 
 function trainingActionPool(action) {
+  if (Array.isArray(TRAINING_RPG_VARIANTS[action]) && TRAINING_RPG_VARIANTS[action].length) return TRAINING_RPG_VARIANTS[action];
   if (TRAINING_OPTION_LIBRARY[action]) return TRAINING_OPTION_LIBRARY[action];
   if (action === 'work_in_hand') return TRAINING_OPTION_LIBRARY.cool_down;
   return TRAINING_OPTION_LIBRARY.trot;
@@ -1893,12 +1894,35 @@ function buildTrainingActionText(action, horse, environment) {
 }
 
 function pickTrainingVariant(action, horse, environment) {
-  const pool = trainingActionPool(action).map((opt) => ({ ...opt, moodMod: {}, personalityMod: {} }));
+  const pool = trainingActionPool(action);
+  const picked = pick(pool) || {};
+  const optionPool = Array.isArray(picked.options) && picked.options.length
+    ? picked.options
+    : (TRAINING_OPTION_LIBRARY[action] || TRAINING_OPTION_LIBRARY.trot);
+  const options = optionPool.map((opt) => ({
+    ...opt,
+    moodMod: opt.moodMod || {},
+    personalityMod: opt.personalityMod || {}
+  }));
   return {
-    id: rnd(1, 20),
-    text: buildTrainingActionText(action, horse, environment),
-    options: pool
+    id: picked.id || rnd(1, 20),
+    text: picked.text || buildTrainingActionText(action, horse, environment),
+    options
   };
+}
+
+function preferredTrainingSessionLimit(horse) {
+  const stamina = horse.trainingPreference || 'Medium';
+  const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
+  return clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
+}
+
+function markTrainingSession(horse, count = 1) {
+  const sessionCount = Math.max(1, Math.round(Number(count) || 1));
+  horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + sessionCount;
+  if (horse.trainingSessionsThisMonth > preferredTrainingSessionLimit(horse)) {
+    horse.mood = 'No energy';
+  }
 }
 
 function defaultTrainingRpgConfig() {
@@ -1999,6 +2023,7 @@ function stableTextHash(text) {
 function trainingOptionChances(option, horse, session, optionIndex = 0) {
   const moodBonus = option.moodMod?.[horse.mood] || 0;
   const personalityBonus = option.personalityMod?.[horse.personality] || 0;
+  const traitBonus = Math.abs(moodBonus) >= Math.abs(personalityBonus) ? moodBonus : personalityBonus;
   const bondBonus = Math.round(((horse.bond || 0) - 50) * 0.14);
   const qualityOfLife = calculateHorseQualityOfLife(horse);
   const baseSuccess = qualityOfLife >= 60 ? 50 : 40;
@@ -2011,7 +2036,7 @@ function trainingOptionChances(option, horse, session, optionIndex = 0) {
   const promptBias = (promptSeed % 9) - 4;
   const environmentPenalty = session.environment && ['Gusty', 'Unexpected loud sounds', 'Slightly slick in spots', 'Choppy and uneven', 'Crowded schooling ring'].some((hazard) => Object.values(session.environment).includes(hazard)) ? -4 : 0;
   const successChance = clamp(
-    Math.round(baseSuccess + moodBonus + personalityBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.8) + bondBonus + controlBonus + confidenceBonus + skillBonus + optionBias + promptBias + environmentPenalty),
+    Math.round(baseSuccess + traitBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.8) + bondBonus + controlBonus + confidenceBonus + skillBonus + optionBias + promptBias + environmentPenalty),
     baseSuccess,
     95
   );
@@ -2931,7 +2956,7 @@ function applyAutoTraining(horse) {
       if (horse.illnesses.some((n) => n.active)) break;
       horse.behavior = Math.max(0, (horse.behavior || 0) + rnd(1, 2));
       horse.managed.trained = true;
-      horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+      markTrainingSession(horse);
       trainedSessions += 1;
     }
     if (horse.requiresBreakingIn && horse.behavior >= 500) {
@@ -2973,7 +2998,7 @@ function applyAutoTraining(horse) {
       skillGains += 1;
     }
     horse.managed.trained = true;
-    horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+    markTrainingSession(horse);
     trainedSessions += 1;
   }
   if (trainedSessions) {
@@ -3042,8 +3067,7 @@ function trainingControlabilitySession(horse, focus) {
     const handSessions = horse.handTrainingSessionsThisMonth || 0;
     horse.handTrainingSessionsThisMonth = handSessions + 1;
     if (handSessions < 1) {
-      horse.mood = 'No energy';
-      pushReport(`${horse.name} completed Hand Work and feels low on energy. No controlability gains this session.`);
+      pushReport(`${horse.name} completed Hand Work but needs a warm-up session before controlability gains apply.`);
       return false;
     }
   }
@@ -3081,7 +3105,7 @@ function updateMonthlyCare(horse) {
   const shows = horse.showEntriesThisMonth || 0;
   horse.lastTrainingSessions = sessions;
   horse.lastShowEntries = shows;
-  if (sessions > maxTrainingSessions || shows > 3) {
+  if (sessions > horse.preferredTrainingSessions || shows > 3) {
     horse.lastTrainingIssue = 'high';
     horse.overTrainingCountYear = (horse.overTrainingCountYear || 0) + 1;
     if ([4, 8].includes(horse.overTrainingCountYear)) {
@@ -4179,7 +4203,7 @@ function applyExerciseSession(horse, options = {}) {
   const hours = rnd(1, 3);
   horse.autoExerciseHours = accumulate ? (horse.autoExerciseHours || 0) + hours : hours;
   horse.managed.trained = true;
-  horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+  markTrainingSession(horse);
   if (!silent) {
     pushReport(`${horse.name} completed exercise: ${exercise} for ${hours} hour(s).`);
   }
@@ -6672,6 +6696,7 @@ function advanceOneDay() {
     if (isPregnantMare(h)) processPregnancy(h, newborns, 1);
     applyStablehandCare(h);
     applyDailyPregnancyUpdates(h);
+    h.fatigue = 0;
   });
   if (newborns.length) app.horses = app.horses.concat(newborns);
   app.hour = 0;
@@ -7245,7 +7270,6 @@ function renderTraining() {
         let outcomePoints = result.outcome === 'success' ? 2 : result.outcome === 'neutral' ? 1 : 0;
         if (session.action === 'work_in_hand' && (horse.trainingSessionsThisMonth || 0) <= 1) {
           outcomePoints = 0;
-          horse.mood = 'No energy';
         }
         const selectedSkill = session.exercise || (app.trainingSelection?.exercise || '');
         horse.managed.trained = true;
@@ -7452,7 +7476,7 @@ function renderTraining() {
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     h.managed.trained = true;
-    h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
+    markTrainingSession(h);
     h.manualTrainingThisMonth = true;
     if (app.settings?.trainingMode === 'normal') {
       applyNormalTrainingSession(h, d, exerciseSelect.value);
@@ -7471,7 +7495,7 @@ function renderTraining() {
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     trainingControlabilitySession(h, focus);
     h.managed.trained = true;
-    h.trainingSessionsThisMonth = (h.trainingSessionsThisMonth || 0) + 1;
+    markTrainingSession(h);
     h.manualTrainingThisMonth = true;
     render();
   };
@@ -7533,7 +7557,7 @@ function applyBarnActivity(horse, activity, options = {}) {
   }
   if (activity === 'lunge') {
     horse.bond = clamp((horse.bond || 0) + 3, horse.isRescue ? -50 : 0, 100);
-    horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + 1;
+    markTrainingSession(horse);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
     log(`Barn: ${horse.name} completed a lunging session.`);
   }
