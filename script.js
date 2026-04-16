@@ -5966,7 +5966,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     if (rpgRoundStats) {
       rails = Math.max(0, Math.round((rpgRoundStats.faults || 0) / 4));
       refusals = Math.max(0, rpgRoundStats.refusals || 0);
-      faults = Math.max(0, rpgRoundStats.faults || 0) + overSeconds;
+      faults = Math.max(0, rpgRoundStats.faults || 0);
       eliminated = rpgRoundStats.eliminated === true;
       if (eliminated) {
         score = 0;
@@ -5986,7 +5986,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     } else {
-      faults = rails * 4 + refusals * 4 + overSeconds;
+      faults = rails * 4 + refusals * 4;
       score = clamp(baseScore - faults * 1.5, 0, 100);
       penaltiesText = faults === 0 ? 'Clear Round' : `${faults} faults`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -6038,7 +6038,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     } else {
-      const penalties = rails * 4 + refusals * 20 + overSeconds * 0.4;
+      const penalties = rails * 4 + refusals * 8 + overSeconds * 0.4;
       score = clamp(baseScore - penalties * 0.6, 0, 100);
       penaltiesText = penalties <= 0.01 ? 'Clear Round' : `${penalties.toFixed(1)} penalties`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -6495,17 +6495,14 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
           rs.eliminated = true;
           rs.eliminationReason = 'fall';
           displayOutcome = 'Elimination (fall)';
-        } else if (session.refusalCount >= 3) {
+        } else if (session.refusalCount >= 2) {
           session.eliminated = true;
           rs.eliminated = true;
-          rs.eliminationReason = '3 refusals';
-          displayOutcome = 'Elimination (3 refusals)';
+          rs.eliminationReason = '2 refusals';
+          displayOutcome = 'Elimination (2 refusals)';
         } else if (session.refusalCount === 1) {
           rs.faults += 4;
           displayOutcome = 'Refusal (4 faults)';
-        } else {
-          rs.faults += 8;
-          displayOutcome = 'Refusal (8 faults)';
         }
       }
     } else if (session.discipline === 'hunter') {
@@ -6570,11 +6567,11 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         } else if (phaseText.includes('cross-country')) {
           rs.refusals += 1;
           if (rs.refusals === 1) {
-            rs.faults += 20;
-            displayOutcome = 'XC Refusal (20 penalties)';
+            rs.faults += 8;
+            displayOutcome = 'XC Refusal (8 penalties)';
           } else if (rs.refusals === 2) {
-            rs.faults += 40;
-            displayOutcome = 'XC Refusal (40 penalties)';
+            rs.faults += 16;
+            displayOutcome = 'XC Refusal (16 penalties)';
           } else {
             session.eliminated = true;
             rs.eliminated = true;
