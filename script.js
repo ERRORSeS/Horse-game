@@ -251,7 +251,7 @@ function currentHourAbsolute() {
 }
 
 function pickNegativeMoodExcludingNoEnergy() {
-  const pool = NEGATIVE_MOODS.filter((m) => m !== 'No energy');
+  const pool = NEGATIVE_MOODS.filter((m) => !['No energy', 'Uncomfortable', 'Distress'].includes(m));
   return pick(pool.length ? pool : NEGATIVE_MOODS);
 }
 
@@ -2644,7 +2644,7 @@ function weightPerformanceDelta(weight) {
 function applyMonthlyMoodShift(horse) {
   const preferred = horse.preferredMood;
   if (horse.isRescue && (horse.bond || 0) <= 0) {
-    return rnd(1, 100) <= 95 ? pick(['Uncomfortable', 'Distress', 'Overly-Active', 'Bad moods', 'Grumpy']) : preferred;
+    return rnd(1, 100) <= 95 ? pick(['Overly-Active', 'Bad moods', 'Grumpy']) : preferred;
   }
   const bond = horse.bond || 0;
   if (bond >= 45 && rnd(1, 100) <= 40) {
@@ -2724,16 +2724,6 @@ function trainerNotesForHorse(horse) {
   }
   if (horse.lastFeedIssue?.badFeed && horse.lastFeedIssue?.betterFeed) {
     notes.push(`${subject} needs ${horse.lastFeedIssue.badFeed} changed to ${horse.lastFeedIssue.betterFeed}!`);
-    if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
-      notes.push(`${horse.name} looks ${horse.mood}, consider switching the feed.`);
-    }
-  }
-  if (
-    ['Uncomfortable', 'Distress'].includes(horse.mood)
-    && horse.lastTackIssue?.badTack
-    && horse.lastTackIssue?.suggestedTack
-  ) {
-    notes.push(`${horse.name} doesn’t seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
   }
   if (horse.lastTurnoutIssue === 'low') {
     notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
@@ -2752,6 +2742,23 @@ function trainerNotesForHorse(horse) {
   }
   if ((horse.injuryCountYear || 0) > 3) {
     notes.push(`${subject} is prone to injuries, better give ${object} some joint support feed!`);
+  }
+  if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
+    let reason = '';
+    let suggestion = '';
+    if (horse.lastTackIssue?.badTack && horse.lastTackIssue?.suggestedTack) {
+      reason = `wrong ${horse.lastTackIssue.badTack}`;
+      suggestion = `switch to ${horse.lastTackIssue.suggestedTack}`;
+    } else if (horse.lastFeedIssue?.badFeed && horse.lastFeedIssue?.betterFeed) {
+      reason = `${horse.lastFeedIssue.badFeed} feed not matching current needs`;
+      suggestion = `switch feeding plan to ${horse.lastFeedIssue.betterFeed}`;
+    } else if (horse.lastTurnoutIssue === 'low') {
+      reason = 'too little turnout';
+      suggestion = `increase turnout to at least ${resolvedTurnoutBounds(horse)[0]} hours`;
+    }
+    if (reason && suggestion) {
+      notes.push(`${horse.name} is showing ${horse.mood.toLowerCase()} due to ${reason}, try to ${suggestion}.`);
+    }
   }
   const bestFeed = recommendedFeedForHorse(horse);
   notes.push(`This is the best feedplan for this horse, ${bestFeed} ${feedMin}-${feedMax}g.`);
@@ -3159,23 +3166,23 @@ function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
   horse.lastTackIssue = null;
   if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle', reason: 'Flash Bridle can be too restrictive for easy-going horses' };
   }
   if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle' };
+    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle', reason: 'Drop Noseband Bridle can cause discomfort for spooky horses' };
   }
   if (['dressage', 'flatwork'].includes(discipline) && tack.bridle === 'Figure-8 Bridle') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle', reason: 'Figure-8 Bridle carries a discomfort risk in dressage/flatwork' };
   }
   if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle' };
+    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle', reason: 'Pelham Bit leverage can be uncomfortable for easy-going horses' };
   }
   if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') {
     horse.mood = 'Distress';
-    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle' };
+    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle', reason: 'Gag Bit has a distress risk for spooky horses' };
   }
   if (tack.bit === 'Loose Ring Snaffle' && !NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 20) horse.mood = pick(['Happy', 'Motivated']);
 }
@@ -3236,20 +3243,14 @@ function updateMonthlyCare(horse) {
   }
 
   let mood = horse.mood;
-  const tackDelta = tackControlabilityDelta(horse, 'flatwork');
-  if (tackDelta <= -8 && !['Distress', 'No energy'].includes(mood)) mood = 'Uncomfortable';
   if (!horse.lastFeedMoodOverride && (!mood || mood === 'Neutral')) {
     mood = applyMonthlyMoodShift(horse);
-  }
-  if ((horse.illnesses || []).some((i) => i.active)) {
-    mood = 'Distress';
   }
   if (horse.turnoutHours < minTurnout) {
     mood = 'Distress';
     horse.lastTurnoutIssue = 'low';
     updateWeight(horse, 1);
   } else if (horse.turnoutHours > maxTurnout) {
-    mood = 'Uncomfortable';
     horse.lastTurnoutIssue = 'high';
     updateWeight(horse, -1);
   }
