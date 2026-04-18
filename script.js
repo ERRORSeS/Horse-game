@@ -2733,7 +2733,7 @@ function trainerNotesForHorse(horse) {
     && horse.lastTackIssue?.badTack
     && horse.lastTackIssue?.suggestedTack
   ) {
-    notes.push(`${horse.name} doesn't seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
+    notes.push(`${horse.name} doesn’t seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
   }
   if (horse.lastTurnoutIssue === 'low') {
     notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
@@ -2785,7 +2785,7 @@ function evaluateFeedEffects(horse) {
         competitionBoost += 1;
         break;
       case 'Sports Feed':
-        if (!activeTraining && competitionCount === 0) {
+        if (!activeTraining || competitionCount === 0) {
           weightDelta += 1;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
@@ -2821,7 +2821,7 @@ function evaluateFeedEffects(horse) {
         break;
       case 'Calm nd Ez':
         if (['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality)) {
-          moodOverride = 'Uncomfortable';
+          moodOverride = 'Distress';
           competitionBoost -= 1;
           wrongFeedUsed = true;
           feedIssue = { badFeed: 'Calm nd Ez', betterFeed: 'Basic Feed' };
@@ -2844,10 +2844,10 @@ function evaluateFeedEffects(horse) {
       case 'Old Horse Feed':
         if (horse.age < 15 && !horse.retiredForever) {
           weightDelta += 1;
-          moodOverride = 'Distress';
+          moodOverride = 'Overly-Active';
           wrongFeedUsed = true;
           feedIssue = { badFeed: 'Old Horse Feed', betterFeed: 'Basic Feed' };
-          if (['Energetic', 'Stubborn'].includes(horse.personality)) moodOverride = 'Overly-Active';
+          competitionBoost -= 1;
         } else if (horse.age >= 20 || horse.retiredToBreeding || horse.retiredForever) {
           moodOverride = 'Happy';
           if (['Very Underweight', 'Underweight'].includes(horse.weightStatus)) weightDelta += 1;
@@ -2922,13 +2922,8 @@ function evaluateFeedEffects(horse) {
   const hasRecommendedFeed = (horse.feedPlan || []).some((f) => f.type === recommendedBaseFeed);
   const feedMatchesHorse = !wrongFeedUsed && (!moodOverride || !NEGATIVE_MOODS.includes(moodOverride));
   if (feedMatchesHorse && inPreferredFeedRange && hasRecommendedFeed && !usingWeightGainFeed && !usingDietFeed) {
-    if (horse.weightStatus === 'Very Underweight' || horse.weightStatus === 'Underweight') {
-      weightDelta = 1;
-    } else if (horse.weightStatus === 'Fleshy' || horse.weightStatus === 'Overweight') {
-      weightDelta = -1;
-    } else {
-      weightDelta = 0;
-    }
+    horse.weightStatus = 'Moderate';
+    weightDelta = 0;
   }
   if (wrongFeedUsed) {
     horse.wrongFeedMonthsYear = (horse.wrongFeedMonthsYear || 0) + 1;
@@ -3096,29 +3091,29 @@ function tackControlabilityDelta(horse, discipline = 'flatwork') {
   if (tack.bridle === 'Snaffle Bridle' && ['Easy-Going', 'Bomb-proof'].includes(horse.personality)) delta += 15;
   if (tack.bridle === 'Flash Bridle') {
     delta += clamp(Math.round((horse.controlability || 50) * 0.12), 5, 20);
-    if (['Energetic', 'Unfocused', 'Excitable', 'Stubborn'].includes(horse.personality)) delta += 4;
+    if (['Energetic', 'Unfocused', 'Excitable'].includes(horse.personality)) delta += 4;
   }
   if (tack.bridle === 'Drop Noseband Bridle') {
     delta += clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25);
-    if (['Unfocused', 'Excitable'].includes(horse.personality)) delta += 3;
+    if (['Unfocused'].includes(horse.personality)) delta += 3;
   }
   if (tack.bridle === 'Figure-8 Bridle') {
     delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25) : 3;
-    if (['Hot-Blooded', 'Stubborn'].includes(horse.personality)) delta += 3;
+    if (['Hot-Blooded'].includes(horse.personality)) delta += 3;
   }
   if (tack.bridle === 'Double Bridle') delta += (horse.bond || 0) >= 45 ? 25 : -20;
 
   if (tack.bit === 'Loose Ring Snaffle') delta += 1;
   if (tack.bit === 'Eggbutt Snaffle') {
     delta += 5;
-    if (['Unfocused', 'Hot-Blooded', 'Excitable', 'Stubborn'].includes(horse.personality)) delta += 2;
+    if (['Unfocused', 'Hot-Blooded', 'Excitable'].includes(horse.personality)) delta += 2;
   }
   if (tack.bit === 'D-Ring Bit') delta += 9;
   if (tack.bit === 'Pelham Bit') {
     delta += 15;
-    if (['Hot-Blooded', 'Spooky', 'Energetic', 'Stubborn'].includes(horse.personality)) delta += 3;
+    if (['Hot-Blooded', 'Spooky', 'Energetic'].includes(horse.personality)) delta += 3;
   }
-  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' ? -12 : ['Stubborn'].includes(horse.personality) ? 16 : 14;
+  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' ? -12 : ['Hot-Blooded', 'Excitable', 'Energetic'].includes(horse.personality) ? 16 : 14;
 
   if (tack.saddle === 'Jumping Saddle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 4 : -1;
   if (tack.saddle === 'Dressage Saddle') delta += discipline === 'dressage' || discipline === 'flatwork' ? 4 : -1;
@@ -5995,8 +5990,8 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const baseCompetitionPercent = lowBondAndCare ? rnd(15, 25) : rnd(25, 50);
   const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
   const bridleBitFailureRisk = tackFailurePenalty(horse, discipline);
-  const hasDressageClearTestCombo = discipline === 'dressage' && horse.tack?.bridle === 'Flash Bridle' && horse.tack?.bit === 'Pelham Bit';
-  const clearTestBoost = hasDressageClearTestCombo ? rnd(5, 10) : 0;
+  const hasDressageClearTestBoost = discipline === 'dressage' && horse.tack?.bridle === 'Flash Bridle';
+  const clearTestBoost = hasDressageClearTestBoost ? 20 : 0;
   const fieldSize = competitionFieldSize();
   let score = baseScore;
   let resultText = `${baseScore}`;
