@@ -2916,9 +2916,20 @@ function evaluateFeedEffects(horse) {
   }
   const usingWeightGainFeed = (horse.feedPlan || []).some((f) => f.type === 'Weight Gain');
   const usingDietFeed = (horse.feedPlan || []).some((f) => f.type === 'Diet Feed');
+  const isNearPreferredAmount = Math.abs(totalGrams - pref) <= 20;
   const feedMatchesHorse = !wrongFeedUsed && (!moodOverride || !NEGATIVE_MOODS.includes(moodOverride));
   if (feedMatchesHorse && !usingWeightGainFeed && !usingDietFeed) {
-    weightDelta = 0;
+    if (isNearPreferredAmount) {
+      if (horse.weightStatus === 'Very Underweight' || horse.weightStatus === 'Underweight') {
+        weightDelta = 1;
+      } else if (horse.weightStatus === 'Fleshy' || horse.weightStatus === 'Overweight') {
+        weightDelta = -1;
+      } else {
+        weightDelta = 0;
+      }
+    } else {
+      weightDelta = 0;
+    }
   }
   if (wrongFeedUsed) {
     horse.wrongFeedMonthsYear = (horse.wrongFeedMonthsYear || 0) + 1;
