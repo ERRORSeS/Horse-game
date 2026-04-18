@@ -2916,17 +2916,16 @@ function evaluateFeedEffects(horse) {
   }
   const usingWeightGainFeed = (horse.feedPlan || []).some((f) => f.type === 'Weight Gain');
   const usingDietFeed = (horse.feedPlan || []).some((f) => f.type === 'Diet Feed');
-  const isNearPreferredAmount = Math.abs(totalGrams - pref) <= 20;
+  const [feedMin, feedMax] = feedRangeBounds(horse);
+  const inPreferredFeedRange = totalGrams >= feedMin && totalGrams <= feedMax;
+  const recommendedBaseFeed = recommendedFeedForHorse(horse, { ignoreWeightStatus: true });
+  const hasRecommendedFeed = (horse.feedPlan || []).some((f) => f.type === recommendedBaseFeed);
   const feedMatchesHorse = !wrongFeedUsed && (!moodOverride || !NEGATIVE_MOODS.includes(moodOverride));
-  if (feedMatchesHorse && !usingWeightGainFeed && !usingDietFeed) {
-    if (isNearPreferredAmount) {
-      if (horse.weightStatus === 'Very Underweight' || horse.weightStatus === 'Underweight') {
-        weightDelta = 1;
-      } else if (horse.weightStatus === 'Fleshy' || horse.weightStatus === 'Overweight') {
-        weightDelta = -1;
-      } else {
-        weightDelta = 0;
-      }
+  if (feedMatchesHorse && inPreferredFeedRange && hasRecommendedFeed && !usingWeightGainFeed && !usingDietFeed) {
+    if (horse.weightStatus === 'Very Underweight' || horse.weightStatus === 'Underweight') {
+      weightDelta = 1;
+    } else if (horse.weightStatus === 'Fleshy' || horse.weightStatus === 'Overweight') {
+      weightDelta = -1;
     } else {
       weightDelta = 0;
     }
@@ -5996,7 +5995,8 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const baseCompetitionPercent = lowBondAndCare ? rnd(15, 25) : rnd(25, 50);
   const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
   const bridleBitFailureRisk = tackFailurePenalty(horse, discipline);
-  const clearTestBoost = (horse.tack?.bridle === 'Flash Bridle' ? 20 : 0) + (horse.tack?.bit === 'Pelham Bit' && discipline === 'dressage' ? 25 : 0);
+  const hasDressageClearTestCombo = discipline === 'dressage' && horse.tack?.bridle === 'Flash Bridle' && horse.tack?.bit === 'Pelham Bit';
+  const clearTestBoost = hasDressageClearTestCombo ? rnd(5, 10) : 0;
   const fieldSize = competitionFieldSize();
   let score = baseScore;
   let resultText = `${baseScore}`;
