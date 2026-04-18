@@ -2725,7 +2725,8 @@ function trainerNotesForHorse(horse) {
   if (horse.lastFeedIssue?.badFeed && horse.lastFeedIssue?.betterFeed) {
     notes.push(`${subject} needs ${horse.lastFeedIssue.badFeed} changed to ${horse.lastFeedIssue.betterFeed}!`);
     if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
-      notes.push(`${horse.name} looks ${horse.mood}, consider switching the feed.`);
+      const reason = horse.lastFeedIssue.reason ? ` Reason: ${horse.lastFeedIssue.reason}.` : '';
+      notes.push(`${horse.name} isn't liking this feeding plan, consider switching to ${horse.lastFeedIssue.betterFeed}.${reason}`);
     }
   }
   if (
@@ -2733,7 +2734,10 @@ function trainerNotesForHorse(horse) {
     && horse.lastTackIssue?.badTack
     && horse.lastTackIssue?.suggestedTack
   ) {
-    notes.push(`${horse.name} doesn’t seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
+    const tackReason = horse.lastTackIssue.reason ? ` Reason: ${horse.lastTackIssue.reason}.` : '';
+    notes.push(`${horse.name} doesn’t seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.${tackReason}`);
+  } else if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
+    notes.push(`${horse.name} looks ${horse.mood} because current management choices are not a great match right now.`);
   }
   if (horse.lastTurnoutIssue === 'low') {
     notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
@@ -2789,7 +2793,7 @@ function evaluateFeedEffects(horse) {
           weightDelta += 1;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Sports Feed', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Sports Feed', betterFeed: 'Basic Feed', reason: 'Sports Feed is better suited for active training or competition months' };
         } else {
           trainingBoost += 2;
           competitionBoost += 1;
@@ -2801,7 +2805,7 @@ function evaluateFeedEffects(horse) {
           moodOverride = 'Overly-Active';
           competitionBoost -= 1;
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Sweet Feed', betterFeed: 'Calm nd Ez' };
+          feedIssue = { badFeed: 'Sweet Feed', betterFeed: 'Calm nd Ez', reason: 'Sweet Feed can make energetic temperaments feel more unsettled' };
         } else if (horse.personality === 'Lazy') {
           moodOverride = 'Motivated';
           competitionBoost += 1;
@@ -2814,7 +2818,7 @@ function evaluateFeedEffects(horse) {
           weightDelta += 1;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Brood-mare Feed', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Brood-mare Feed', betterFeed: 'Basic Feed', reason: 'Brood-mare Feed should only be used for breeding mares or very young horses' };
         } else {
           moodOverride = 'Happy';
         }
@@ -2824,7 +2828,7 @@ function evaluateFeedEffects(horse) {
           moodOverride = 'Distress';
           competitionBoost -= 1;
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Calm nd Ez', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Calm nd Ez', betterFeed: 'Basic Feed', reason: 'Calm nd Ez can lower engagement too much for this temperament' };
         } else {
           moodOverride = 'Neutral';
           competitionBoost += 1;
@@ -2836,7 +2840,7 @@ function evaluateFeedEffects(horse) {
           weightDelta += 1;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Youngster Feed', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Youngster Feed', betterFeed: 'Basic Feed', reason: 'Youngster Feed is formulated for younger developing horses' };
         } else {
           trainingBoost += 2;
         }
@@ -2846,7 +2850,7 @@ function evaluateFeedEffects(horse) {
           weightDelta += 1;
           moodOverride = 'Overly-Active';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Old Horse Feed', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Old Horse Feed', betterFeed: 'Basic Feed', reason: 'Old Horse Feed is designed for senior or retired horses' };
           competitionBoost -= 1;
         } else if (horse.age >= 20 || horse.retiredToBreeding || horse.retiredForever) {
           moodOverride = 'Happy';
@@ -2859,7 +2863,7 @@ function evaluateFeedEffects(horse) {
         if (!hasInjury) {
           moodOverride = 'Uncomfortable';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Recovery', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Recovery', betterFeed: 'Basic Feed', reason: 'Recovery feed is usually only needed when the horse has an active health issue' };
         } else {
           const roll = rnd(1, 100);
           if (roll > 10 && roll <= 80) {
@@ -2872,7 +2876,7 @@ function evaluateFeedEffects(horse) {
           moodOverride = 'Distress';
           weightDelta += 1;
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Weight Gain', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Weight Gain', betterFeed: 'Basic Feed', reason: 'Weight Gain feed can cause discomfort when the horse is not underweight' };
         } else {
           weightDelta += 1;
         }
@@ -2884,7 +2888,7 @@ function evaluateFeedEffects(horse) {
           weightDelta -= 2;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Diet Feed', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Diet Feed', betterFeed: 'Basic Feed', reason: 'Diet Feed is intended for overweight horses and can leave this horse underfueled' };
         }
         if (feed.grams > 60) {
           moodOverride = 'Distress';
@@ -2897,7 +2901,7 @@ function evaluateFeedEffects(horse) {
         } else {
           moodOverride = 'Distress';
           wrongFeedUsed = true;
-          feedIssue = { badFeed: 'Joint Support', betterFeed: 'Basic Feed' };
+          feedIssue = { badFeed: 'Joint Support', betterFeed: 'Basic Feed', reason: 'Joint Support feed is only needed for horses with recurring injury concerns' };
         }
         break;
       default:
@@ -3159,23 +3163,23 @@ function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
   horse.lastTackIssue = null;
   if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle', reason: 'Flash Bridle can feel too restrictive for an easy-going horse' };
   }
   if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle' };
+    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle', reason: 'Drop Noseband Bridle can add jaw restriction for spooky horses' };
   }
   if (['dressage', 'flatwork'].includes(discipline) && tack.bridle === 'Figure-8 Bridle') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle', reason: 'Figure-8 Bridles are less suitable for relaxed dressage contact' };
   }
   if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle' };
+    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle', reason: 'Pelham leverage can feel too strong for an easy-going horse' };
   }
   if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') {
     horse.mood = 'Distress';
-    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle' };
+    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle', reason: 'Gag Bit pressure can cause distress in spooky horses' };
   }
   if (tack.bit === 'Loose Ring Snaffle' && !NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 20) horse.mood = pick(['Happy', 'Motivated']);
 }
