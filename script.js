@@ -2726,6 +2726,8 @@ function trainerNotesForHorse(horse) {
     notes.push(`${subject} needs ${horse.lastFeedIssue.badFeed} changed to ${horse.lastFeedIssue.betterFeed}!`);
     if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
       notes.push(`${horse.name} looks ${horse.mood}, consider switching the feed.`);
+      notes.push(`${horse.name} isn't liking this feeding plan, consider switching to ${horse.lastFeedIssue.betterFeed}.`);
+      notes.push(`Reason: ${horse.lastFeedIssue.badFeed} is not a good fit for ${horse.name}'s current needs.`);
     }
   }
   if (
@@ -2734,6 +2736,7 @@ function trainerNotesForHorse(horse) {
     && horse.lastTackIssue?.suggestedTack
   ) {
     notes.push(`${horse.name} doesn’t seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
+    notes.push(`Reason: ${horse.lastTackIssue.reason || `${horse.lastTackIssue.badTack} does not suit ${horse.name}'s personality or current work`}.`);
   }
   if (horse.lastTurnoutIssue === 'low') {
     notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
@@ -2752,6 +2755,9 @@ function trainerNotesForHorse(horse) {
   }
   if ((horse.injuryCountYear || 0) > 3) {
     notes.push(`${subject} is prone to injuries, better give ${object} some joint support feed!`);
+  }
+  if (['Uncomfortable', 'Distress'].includes(horse.mood) && !horse.lastFeedIssue && !horse.lastTackIssue) {
+    notes.push(`Reason: ${horse.name} is showing ${horse.mood.toLowerCase()} due to recent workload, turnout, or recovery needs.`);
   }
   const bestFeed = recommendedFeedForHorse(horse);
   notes.push(`This is the best feedplan for this horse, ${bestFeed} ${feedMin}-${feedMax}g.`);
@@ -3159,23 +3165,23 @@ function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
   horse.lastTackIssue = null;
   if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle', reason: 'Flash Bridle can be too restrictive for easy-going horses' };
   }
   if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle' };
+    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle', reason: 'Drop Noseband Bridle can cause discomfort for spooky horses' };
   }
   if (['dressage', 'flatwork'].includes(discipline) && tack.bridle === 'Figure-8 Bridle') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle' };
+    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle', reason: 'Figure-8 Bridle carries a discomfort risk in dressage/flatwork' };
   }
   if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle' };
+    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle', reason: 'Pelham Bit leverage can be uncomfortable for easy-going horses' };
   }
   if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') {
     horse.mood = 'Distress';
-    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle' };
+    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle', reason: 'Gag Bit has a distress risk for spooky horses' };
   }
   if (tack.bit === 'Loose Ring Snaffle' && !NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 20) horse.mood = pick(['Happy', 'Motivated']);
 }
