@@ -2728,6 +2728,13 @@ function trainerNotesForHorse(horse) {
       notes.push(`${horse.name} looks ${horse.mood}, consider switching the feed.`);
     }
   }
+  if (
+    ['Uncomfortable', 'Distress'].includes(horse.mood)
+    && horse.lastTackIssue?.badTack
+    && horse.lastTackIssue?.suggestedTack
+  ) {
+    notes.push(`${horse.name} doesn't seem to be comfortable with this ${horse.lastTackIssue.badTack}, I suggest switching it to ${horse.lastTackIssue.suggestedTack}.`);
+  }
   if (horse.lastTurnoutIssue === 'low') {
     notes.push(`${subject} has so much energy, give ${object} more turn-out, it's a living creature after all!`);
   }
@@ -3077,16 +3084,31 @@ function tackControlabilityDelta(horse, discipline = 'flatwork') {
   const tack = horse.tack || {};
   let delta = 0;
   if (tack.bridle === 'Snaffle Bridle' && ['Easy-Going', 'Bomb-proof'].includes(horse.personality)) delta += 15;
-  if (tack.bridle === 'Flash Bridle') delta += clamp(Math.round((horse.controlability || 50) * 0.12), 5, 20);
-  if (tack.bridle === 'Drop Noseband Bridle') delta += clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25);
-  if (tack.bridle === 'Figure-8 Bridle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25) : 3;
+  if (tack.bridle === 'Flash Bridle') {
+    delta += clamp(Math.round((horse.controlability || 50) * 0.12), 5, 20);
+    if (['Energetic', 'Unfocused', 'Excitable', 'Stubborn'].includes(horse.personality)) delta += 4;
+  }
+  if (tack.bridle === 'Drop Noseband Bridle') {
+    delta += clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25);
+    if (['Unfocused', 'Excitable'].includes(horse.personality)) delta += 3;
+  }
+  if (tack.bridle === 'Figure-8 Bridle') {
+    delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25) : 3;
+    if (['Hot-Blooded', 'Stubborn'].includes(horse.personality)) delta += 3;
+  }
   if (tack.bridle === 'Double Bridle') delta += (horse.bond || 0) >= 45 ? 25 : -20;
 
   if (tack.bit === 'Loose Ring Snaffle') delta += 1;
-  if (tack.bit === 'Eggbutt Snaffle') delta += 5;
+  if (tack.bit === 'Eggbutt Snaffle') {
+    delta += 5;
+    if (['Unfocused', 'Hot-Blooded', 'Excitable', 'Stubborn'].includes(horse.personality)) delta += 2;
+  }
   if (tack.bit === 'D-Ring Bit') delta += 9;
-  if (tack.bit === 'Pelham Bit') delta += 15;
-  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' ? -12 : 14;
+  if (tack.bit === 'Pelham Bit') {
+    delta += 15;
+    if (['Hot-Blooded', 'Spooky', 'Energetic', 'Stubborn'].includes(horse.personality)) delta += 3;
+  }
+  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' ? -12 : ['Stubborn'].includes(horse.personality) ? 16 : 14;
 
   if (tack.saddle === 'Jumping Saddle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 4 : -1;
   if (tack.saddle === 'Dressage Saddle') delta += discipline === 'dressage' || discipline === 'flatwork' ? 4 : -1;
@@ -3129,11 +3151,27 @@ function tackFailurePenalty(horse, discipline = 'flatwork') {
 
 function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
   const tack = horse.tack || {};
-  if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') horse.mood = 'Uncomfortable';
-  if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') horse.mood = 'Uncomfortable';
-  if (discipline === 'dressage' && tack.bridle === 'Figure-8 Bridle') horse.mood = 'Uncomfortable';
-  if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') horse.mood = 'Uncomfortable';
-  if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') horse.mood = 'Distress';
+  horse.lastTackIssue = null;
+  if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
+    horse.mood = 'Uncomfortable';
+    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle' };
+  }
+  if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') {
+    horse.mood = 'Uncomfortable';
+    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle' };
+  }
+  if (['dressage', 'flatwork'].includes(discipline) && tack.bridle === 'Figure-8 Bridle') {
+    horse.mood = 'Uncomfortable';
+    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle' };
+  }
+  if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') {
+    horse.mood = 'Uncomfortable';
+    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle' };
+  }
+  if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') {
+    horse.mood = 'Distress';
+    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle' };
+  }
   if (tack.bit === 'Loose Ring Snaffle' && !NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 20) horse.mood = pick(['Happy', 'Motivated']);
 }
 
@@ -5985,6 +6023,17 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   if (tack.body === 'Draw Reins' && !hotBlooded) {
     tackPenaltyBias += 3;
     tackRefusalBias += 6;
+  }
+  if (tack.bridle === 'Flash Bridle') {
+    tackPenaltyBias -= 1;
+    tackRefusalBias -= 1;
+  }
+  if (tack.bridle === 'Drop Noseband Bridle' && discipline === 'jumping') {
+    tackPenaltyBias -= 2;
+  }
+  if (tack.bridle === 'Figure-8 Bridle' && ['jumping', 'eventing'].includes(discipline)) {
+    tackPenaltyBias -= 2;
+    tackRefusalBias -= 3;
   }
 
   if (discipline === 'jumping') {
