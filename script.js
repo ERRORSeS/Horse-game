@@ -260,6 +260,23 @@ function resetTrainingWindow(horse) {
   horse.trainingSessionsSinceReset = 0;
 }
 
+function ensureMoodShiftSchedule(horse) {
+  if (!horse) return;
+  if (!Number.isFinite(horse.nextMoodShiftHourAbsolute)) {
+    horse.nextMoodShiftHourAbsolute = currentHourAbsolute() + rnd(12, 14);
+  }
+}
+
+function applyScheduledMoodShift(horse, force = false) {
+  if (!horse) return false;
+  const now = currentHourAbsolute();
+  ensureMoodShiftSchedule(horse);
+  if (!force && now < horse.nextMoodShiftHourAbsolute) return false;
+  horse.mood = resolveMonthlyMoodFromCare(horse);
+  horse.nextMoodShiftHourAbsolute = now + rnd(12, 14);
+  return true;
+}
+
 function applyDailyRolloverToHorse(horse, newborns) {
   if (!horse) return;
   if (horse.foalVitality && Number.isFinite(horse.foalVitality.ageDays)) horse.foalVitality.ageDays += 1;
@@ -3608,6 +3625,7 @@ function hydrateFromSave(data) {
     h.handTrainingSkillCapThisMonth = Number.isFinite(h.handTrainingSkillCapThisMonth) ? h.handTrainingSkillCapThisMonth : null;
     h.handTrainingSkillCapMonthIndex = Number.isFinite(h.handTrainingSkillCapMonthIndex) ? h.handTrainingSkillCapMonthIndex : null;
     h.trainingSessionsSinceReset = Number.isFinite(h.trainingSessionsSinceReset) ? h.trainingSessionsSinceReset : 0;
+    h.nextMoodShiftHourAbsolute = Number.isFinite(h.nextMoodShiftHourAbsolute) ? h.nextMoodShiftHourAbsolute : currentHourAbsolute() + rnd(12, 14);
     h.preferredMoodMonths = Number.isFinite(h.preferredMoodMonths) ? h.preferredMoodMonths : 0;
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
     h.careerLevelCaps = h.careerLevelCaps && typeof h.careerLevelCaps === 'object' ? h.careerLevelCaps : {};
@@ -4626,6 +4644,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     handTrainingSkillGainsThisMonth: 0,
     handTrainingSkillCapThisMonth: null,
     handTrainingSkillCapMonthIndex: null,
+    nextMoodShiftHourAbsolute: currentHourAbsolute() + rnd(12, 14),
     manualTrainingThisMonth: false,
     farrierThisMonth: false,
     turnoutHours: 0,
@@ -7034,6 +7053,11 @@ function advanceOneHour() {
     advanceOneDay();
     return;
   }
+  app.horses.forEach((h) => applyScheduledMoodShift(h, false));
+  Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
+    if (!Array.isArray(roster)) return;
+    roster.forEach((h) => applyScheduledMoodShift(h, false));
+  });
   resolveAllPendingCompetitions();
 }
 
