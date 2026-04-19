@@ -283,7 +283,6 @@ function applyDailyRolloverToHorse(horse, newborns) {
   if (isPregnantMare(horse)) processPregnancy(horse, newborns, 1);
   applyStablehandCare(horse);
   applyDailyPregnancyUpdates(horse);
-  applyScheduledMoodShift(horse, true);
   resolvePendingCompetitions(horse);
   resetTrainingWindow(horse);
   horse.fatigue = 0;
@@ -7040,7 +7039,6 @@ function advanceOneDay() {
   Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
     if (!Array.isArray(roster)) return;
     roster.forEach((h) => {
-      applyScheduledMoodShift(h, true);
       resolvePendingCompetitions(h);
       resetTrainingWindow(h);
       h.fatigue = 0;
