@@ -1969,6 +1969,30 @@ function autoTrainingSkillCapRange(stamina = 'Medium') {
   return [5, 7];
 }
 
+function ensureHandTrainingSkillCap(horse) {
+  if (!horse) return 0;
+  const monthIdx = currentMonthIndex();
+  const [minCap, maxCap] = autoTrainingSkillCapRange(horse.trainingPreference || 'Medium');
+  if (horse.handTrainingSkillCapMonthIndex !== monthIdx || !Number.isFinite(horse.handTrainingSkillCapThisMonth)) {
+    horse.handTrainingSkillCapMonthIndex = monthIdx;
+    horse.handTrainingSkillCapThisMonth = rnd(minCap, maxCap);
+    horse.handTrainingSkillGainsThisMonth = 0;
+  }
+  return horse.handTrainingSkillCapThisMonth;
+}
+
+function consumeHandTrainingSkillGain(horse, requested = 1) {
+  if (!horse) return 0;
+  const capThisMonth = ensureHandTrainingSkillCap(horse);
+  const gainsSoFar = Number.isFinite(horse.handTrainingSkillGainsThisMonth) ? horse.handTrainingSkillGainsThisMonth : 0;
+  const remaining = Math.max(0, capThisMonth - gainsSoFar);
+  const wanted = Math.max(0, Math.round(Number(requested) || 0));
+  const granted = Math.min(remaining, wanted);
+  if (granted <= 0 && wanted > 0) horse.mood = 'No energy';
+  if (granted > 0) horse.handTrainingSkillGainsThisMonth = gainsSoFar + granted;
+  return granted;
+}
+
 function markTrainingSession(horse, count = 1) {
   const sessionCount = Math.max(1, Math.round(Number(count) || 1));
   horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + sessionCount;
@@ -3312,6 +3336,9 @@ function updateMonthlyCare(horse) {
   trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
   horse.handTrainingSessionsThisMonth = 0;
+  horse.handTrainingSkillGainsThisMonth = 0;
+  horse.handTrainingSkillCapThisMonth = null;
+  horse.handTrainingSkillCapMonthIndex = null;
   horse.showEntriesThisMonth = 0;
 }
 
@@ -3525,6 +3552,9 @@ function hydrateFromSave(data) {
     h.overTrainingCountYear = Number.isFinite(h.overTrainingCountYear) ? h.overTrainingCountYear : 0;
     h.pendingOvertrainingInjury = h.pendingOvertrainingInjury || false;
     h.handTrainingSessionsThisMonth = Number.isFinite(h.handTrainingSessionsThisMonth) ? h.handTrainingSessionsThisMonth : 0;
+    h.handTrainingSkillGainsThisMonth = Number.isFinite(h.handTrainingSkillGainsThisMonth) ? h.handTrainingSkillGainsThisMonth : 0;
+    h.handTrainingSkillCapThisMonth = Number.isFinite(h.handTrainingSkillCapThisMonth) ? h.handTrainingSkillCapThisMonth : null;
+    h.handTrainingSkillCapMonthIndex = Number.isFinite(h.handTrainingSkillCapMonthIndex) ? h.handTrainingSkillCapMonthIndex : null;
     h.trainingSessionsSinceReset = Number.isFinite(h.trainingSessionsSinceReset) ? h.trainingSessionsSinceReset : 0;
     h.lastMoodShiftHourAbsolute = Number.isFinite(h.lastMoodShiftHourAbsolute) ? h.lastMoodShiftHourAbsolute : currentHourAbsolute();
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
@@ -4540,6 +4570,9 @@ function baseHorse(type = 'trained', origin = 'player') {
     showEntriesThisMonth: 0,
     lastShowEntries: 0,
     handTrainingSessionsThisMonth: 0,
+    handTrainingSkillGainsThisMonth: 0,
+    handTrainingSkillCapThisMonth: null,
+    handTrainingSkillCapMonthIndex: null,
     manualTrainingThisMonth: false,
     farrierThisMonth: false,
     turnoutHours: 0,
@@ -5387,6 +5420,7 @@ function createHorseCard(horse) {
     <select class='auto-focus'>${autoFocusOptions}</select>
     <p class='small'>Auto training uses the preferred training amount (${horse.preferredTrainingSessions} sessions).</p>
     <p class='small'>Auto-training monthly skill cap: ${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills.</p>
+    <p class='small'>Hand training skill gains this month: ${horse.handTrainingSkillGainsThisMonth || 0}/${ensureHandTrainingSkillCap(horse)}.</p>
     <button data-action='save-auto-focus'>Save Auto Training</button>
     ${canAutoCare ? `<button data-action='toggle-auto-stall'>Auto Stall Cleaning: ${horse.autoStallCleaning ? 'On' : 'Off'}</button><button data-action='toggle-auto-groom'>Auto Grooming: ${horse.autoGrooming ? 'On' : 'Off'}</button>` : ''}
     ${horse.autoTrainingFocus ? `<p class='small'>Auto training set to: ${horse.autoTrainingFocus}</p>` : '<p class="small">No auto training assigned.</p>'}
@@ -6233,6 +6267,10 @@ function normalizeTrainingDisciplineKey(discipline) {
 
 function applyNormalTrainingSession(horse, discipline, exercise) {
   const disciplineKey = normalizeTrainingDisciplineKey(discipline);
+  if (!consumeHandTrainingSkillGain(horse, 1)) {
+    pushReport(`${horse.name} is out of energy for hand-training skill gains this month.`);
+    return;
+  }
   const gain = rnd(1, 4);
   const confidenceGain = rnd(0, 2);
   if (disciplineKey === 'dressage') {
@@ -6250,6 +6288,7 @@ function applyNormalTrainingSession(horse, discipline, exercise) {
 
 function applyRpgSkillGain(horse, discipline, exercise, gain) {
   if (!gain) return { actualGain: 0, skill: exercise || '' };
+  if (!consumeHandTrainingSkillGain(horse, 1)) return { actualGain: 0, skill: exercise || '' };
   const disciplineKey = normalizeTrainingDisciplineKey(discipline);
   const skillPool = EXERCISE_MENU[disciplineKey] || EXERCISE_MENU.jumping;
   const fallbackSkill = skillPool[0];
@@ -7708,6 +7747,14 @@ function renderTraining() {
     if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle training.');
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
+    const handSkillCap = ensureHandTrainingSkillCap(h);
+    const handSkillGains = Number.isFinite(h.handTrainingSkillGainsThisMonth) ? h.handTrainingSkillGainsThisMonth : 0;
+    if (handSkillGains >= handSkillCap) {
+      h.mood = 'No energy';
+      pushReport(`${h.name} hit the hand-training monthly skill cap (${handSkillCap}) and has no energy left.`);
+      render();
+      return alert('No energy: this horse reached the monthly hand-training skill cap.');
+    }
     h.managed.trained = true;
     markTrainingSession(h);
     h.manualTrainingThisMonth = true;
@@ -8140,6 +8187,9 @@ function monthlyProgress() {
       resolvePendingCompetitions(h);
       h.trainingSessionsThisMonth = 0;
       h.handTrainingSessionsThisMonth = 0;
+      h.handTrainingSkillGainsThisMonth = 0;
+      h.handTrainingSkillCapThisMonth = null;
+      h.handTrainingSkillCapMonthIndex = null;
       h.showEntriesThisMonth = 0;
       resetTrainingWindow(h);
     });
