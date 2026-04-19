@@ -5402,7 +5402,7 @@ function createHorseCard(horse) {
     <button data-action='save-tack'>Save Tack</button>
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
-    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Training stamina: ${horse.trainingPreference} (${trainingStaminaRange(horse.trainingPreference)} sessions) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Stamina: ${horse.trainingPreference} (${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills / per month) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
     ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: Confirmed (timeline hidden — use pH testing only).</p>` : ''}
     ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
     ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
@@ -5418,7 +5418,7 @@ function createHorseCard(horse) {
     ${horse.showTrainerNotes ? `<div class='box'>${horse.trainerNotes.length ? horse.trainerNotes.map((n) => `<p class='small'>${n}</p>`).join('') : '<p class="small">No trainer notes this month.</p>'}</div>` : ''}
     <label>Auto Training Focus (monthly)</label>
     <select class='auto-focus'>${autoFocusOptions}</select>
-    <p class='small'>Auto training uses the preferred training amount (${horse.preferredTrainingSessions} sessions).</p>
+    <p class='small'>Auto training stamina cap: ${horse.trainingPreference} (${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills / per month).</p>
     <p class='small'>Auto-training monthly skill cap: ${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills.</p>
     <p class='small'>Hand training skill gains this month: ${horse.handTrainingSkillGainsThisMonth || 0}/${ensureHandTrainingSkillCap(horse)}.</p>
     <button data-action='save-auto-focus'>Save Auto Training</button>
