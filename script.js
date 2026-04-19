@@ -2680,6 +2680,14 @@ function recommendedFeedForHorse(horse, options = {}) {
 function stablehandFeedPlanForHorse(horse) {
   const [feedMin, feedMax] = feedRangeBounds(horse);
   const targetGrams = clamp(Math.round((feedMin + feedMax) / 2), 50, 250);
+  if (horse.illnesses.some((i) => i.active)) {
+    const calmShare = Math.max(30, Math.round(targetGrams * 0.6));
+    const recoveryShare = Math.max(20, targetGrams - calmShare);
+    return [
+      { type: 'Calm nd Ez', grams: calmShare },
+      { type: 'Recovery', grams: recoveryShare }
+    ];
+  }
   const preferredFeed = recommendedFeedForHorse(horse, { ignoreWeightStatus: true });
   let managedFeed = preferredFeed;
   if (['Overweight', 'Fleshy'].includes(horse.weightStatus)) {
@@ -2696,13 +2704,6 @@ function applyStablehandCare(horse) {
   horse.managed = horse.managed || {};
   horse.managed.fed = true;
   horse.managed.vet = true;
-
-  (horse.illnesses || []).forEach((issue) => {
-    if (!issue) return;
-    issue.active = false;
-    issue.remaining = 0;
-    issue.hidden = false;
-  });
 
   horse.stallCleanliness = Math.max(90, Number(horse.stallCleanliness) || 0);
   horse.hoofCare = Math.max(90, Number(horse.hoofCare) || 0);
@@ -2760,12 +2761,13 @@ function trainerNotesForHorse(horse) {
       suggestion = `increase turnout to at least ${resolvedTurnoutBounds(horse)[0]} hours`;
     }
     if (reason && suggestion) {
-      notes.push(`${horse.name} is showing ${horse.mood.toLowerCase()} due to ${reason}, try to ${suggestion}.`);
-    } else if (!horse.lastMoodReason) {
-      notes.push(`${horse.name} is showing ${horse.mood.toLowerCase()} due to feed/tack/turnout mismatch. Check feed type, bridle/bit fit, and turnout minimum.`);
+      notes.push(`${horse.name} is feeling ${horse.mood.toLowerCase()} due to ${reason}, I suggest ${suggestion}.`);
+    } else if (horse.lastMoodReason) {
+      notes.push(`${horse.name} is feeling ${horse.mood.toLowerCase()} due to current management mismatch, I suggest checking feed type, bridle/bit fit, and turnout minimum.`);
     }
   }
-  const bestFeed = recommendedFeedForHorse(horse);
+  const recovering = horse.illnesses.some((i) => i.active);
+  const bestFeed = recovering ? 'Calm nd Ez + Recovery (mix)' : recommendedFeedForHorse(horse);
   notes.push(`This is the best feedplan for this horse, ${bestFeed} ${feedMin}-${feedMax}g.`);
   horse.trainerNotes = notes;
 }
