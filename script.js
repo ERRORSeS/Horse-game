@@ -2667,7 +2667,7 @@ function genderPronouns(horse) {
 
 function recommendedFeedForHorse(horse, options = {}) {
   const { ignoreWeightStatus = false } = options;
-  if (horse.illnesses.some((i) => i.active)) return 'Recovery';
+  if (horse.illnesses.some((i) => i.active)) return 'Calm nd Ez';
   if ((horse.injuryCountYear || 0) > 3) return 'Joint Support';
   if (horse.pregnantBy || horse.pregnantEmbryo || horse.retiredToBreeding) return 'Brood-mare Feed';
   if (horse.age <= 5) return 'Youngster Feed';
@@ -2747,6 +2747,9 @@ function trainerNotesForHorse(horse) {
   if (['Uncomfortable', 'Distress'].includes(horse.mood)) {
     let reason = '';
     let suggestion = '';
+    if (horse.lastMoodReason) {
+      notes.push(`Mood reason: ${horse.lastMoodReason}`);
+    }
     if (horse.lastTackIssue?.badTack && horse.lastTackIssue?.suggestedTack) {
       reason = `wrong ${horse.lastTackIssue.badTack}`;
       suggestion = `switch to ${horse.lastTackIssue.suggestedTack}`;
