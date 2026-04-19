@@ -2605,9 +2605,9 @@ function applySoundnessWear(horse) {
 }
 
 function trainingSessionBounds(level) {
-  if (level === 'Low') return [10, 15];
-  if (level === 'High') return [30, 50];
-  return [15, 30];
+  if (level === 'Low') return [2, 5];
+  if (level === 'High') return [7, 10];
+  return [5, 7];
 }
 
 function trainingStaminaRange(level) {
