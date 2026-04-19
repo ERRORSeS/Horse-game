@@ -1963,6 +1963,12 @@ function preferredTrainingSessionLimit(horse) {
   return clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
 }
 
+function autoTrainingSkillCapRange(stamina = 'Medium') {
+  if (stamina === 'Low') return [2, 5];
+  if (stamina === 'High') return [7, 10];
+  return [5, 7];
+}
+
 function markTrainingSession(horse, count = 1) {
   const sessionCount = Math.max(1, Math.round(Number(count) || 1));
   horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + sessionCount;
@@ -3022,7 +3028,8 @@ function applyAutoTraining(horse) {
   const stamina = horse.trainingPreference || 'Medium';
   const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
   const preferred = clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
-  const skillCap = stamina === 'Low' ? rnd(2, 5) : stamina === 'High' ? rnd(7, 10) : rnd(5, 7);
+  const [minSkillCap, maxSkillCap] = autoTrainingSkillCapRange(stamina);
+  const skillCap = rnd(minSkillCap, maxSkillCap);
   let skillGains = 0;
   let trainedSessions = 0;
   if (horse.autoTrainingFocus === 'Light Exercise') {
@@ -5379,6 +5386,7 @@ function createHorseCard(horse) {
     <label>Auto Training Focus (monthly)</label>
     <select class='auto-focus'>${autoFocusOptions}</select>
     <p class='small'>Auto training uses the preferred training amount (${horse.preferredTrainingSessions} sessions).</p>
+    <p class='small'>Auto-training monthly skill cap: ${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills.</p>
     <button data-action='save-auto-focus'>Save Auto Training</button>
     ${canAutoCare ? `<button data-action='toggle-auto-stall'>Auto Stall Cleaning: ${horse.autoStallCleaning ? 'On' : 'Off'}</button><button data-action='toggle-auto-groom'>Auto Grooming: ${horse.autoGrooming ? 'On' : 'Off'}</button>` : ''}
     ${horse.autoTrainingFocus ? `<p class='small'>Auto training set to: ${horse.autoTrainingFocus}</p>` : '<p class="small">No auto training assigned.</p>'}
