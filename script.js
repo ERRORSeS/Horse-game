@@ -260,27 +260,12 @@ function resetTrainingWindow(horse) {
   horse.trainingSessionsSinceReset = 0;
 }
 
-function applyScheduledMoodShift(horse, force = false) {
-  if (!horse || horse.mood === 'No energy') return;
-  const currentHour = currentHourAbsolute();
-  if (!Number.isFinite(horse.lastMoodShiftHourAbsolute)) {
-    horse.lastMoodShiftHourAbsolute = currentHour;
-    if (!force) return;
-  }
-  if (!force && currentHour - horse.lastMoodShiftHourAbsolute < 12) return;
-  let nextMood = applyMonthlyMoodShift(horse);
-  if (nextMood === 'No energy') nextMood = pickNegativeMoodExcludingNoEnergy();
-  horse.mood = nextMood;
-  horse.lastMoodShiftHourAbsolute = currentHour;
-}
-
 function applyDailyRolloverToHorse(horse, newborns) {
   if (!horse) return;
   if (horse.foalVitality && Number.isFinite(horse.foalVitality.ageDays)) horse.foalVitality.ageDays += 1;
   if (isPregnantMare(horse)) processPregnancy(horse, newborns, 1);
   applyStablehandCare(horse);
   applyDailyPregnancyUpdates(horse);
-  applyScheduledMoodShift(horse, true);
   resolvePendingCompetitions(horse);
   resetTrainingWindow(horse);
   horse.fatigue = 0;
@@ -2112,8 +2097,9 @@ function trainingOptionChances(option, horse, session, optionIndex = 0) {
   const promptSeed = stableTextHash(`${horse.id}|${session.action}|${session.stepIndex}|${session.variant?.id || 0}|${option.intent || option.label}|${optionIndex}`);
   const promptBias = (promptSeed % 9) - 4;
   const environmentPenalty = session.environment && ['Gusty', 'Unexpected loud sounds', 'Slightly slick in spots', 'Choppy and uneven', 'Crowded schooling ring'].some((hazard) => Object.values(session.environment).includes(hazard)) ? -4 : 0;
+  const moodAdvantage = moodAdvantageRoll(horse, 'training');
   const successChance = clamp(
-    Math.round(baseSuccess + traitBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.8) + bondBonus + controlBonus + confidenceBonus + skillBonus + optionBias + promptBias + environmentPenalty),
+    Math.round(baseSuccess + traitBonus + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.8) + bondBonus + controlBonus + confidenceBonus + skillBonus + optionBias + promptBias + environmentPenalty + (moodAdvantage.active ? moodAdvantage.successBonus : 0)),
     baseSuccess,
     95
   );
@@ -2671,19 +2657,86 @@ function weightPerformanceDelta(weight) {
   return -4;
 }
 
-function applyMonthlyMoodShift(horse) {
-  const preferred = horse.preferredMood;
-  if (horse.isRescue && (horse.bond || 0) <= 0) {
-    return rnd(1, 100) <= 95 ? pick(['Overly-Active', 'Bad moods', 'Grumpy']) : preferred;
+function hasWrongTackForMood(horse) {
+  const tack = horse.tack || {};
+  if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') return true;
+  if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') return true;
+  if (tack.bridle === 'Figure-8 Bridle') return true;
+  if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') return true;
+  if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') return true;
+  return false;
+}
+
+function moodCareAlignment(horse) {
+  const turnoutLow = horse.lastTurnoutIssue === 'low';
+  const turnoutHigh = horse.lastTurnoutIssue === 'high';
+  const wrongFeed = Boolean(horse.lastFeedIssue?.badFeed);
+  const wrongTack = hasWrongTackForMood(horse) || Boolean(horse.lastTackIssue?.badTack);
+  const trainingOver = horse.lastTrainingIssue === 'high';
+  const trainingOk = !horse.lastTrainingIssue;
+  const turnoutOk = !turnoutLow && !turnoutHigh;
+  const tackOk = !wrongTack;
+  const feedOk = !wrongFeed;
+  const calmFeedOnLazyHorse = (horse.feedPlan || []).some((f) => f.type === 'Calm nd Ez')
+    && ['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality);
+  const overlyActiveFeed = (horse.feedPlan || []).some((f) => f.type === 'Sweet Feed')
+    && ['Energetic', 'Stubborn'].includes(horse.personality);
+  const oldFeedTooYoung = (horse.feedPlan || []).some((f) => f.type === 'Old Horse Feed') && horse.age < 15;
+  return {
+    turnoutLow,
+    wrongFeed,
+    wrongTack,
+    trainingOver,
+    trainingOk,
+    turnoutOk,
+    tackOk,
+    feedOk,
+    calmFeedOnLazyHorse,
+    overlyActiveFeed,
+    oldFeedTooYoung
+  };
+}
+
+function resolveMonthlyMoodFromCare(horse) {
+  const preferred = horse.preferredMood || pick(POSITIVE_MOODS.concat('Neutral'));
+  const alignment = moodCareAlignment(horse);
+  const hasMismatch = alignment.wrongFeed || alignment.wrongTack || alignment.turnoutLow;
+  if (alignment.trainingOver || alignment.calmFeedOnLazyHorse) {
+    horse.lastMoodReason = 'No energy from overtraining or calming feed mismatch.';
+    return 'No energy';
   }
-  const bond = horse.bond || 0;
-  if (bond >= 45 && rnd(1, 100) <= 40) {
-    return pick(['Motivated', 'Happy', 'Try-Hard']);
+  if (alignment.overlyActiveFeed || alignment.oldFeedTooYoung || (alignment.turnoutLow && rnd(1, 100) <= 50)) {
+    horse.lastMoodReason = 'Overly-Active from low turnout or high-energy feed mismatch.';
+    return 'Overly-Active';
   }
-  const roll = rnd(1, 100);
-  if (roll <= 55) return preferred;
-  if (roll <= 80) return 'Neutral';
-  return rnd(1, 100) <= 50 ? 'Bad moods' : 'Grumpy';
+  if (hasMismatch) {
+    horse.lastMoodReason = 'Uncomfortable/Distress from feed, tack, or turnout mismatch.';
+    return rnd(1, 100) <= 55 ? 'Uncomfortable' : 'Distress';
+  }
+
+  const preferredCount = Number(horse.preferredMoodMonths || 0);
+  const randomNegativeChance = clamp(26 - (preferredCount * 4), 4, 26);
+  if (rnd(1, 100) <= randomNegativeChance) return rnd(1, 100) <= 45 ? 'Bad moods' : 'Grumpy';
+  if (rnd(1, 100) <= 22) return 'Neutral';
+  return preferred;
+}
+
+function moodAdvantageRoll(horse, context = 'training') {
+  const alignment = moodCareAlignment(horse);
+  const mood = horse.mood || 'Neutral';
+  if (mood === 'Motivated' && alignment.feedOk && alignment.tackOk && alignment.trainingOk) {
+    const chance = rnd(15, 25);
+    return { active: rnd(1, 100) <= chance, chance, successBonus: 8, skillBonus: 0, performanceBonus: 6 };
+  }
+  if (mood === 'Happy' && alignment.tackOk && alignment.turnoutOk) {
+    const chance = rnd(10, 20);
+    return { active: rnd(1, 100) <= chance, chance, successBonus: context === 'training' ? 4 : 0, skillBonus: 2, performanceBonus: 0 };
+  }
+  if (mood === 'Try-Hard' && alignment.tackOk && !alignment.trainingOver) {
+    const chance = rnd(15, 20);
+    return { active: rnd(1, 100) <= chance, chance, successBonus: context === 'training' ? 5 : 0, skillBonus: 1, performanceBonus: context === 'competition' ? 7 : 3 };
+  }
+  return { active: false, chance: 0, successBonus: 0, skillBonus: 0, performanceBonus: 0 };
 }
 
 function genderPronouns(horse) {
@@ -3255,7 +3308,8 @@ function trainingControlabilitySession(horse, focus) {
   const personalityMod = ['Easy-Going', 'Bomb-proof'].includes(horse.personality) ? 12 : ['Stubborn', 'Spooky', 'Unfocused'].includes(horse.personality) ? -12 : 0;
   const tackMod = tackControlabilityDelta(horse, 'flatwork');
   const tackFailureRisk = tackFailurePenalty(horse, 'flatwork');
-  const successChance = clamp(baseSuccess + moodMod + personalityMod + tackMod - tackFailureRisk, 10, 95);
+  const moodAdvantage = moodAdvantageRoll(horse, 'training');
+  const successChance = clamp(baseSuccess + moodMod + personalityMod + tackMod - tackFailureRisk + (moodAdvantage.active ? moodAdvantage.successBonus : 0), 10, 95);
   const roll = rnd(1, 100);
   if (roll <= successChance) {
     const gain = rnd(5, 10);
@@ -3295,23 +3349,16 @@ function updateMonthlyCare(horse) {
     horse.lastTrainingIssue = 'low';
   }
 
-  let mood = horse.mood;
-  if (!horse.lastFeedMoodOverride && (!mood || mood === 'Neutral')) {
-    mood = applyMonthlyMoodShift(horse);
-  }
+  let mood = resolveMonthlyMoodFromCare(horse);
   if (horse.turnoutHours < minTurnout && !(horse.illnesses || []).some((i) => i.active)) {
-    mood = 'Distress';
-    horse.lastMoodReason = `Distress because turnout is too low (${horse.turnoutHours}h, needs at least ${minTurnout}h).`;
     horse.lastTurnoutIssue = 'low';
     updateWeight(horse, 1);
   } else if (horse.turnoutHours > maxTurnout) {
     horse.lastTurnoutIssue = 'high';
-    if (!['Distress', 'Uncomfortable'].includes(mood)) mood = 'No energy';
   }
   const hasSportsFeed = (horse.feedPlan || []).some((f) => f.type === 'Sports Feed');
   if (horse.lastTrainingIssue === 'high') {
-    if (!hasSportsFeed) mood = 'No energy';
-    else if (mood === 'No energy') mood = 'Neutral';
+    if (hasSportsFeed && mood === 'No energy') mood = 'Neutral';
   } else if (horse.lastTrainingIssue === 'low') {
     if (!['Distress', 'No energy'].includes(mood)) mood = 'Overly-Active';
   }
@@ -3332,6 +3379,11 @@ function updateMonthlyCare(horse) {
   } else if (careStars === 5) {
     horse.qualityOfLife = clamp(horse.qualityOfLife + 2, 0, 100);
     if (NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 40) horse.mood = pick(POSITIVE_MOODS);
+  }
+  if (horse.mood === (horse.preferredMood || 'Neutral')) {
+    horse.preferredMoodMonths = (horse.preferredMoodMonths || 0) + 1;
+  } else {
+    horse.preferredMoodMonths = 0;
   }
   trainerNotesForHorse(horse);
   horse.trainingSessionsThisMonth = 0;
@@ -3556,7 +3608,7 @@ function hydrateFromSave(data) {
     h.handTrainingSkillCapThisMonth = Number.isFinite(h.handTrainingSkillCapThisMonth) ? h.handTrainingSkillCapThisMonth : null;
     h.handTrainingSkillCapMonthIndex = Number.isFinite(h.handTrainingSkillCapMonthIndex) ? h.handTrainingSkillCapMonthIndex : null;
     h.trainingSessionsSinceReset = Number.isFinite(h.trainingSessionsSinceReset) ? h.trainingSessionsSinceReset : 0;
-    h.lastMoodShiftHourAbsolute = Number.isFinite(h.lastMoodShiftHourAbsolute) ? h.lastMoodShiftHourAbsolute : currentHourAbsolute();
+    h.preferredMoodMonths = Number.isFinite(h.preferredMoodMonths) ? h.preferredMoodMonths : 0;
     h.injuryCountYear = Number.isFinite(h.injuryCountYear) ? h.injuryCountYear : 0;
     h.careerLevelCaps = h.careerLevelCaps && typeof h.careerLevelCaps === 'object' ? h.careerLevelCaps : {};
     h.healthTrackingYear = Number.isFinite(h.healthTrackingYear) ? h.healthTrackingYear : app.year;
@@ -4561,6 +4613,7 @@ function baseHorse(type = 'trained', origin = 'player') {
     autoExerciseHours: 0,
     preferredFeedGrams: rnd(50, 250),
     preferredMood: pick(['Motivated', 'Happy', 'Try-Hard', 'Neutral']),
+    preferredMoodMonths: 0,
     mood: 'Neutral',
     weightStatus: 'Moderate',
     trainingPreference: pick(['Low', 'Medium', 'High']),
@@ -6054,10 +6107,11 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const trainingBoost = trainingPerformanceDelta(horse);
   const turnoutBoost = turnoutPerformanceDelta(horse);
   const interactionBoost = interaction?.modifier || 0;
+  const moodAdvantage = moodAdvantageRoll(horse, 'competition');
   const quality = calculateHorseQualityOfLife(horse);
   const lowBondAndCare = (horse.bond || 0) < 0 && quality < 45;
   const baseCompetitionPercent = lowBondAndCare ? rnd(15, 25) : rnd(25, 50);
-  const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + rnd(-6, 6)), 0, 100);
+  const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + (moodAdvantage.active ? moodAdvantage.performanceBonus : 0) + rnd(-6, 6)), 0, 100);
   const bridleBitFailureRisk = tackFailurePenalty(horse, discipline);
   const hasDressageClearTestBoost = discipline === 'dressage' && horse.tack?.bridle === 'Flash Bridle';
   const clearTestBoost = hasDressageClearTestBoost ? 20 : 0;
@@ -6507,6 +6561,7 @@ function competitionChanceModifiers(session, horse, step) {
 
 function competitionOptionChances(session, horse, option, step) {
   const mods = competitionChanceModifiers(session, horse, step);
+  const moodAdvantage = moodAdvantageRoll(horse, 'competition');
   const disciplineSkill = effectiveDisciplineSkill(horse, session.discipline);
   const skillMod = Math.round((disciplineSkill - 50) * 0.12);
   const confidenceField = session.discipline === 'dressage' ? 'confidenceFlat' : 'confidenceJump';
@@ -6535,7 +6590,7 @@ function competitionOptionChances(session, horse, option, step) {
   const randomAdjust = Math.round((stepRandom * 0.6) + (optionBias * 0.4));
   const randomSwing = randomAdjust;
   const baseSuccessChance = clamp(
-    Math.round(rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust),
+    Math.round(rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust + (moodAdvantage.active ? moodAdvantage.performanceBonus : 0)),
     rangeMin,
     rangeMax
   );
@@ -6965,7 +7020,6 @@ function advanceOneDay() {
   Object.values(app.lessonHorsesByBarn || {}).forEach((roster) => {
     if (!Array.isArray(roster)) return;
     roster.forEach((h) => {
-      applyScheduledMoodShift(h, true);
       resolvePendingCompetitions(h);
       resetTrainingWindow(h);
       h.fatigue = 0;
@@ -7845,7 +7899,8 @@ function applyBarnActivity(horse, activity, options = {}) {
     const variant = pick(BARN_TRAIL_VARIANTS);
     const choice = pick(variant.options);
     const quality = calculateHorseQualityOfLife(horse);
-    const successChance = clamp(Math.round((choice.success * 0.25) + ((horse.bond || 0) * 0.35) + ((quality - 50) * 0.35) + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.5)), 10, 97);
+    const moodAdvantage = moodAdvantageRoll(horse, 'training');
+    const successChance = clamp(Math.round((choice.success * 0.25) + ((horse.bond || 0) * 0.35) + ((quality - 50) * 0.35) + (moodOutcomeModifier(horse.mood) * 2) + (personalityOutcomeModifier(horse.personality) * 1.5) + (moodAdvantage.active ? moodAdvantage.successBonus : 0)), 10, 97);
     const partialChance = clamp(choice.neutral, 2, 95 - successChance);
     const roll = rnd(1, 100);
     const outcome = roll <= successChance ? 'success' : roll <= successChance + partialChance ? 'partial' : 'fail';
