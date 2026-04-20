@@ -5714,6 +5714,52 @@ function horseProfileMarkup(horse) {
   `;
 }
 
+function npcSalesLevelLine(horse, discipline, label) {
+  const idx = highestAllowedLevelIndex(horse, discipline);
+  const level = SHOW_LEVELS[discipline][idx];
+  const currentText = discipline === 'jumping'
+    ? `${level}m`
+    : level;
+  return `${label} (${currentText}) [${level}]`;
+}
+
+function showRecordSummaryForCurrentLevels(horse) {
+  const records = (horse.showResults || []).filter((entry) => {
+    const discipline = entry?.discipline;
+    if (!SHOW_LEVELS[discipline]) return false;
+    const maxIdx = highestAllowedLevelIndex(horse, discipline);
+    const levelIdx = levelIndex(discipline, entry.level);
+    return levelIdx >= 0 && levelIdx <= maxIdx;
+  });
+  const first = records.filter((r) => r.placing === 1).length;
+  const second = records.filter((r) => r.placing === 2).length;
+  const third = records.filter((r) => r.placing === 3).length;
+  return { total: records.length, first, second, third };
+}
+
+function npcSalesAdMarkup(horse) {
+  const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
+  const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
+  const experience = conformationExperienceTier(horse);
+  const showRecord = showRecordSummaryForCurrentLevels(horse);
+  const stamina = horse.trainingPreference || 'Medium';
+  const soundness = Number.isFinite(horse.soundnessYears) ? `${horse.soundnessYears.toFixed(1)} years` : 'Unknown';
+  return `
+    <h3>${horseDisplayName(horse)}</h3>
+    <p>${horse.gender} • ${horse.age} • ${horse.breed} •</p>
+    <p>${money(horse.price)}</p>
+    <details>
+      <summary>Open/Close</summary>
+      <p class='small'>${horse.personality} | ${horse.conformation} | ${horse.coat} | ${soundness} |</p>
+      <p class='small'>${npcSalesLevelLine(horse, 'jumping', 'Showjumping Level')} | ${npcSalesLevelLine(horse, 'dressage', 'Dressage Level')} | ${npcSalesLevelLine(horse, 'hunter', 'Hunters Level')} | ${npcSalesLevelLine(horse, 'eventing', 'Eventing Level')}</p>
+      <p class='small'>${showRecord.total} (${showRecord.first}-${showRecord.second}-${showRecord.third}) [show record]</p>
+      <p class='small'>Experience: ${experience.label} • Focus tolerance: ${focusTolerance}month(s) • Ring Performance: ${ringPerformancePercent}% • Stamina: ${stamina}</p>
+      <p class='small'>Seller: ${horse.owner}</p>
+    </details>
+    <button data-sale='${horse.saleId}'>Buy</button>
+  `;
+}
+
 function renderHorses() {
   const el = document.getElementById('horses');
   const playerHorses = app.horses.filter((h) => h.owner === 'Your Stable' || h.isLeased);
@@ -5887,7 +5933,7 @@ function renderSales() {
   app.npcSales.forEach((h) => {
     const b = document.createElement('div');
     b.className = 'box';
-    b.innerHTML = `<h3>${horseDisplayName(h)}</h3><p>${h.breed} • ${h.age} • ${h.gender}</p><p>${money(h.price)}</p><p class='small'>Seller: ${h.owner}</p><details><summary>View Profile</summary>${horseProfileMarkup(h)}</details><button data-sale='${h.saleId}'>Buy Horse</button>`;
+    b.innerHTML = npcSalesAdMarkup(h);
     b.querySelector('button').onclick = () => {
       if (app.money < h.price) return alert('Not enough money');
       app.money -= h.price;
