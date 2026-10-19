@@ -113,7 +113,8 @@ const PERSONALITIES = [
   'Lazy',
   'Unfocused',
   'Hot-Blooded',
-  'Excitable'
+  'Excitable',
+  'Sensitive'
 ];
 
 const LEVEL_SKILL_BANDS = {
@@ -1152,7 +1153,7 @@ let wrongFeedUsed = null;
 const MOODS = ['Motivated', 'Happy', 'Try-Hard', 'Neutral', 'Uncomfortable', 'Distress', 'Overly-Active', 'No energy', 'Bad moods', 'Grumpy'];
 const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overweight'];
 const TACK = {
-  bridle: ['Snaffle Bridle', 'Flash Bridle', 'Drop Noseband Bridle', 'Figure-8 Bridle', 'Double Bridle'],
+  bridle: ['Neckrope', 'Hackamore', 'Snaffle Bridle', 'Flash Bridle', 'Drop Noseband Bridle', 'Figure-8 Bridle', 'Double Bridle'],
   bit: ['Loose Ring Snaffle', 'Eggbutt Snaffle', 'D-Ring Bit', 'Pelham Bit', 'Gag Bit'],
   saddle: ['All-Purpose Saddle', 'Jumping Saddle', 'Dressage Saddle', 'Racing / Close-Contact Saddle', 'Ill-Fitting Saddle'],
   pad: ['Basic Pad', 'Shock-Absorbing Pad', 'Incorrect Size Pad', 'Therapeutic Pad', 'No Pad'],
@@ -2377,7 +2378,7 @@ function resolvePhenotypeFromGenetics(genetics, breed = '') {
   const legs = randomLegMarkings();
   const modifiers = randomModifierPack();
   return {
-    coat: color,
+    coat: normalizeCoatShade(color),
     marking,
     marking2,
     faceMarking: face,
@@ -2449,6 +2450,8 @@ function currentMonthIndex() {
 
 function personalityProfile(personality) {
   switch (personality) {
+    case 'Sensitive':
+      return { trainDelta: 6, showDelta: 2, penaltyBias: 0, refusalBias: -2, fallBias: 0, careerDelta: 0 };
     case 'Stubborn':
       return { trainDelta: -15, showDelta: -6, penaltyBias: 2, refusalBias: 12, fallBias: 2, careerDelta: 0 };
     case 'Easy-Going':
@@ -2566,7 +2569,7 @@ function maybeAddRandomIllness(horse) {
   if ((horse.dailyGrooming || 65) < 45) chance += 1;
   if (horse.healthGenetics === 'High') chance += 2;
   if (horse.healthGenetics === 'Low') chance -= 1;
-  chance = clamp(chance, 1, 14);
+  chance = clamp(chance, 1, 14) * 0.6;
   if (rnd(1, 100) > chance) return;
   const picked = pick(SICKNESS_TYPES);
   const issue = addIllness(horse, picked);
@@ -2579,13 +2582,14 @@ function maybeAddOvertrainingInjury(horse) {
   if (!horse || horse.retiredForever || horse.deceased) return;
   if (horse.pendingOvertrainingInjury) {
     horse.pendingOvertrainingInjury = false;
+    if (Math.random() >= 0.6) return;
     const issue = addIllness(horse, { name: 'Overtraining Strain', impact: 12, severity: 'More Than Medium', surgeryRisk: 2, retirementRisk: 4 });
     if (issue) pushReport(`${horse.name} picked up an overtraining strain. Reduce sessions and monitor recovery.`);
     return;
   }
   const sessions = horse.trainingSessionsThisMonth || 0;
   const pref = horse.preferredTrainingSessions || trainingSessionBounds(horse.trainingPreference || 'Medium')[1];
-  if (sessions > pref + 3 && rnd(1, 100) <= 8) {
+  if (sessions > pref + 3 && Math.random() < 0.048) {
     const issue = addIllness(horse, { name: 'Muscle Soreness', impact: 6, severity: 'Easy', surgeryRisk: 0, retirementRisk: 0 });
     if (issue) pushReport(`${horse.name} is sore from heavy training volume.`);
   }
@@ -3198,6 +3202,7 @@ function controlabilityFromPersonality(personality) {
   switch (personality) {
     case 'Easy-Going': return roll <= 45 ? rnd(35, 60) : rnd(60, 100);
     case 'Bomb-proof': return roll <= 30 ? rnd(40, 65) : rnd(65, 100);
+    case 'Sensitive': return rnd(65, 100);
     case 'Spooky': return roll <= 70 ? rnd(10, 50) : rnd(50, 90);
     case 'Stubborn': return roll <= 85 ? rnd(15, 60) : rnd(60, 95);
     case 'Energetic': return roll <= 65 ? rnd(20, 70) : rnd(70, 100);
@@ -3211,7 +3216,9 @@ function controlabilityFromPersonality(personality) {
 
 function tackControlabilityDelta(horse, discipline = 'flatwork') {
   const tack = horse.tack || {};
-  let delta = 0;
+  let delta = horse.pastureControlBonus || 0;
+  if (tack.bridle === 'Neckrope') return delta + ((horse.bond || 0) >= 60 ? 10 : -100);
+  if (tack.bridle === 'Hackamore') return delta + (['Hot-Blooded', 'Sensitive', 'Spooky'].includes(horse.personality) ? 20 : 8);
   if (tack.bridle === 'Snaffle Bridle' && ['Easy-Going', 'Bomb-proof'].includes(horse.personality)) delta += 15;
   if (tack.bridle === 'Flash Bridle') {
     delta += clamp(Math.round((horse.controlability || 50) * 0.12), 5, 20);
@@ -3281,6 +3288,17 @@ function tackFailurePenalty(horse, discipline = 'flatwork') {
 function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
   const tack = horse.tack || {};
   horse.lastTackIssue = null;
+  if (tack.bridle === 'Neckrope' && (horse.bond || 0) < 60) {
+    horse.mood = 'Uncontrollable';
+    horse.lastMoodReason = 'Neckrope requires at least 60% bond.';
+    return;
+  }
+  if (horse.mood === 'Uncontrollable') horse.mood = 'Neutral';
+  if (['Neckrope', 'Hackamore'].includes(tack.bridle)) return;
+  if (horse.personality === 'Sensitive' && ['Gag Bit', 'Pelham Bit'].includes(tack.bit)) {
+    horse.mood = 'Uncomfortable';
+    horse.lastTackIssue = { badTack: tack.bit, suggestedTack: 'Eggbutt Snaffle', reason: 'Sensitive horses dislike harsh bit pressure' };
+  }
   if (!['Distress', 'Uncomfortable'].includes(horse.mood)) horse.lastMoodReason = '';
   if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
     horse.mood = 'Uncomfortable';
@@ -3380,7 +3398,7 @@ function updateMonthlyCare(horse) {
     if (!['Distress', 'No energy'].includes(mood)) mood = 'Overly-Active';
   }
 
-  horse.mood = mood;
+  horse.mood = horse.pastureMood || mood;
   applyBridleBitMoodRisk(horse, 'flatwork');
   if (!['Distress', 'Uncomfortable'].includes(horse.mood)) horse.lastMoodReason = '';
   horse.turnoutQuality = turnoutOkForHorse(horse) ? clamp((horse.turnoutQuality || 65) + 2, 0, 100) : clamp((horse.turnoutQuality || 65) - 3, 0, 100);
@@ -3513,7 +3531,7 @@ function hydrateFromSave(data) {
       if (!h.genetics[key]) h.genetics[key] = randomGenetics()[key];
     });
     const phenotype = resolvePhenotypeFromGenetics(h.genetics, h.breed);
-    h.coat = h.coat || phenotype.coat;
+    h.coat = normalizeCoatShade(h.coat || phenotype.coat);
     h.socks = h.socks || phenotype.socks;
     h.faceMarking = h.faceMarking || phenotype.faceMarking;
     h.marking = normalizeMarkingForBreed(h.marking || phenotype.marking || 'None', h.breed);
@@ -4291,7 +4309,7 @@ function applyBreedTraits(horse) {
   if (horse.breed === 'Friesian') {
     horse.marking = 'None';
     const roll = rnd(1, 100);
-    horse.coat = roll <= 5 ? 'Chestnut (Dark)' : rnd(1, 100) <= 70 ? 'Black' : 'Bay (Dark)';
+    horse.coat = normalizeCoatShade(roll <= 5 ? 'Chestnut (Dark)' : rnd(1, 100) <= 70 ? 'Black' : 'Bay (Dark)');
     horse.potential.dressage = Math.min(100, horse.potential.dressage + 12);
     horse.potential.jumping = Math.max(0, horse.potential.jumping - 10);
     horse.potential.eventing = Math.max(0, horse.potential.eventing - 10);
@@ -4746,7 +4764,7 @@ function baseHorse(type = 'trained', origin = 'player') {
   applyBreedTraits(horse);
   horse.genetics = randomGenetics();
   const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
-  horse.coat = phenotype.coat;
+  horse.coat = normalizeCoatShade(phenotype.coat);
   horse.marking = phenotype.marking;
   horse.marking2 = phenotype.marking2;
   horse.faceMarking = phenotype.faceMarking;
@@ -4855,7 +4873,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     return;
   }
   const foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
-  foal.coat = foalPhenotype.coat;
+  foal.coat = normalizeCoatShade(foalPhenotype.coat);
   foal.marking = foalPhenotype.marking;
   foal.marking2 = foalPhenotype.marking2;
   foal.faceMarking = foalPhenotype.faceMarking;
@@ -4912,7 +4930,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   }
 
   if (dramaticEvents.rareCoat) {
-    foal.coat = pick(COATS.filter((c) => c !== mare.coat && c !== (sire?.coat || '')) || COATS);
+    foal.coat = normalizeCoatShade(pick(COATS.filter((c) => c !== mare.coat && c !== (sire?.coat || '')) || COATS));
     pushReport(`${mare.name}: ${rnd(1, 100) <= 50 ? WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatA : WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatB}`);
   }
   if (dramaticEvents.earlyFoal) {
@@ -4965,7 +4983,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     twin.height = Number((Number(foal.height || heightFromBreed(foal.breed)) + ((Math.random() * 0.6) - 0.3)).toFixed(1));
     twin.genetics = foalGeneticsFromParents(mare, sire || {});
     const twinPhenotype = resolvePhenotypeFromGenetics(twin.genetics, twin.breed);
-    twin.coat = twinPhenotype.coat;
+    twin.coat = normalizeCoatShade(twinPhenotype.coat);
     twin.marking = twinPhenotype.marking;
     twin.marking2 = twinPhenotype.marking2;
     twin.faceMarking = twinPhenotype.faceMarking;
@@ -4973,7 +4991,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     twin.socks = twinPhenotype.socks;
     twin.modifiers = twinPhenotype.modifiers;
     if (rnd(1, 100) <= 55) {
-      twin.coat = foal.coat;
+      twin.coat = normalizeCoatShade(foal.coat);
       twin.marking = foal.marking;
       twin.marking2 = foal.marking2;
     }
@@ -5669,6 +5687,10 @@ function createHorseCard(horse) {
       render();
     };
   });
+  if (app.horses.some((h) => h.id === horse.id)) {
+    node.insertAdjacentHTML('beforeend', autoConformationControls(horse));
+    bindAutoConformationControls(node);
+  }
   return node;
 }
 
@@ -6088,11 +6110,7 @@ function simulateCompetitionRide(horse, discipline, level) {
 }
 
 function competitionJumpCount(discipline, level) {
-  if (discipline === 'jumping') {
-    const height = Number(level);
-    if (!Number.isFinite(height)) return rnd(6, 12);
-    return height <= 1.1 ? rnd(6, 9) : rnd(10, 23);
-  }
+  if (discipline === 'jumping') return rnd(6, 10);
   if (discipline === 'dressage') return rnd(6, 15);
   if (discipline === 'eventing') return rnd(10, 20);
   return rnd(6, 12);
@@ -6193,7 +6211,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   let pct = 0;
   const jump = horse.stats.jumping;
   const dress = horse.stats.dressage;
-  const jumpCount = competitionJumpCount(discipline, level);
+  const jumpCount = interaction?.jumpCount || competitionJumpCount(discipline, level);
   const tack = horse.tack || {};
   const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
   const rpgRoundStats = interaction?.roundStats && typeof interaction.roundStats === 'object' ? interaction.roundStats : null;
@@ -6231,15 +6249,14 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   }
 
   if (discipline === 'jumping') {
-    const railBias = Math.max(0, 4 - Math.floor((jump.Striding + jump.Structure + jump.Power) / 95));
-    rails = clamp(rnd(0, railBias + 1) + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias) + (hotBloodedPenalty ? 2 : 0) + (excitablePenalty ? 1 : 0), 0, 8);
+    rails = Array.from({ length: jumpCount }, () => Math.random() < showjumpingPoleChance(horse, level)).filter(Boolean).length;
     const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
     overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
     if (rpgRoundStats) {
-      rails = Math.max(0, Math.round((rpgRoundStats.faults || 0) / 4));
+      rails = rpgRoundStats.rails || 0;
       refusals = Math.max(0, rpgRoundStats.refusals || 0);
       faults = Math.max(0, rpgRoundStats.faults || 0);
       eliminated = rpgRoundStats.eliminated === true;
@@ -6335,6 +6352,9 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     }
   }
 
+  if (horse.mood === 'Uncontrollable' || (horse.tack?.bridle === 'Neckrope' && (horse.bond || 0) < 60)) {
+    eliminated = true; score = 0; penaltiesText = 'Eliminated'; resultText = 'Eliminated (uncontrollable)'; timeScoreText = 'Eliminated';
+  }
   const placingBase = Math.ceil(((100 - score) / 100) * fieldSize);
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
   const idx = levelIndex(discipline, level);
@@ -6533,7 +6553,7 @@ function buildCompetitionRpgSession(horse, discipline, level) {
       }
     });
   } else {
-    const mainCount = discipline === 'jumping' ? 10 : 8;
+    const mainCount = discipline === 'jumping' ? competitionJumpCount(discipline, level) : 8;
     const phases = competitionInteractionPhases(discipline);
     const disciplineSet = COMPETITION_RPG_VARIANTS[discipline] || COMPETITION_RPG_VARIANTS.jumping;
     const promptOrder = shuffledIndices(disciplineSet.length);
@@ -6599,6 +6619,7 @@ function normalizeCompetitionRpgSession(session) {
   normalized.horseChanceBias = Number.isFinite(session.horseChanceBias) ? clamp(session.horseChanceBias, -8, 8) : 0;
   const rs = session.roundStats || {};
   normalized.roundStats = {
+    rails: Number.isFinite(rs.rails) ? Math.max(0, rs.rails) : 0,
     faults: Number.isFinite(rs.faults) ? Math.max(0, rs.faults) : 0,
     refusals: Number.isFinite(rs.refusals) ? Math.max(0, rs.refusals) : 0,
     clearJumps: Number.isFinite(rs.clearJumps) ? Math.max(0, rs.clearJumps) : 0,
@@ -6762,11 +6783,13 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     const phaseText = String(step.phase || '').toLowerCase();
 
     if (session.discipline === 'jumping') {
-      if (outcome === 'success') {
+      const poleDown = Math.random() < showjumpingPoleChance(horse, session.level);
+      if (outcome !== 'fail' && !poleDown) {
         rs.clearJumps += 1;
         displayOutcome = 'Clear Jump';
-      } else if (outcome === 'partial') {
+      } else if (outcome !== 'fail' && poleDown) {
         rs.faults += 4;
+        rs.rails = (rs.rails || 0) + 1;
         displayOutcome = 'Knockdown (4 faults)';
       } else {
         session.refusalCount += 1;
@@ -6903,6 +6926,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
     modifier: clamp(session.modifier + session.readinessBonus, -26, 20),
     phases: session.outcomes,
     memoryPenalty: competitionMemoryPenalty(horse, session.discipline),
+    jumpCount: session.steps.filter((step) => step.stage === 'main_round').length,
     roundStats: session.roundStats || { faults: 0, refusals: 0, clearJumps: 0, eliminated: false, eliminationReason: '' }
   };
   const entry = {
@@ -8009,6 +8033,7 @@ function renderBarn() {
   const filterDefault = currentCountry;
   panel.innerHTML = `
     <h2>Barn</h2>
+    ${pastureOverview(horses)}
     <div class='box'>
       <p><strong>Current Barn:</strong> ${currentBarn.name} | <strong>Location:</strong> ${currentBarn.country}, ${currentBarn.city}</p>
       <details>
@@ -8191,6 +8216,7 @@ function renderBarn() {
     });
   };
 
+  bindPastureControls(panel);
   document.getElementById('barn-filter-country').onchange = renderCatalogList;
   document.getElementById('barn-refresh-list').onclick = () => {
     const refreshed = refreshBarnCatalog(true);
@@ -8232,6 +8258,7 @@ function monthlyProgress() {
     });
   }
 
+  processPastures();
   const survivors = [];
   const newborns = [];
   const conformationBreedPlacings = new Set();
@@ -8280,6 +8307,7 @@ function monthlyProgress() {
     applyStablehandCare(h);
     resolvePendingCompetitions(h);
     resolvePendingConformationShows(h, conformationBreedPlacings);
+    processAutoConformation(h);
     updateRingPerformance(h);
     resetTrainingWindow(h);
     if (!processAgingAndMortality(h)) {
@@ -8608,11 +8636,13 @@ function renderRegistries() {
           <button data-reg-inspect='${h.id}' ${reg ? 'disabled' : ''}>${reg ? 'Inspection Complete' : 'Run Inspection'}</button>
           ${reg ? `<button data-reg-details='${h.id}'>${h.showInspectionDetails ? 'Hide Breakdown' : 'Show Breakdown'}</button>` : ''}
           <div class='inline'>${showButtons}</div>
+          ${autoConformationControls(h)}
           ${detail}
         </div>`;
       }).join('') : '<p class="small">No horses in your stable.</p>'}
     </div>
   `;
+  bindAutoConformationControls(panel);
   panel.querySelectorAll('[data-reg-inspect]').forEach((btn) => {
     btn.onclick = () => {
       const horse = app.horses.find((h) => h.id === btn.dataset.regInspect);
@@ -9164,6 +9194,110 @@ function bootstrap() {
       showFatal(`${error.message} (fallback failed: ${fallbackError.message})`);
     }
   }
+}
+
+function normalizeCoatShade(coat) {
+  const match = String(coat).match(/\((light|medium|dark)\)/i);
+  const shade = match ? match[1].toLowerCase() : pick(['light', 'medium', 'dark']);
+  return `${String(coat).replace(/\s*\((light|medium|dark)\)/ig, '').trim()} (${shade})`;
+}
+
+function showjumpingPoleChance(horse, level) {
+  const height = Number(level);
+  const base = height <= 0.9 ? 0.30 : height <= 1.2 ? 0.40 : 0.45;
+  const personality = { 'Easy-Going': -0.6, 'Bomb-proof': -0.8, Sensitive: -0.3, Spooky: 0.7, 'Hot-Blooded': 0.7, Excitable: 0.6, Unfocused: 0.8, Lazy: 0.3, Stubborn: 0.5, Energetic: 0.3 }[horse.personality] || 0;
+  const tack = clamp(-tackControlabilityDelta(horse, 'jumping') / 30, -1, 1);
+  const mood = ['Happy', 'Motivated', 'Try-Hard'].includes(horse.mood) ? -0.7 : ['Distress', 'Uncomfortable', 'Grumpy', 'Uncontrollable', 'No energy'].includes(horse.mood) ? 0.8 : 0;
+  return clamp(base + personality * 0.15 + tack * 0.15 + mood * 0.20 + rnd(-3, 3) / 100, 0.01, 0.95);
+}
+
+const PASTURE_RULES = { 1: [1, 2, 10, 2], 2: [4, 5, 25, 3], 3: [5, 7, 40, 5], 4: [7, 12, 60, 6], 5: [12, 15, 70, 7] };
+function ensurePastures() {
+  const barn = app.currentBarn;
+  const rules = PASTURE_RULES[clamp(Number(barn.facilityStars) || 1, 1, 5)];
+  if (!Array.isArray(barn.pastures)) {
+    barn.pastures = Array.from({ length: rnd(rules[0], rules[1]) }, (_, i) => ({ id: uid(), name: `Pasture ${i + 1}`, available: rnd(1, 100) <= rules[2], guests: 0 }));
+  }
+  return rules;
+}
+function pastureOverview(horses) {
+  const rules = ensurePastures();
+  const barn = app.currentBarn;
+  return `<div class='box'><h3>Pastures</h3><label><input id='pastures-enabled' type='checkbox' ${barn.pasturesEnabled ? 'checked' : ''}>Enable optional pasture management</label>
+    <p class='small'>${barn.pastures.length} pastures • ${rules[2]}% booking availability • ${rules[3]} horses per pasture. Bookings persist. Availability changes monthly. Turnout improves mood and controlability. Below 3 care stars, staff miss turnout 30% of the time. Crowding can cause distress and fights; stallions may fight, and mares sharing with stallions have a 50% pregnancy chance.</p>
+    ${barn.pasturesEnabled ? barn.pastures.map((p) => { const assigned = horses.filter((h) => h.pastureBooking?.barnId === barn.id && h.pastureBooking?.pastureId === p.id); return `<p>${p.name}: ${p.available ? 'Booking available' : 'Fully booked'} • ${assigned.length + (p.guests || 0)}/${rules[3]} occupied • ${assigned.map((h) => h.name).join(', ') || 'No assigned horses'}</p>`; }).join('') + horses.map((h) => `<label>${horseDisplayName(h)}<select data-pasture-horse='${h.id}'><option value=''>No pasture</option>${barn.pastures.map((p) => `<option value='${p.id}' ${h.pastureBooking?.barnId === barn.id && h.pastureBooking?.pastureId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></label>`).join('') : ''}</div>`;
+}
+function bindPastureControls(panel) {
+  panel.querySelector('#pastures-enabled').onchange = (event) => {
+    app.currentBarn.pasturesEnabled = event.target.checked;
+    if (!event.target.checked) app.horses.forEach((h) => { h.pastureControlBonus = 0; h.pastureMood = ''; });
+    renderBarn();
+  };
+  panel.querySelectorAll('[data-pasture-horse]').forEach((select) => { select.onchange = () => {
+    const h = app.horses.find((h) => h.id === select.dataset.pastureHorse);
+    const barn = app.currentBarn;
+    if (!select.value) { h.pastureBooking = null; h.pastureControlBonus = 0; renderBarn(); return; }
+    const p = barn.pastures.find((p) => p.id === select.value);
+    const rules = ensurePastures();
+    const occupied = app.horses.filter((other) => other.id !== h.id && other.pastureBooking?.barnId === barn.id && other.pastureBooking?.pastureId === p.id).length;
+    if (h.pastureBooking?.pastureId !== p.id && (!p.available || occupied + (p.guests || 0) >= rules[3])) {
+      alert('This pasture has no booking space. Your existing booking is kept.'); renderBarn(); return;
+    }
+    h.pastureBooking = { barnId: barn.id, pastureId: p.id };
+    renderBarn();
+  }; });
+}
+function processPastures() {
+  app.horses.forEach((h) => { h.pastureControlBonus = 0; h.pastureMood = ''; });
+  const barn = app.currentBarn;
+  if (!barn.pasturesEnabled) return;
+  const rules = ensurePastures();
+  for (const p of barn.pastures) {
+    const assigned = app.horses.filter((h) => !h.deceased && !h.retiredForever && h.pastureBooking?.barnId === barn.id && h.pastureBooking?.pastureId === p.id);
+    p.available = rnd(1, 100) <= rules[2];
+    p.guests = p.available ? rnd(0, Math.max(0, rules[3] - assigned.length)) : rnd(1, rules[3]);
+    const attending = [];
+    for (const h of assigned) {
+      if (barn.careStars < 3 && rnd(1, 100) <= 30) {
+        h.pastureControlBonus = -8; h.pastureMood = h.mood = 'Grumpy'; pushReport(`${h.name}: staff forgot pasture turnout; mood and controlability suffered.`); continue;
+      }
+      attending.push(h); h.pastureControlBonus = 8; h.pastureMood = h.mood = 'Happy';
+      if (assigned.length + p.guests > rules[3] && rnd(1, 100) <= 15 * (6 - barn.careStars) / 5) {
+        h.pastureMood = h.mood = 'Distress'; h.pastureControlBonus = -8;
+        if (Math.random() < 0.6) addIllness(h, { name: 'Pasture Fight Bruising', severity: 'Easy', impact: 5 });
+        pushReport(`${h.name} was distressed by crowding and a scuffle in ${p.name}.`);
+      }
+    }
+    const stallions = attending.filter((h) => h.gender === 'Stallion' && h.age >= 3);
+    if (stallions.length > 1 && rnd(1, 100) <= 15 * (6 - barn.careStars) / 5) {
+      stallions.forEach((h) => { h.pastureMood = h.mood = 'Distress'; h.pastureControlBonus = -8; if (Math.random() < 0.6) addIllness(h, { name: 'Stallion Fight Injury', severity: 'Easy', impact: 6 }); });
+      pushReport(`Stallions fought in ${p.name}. Separate them to avoid further fights.`);
+    }
+    if (stallions.length) attending.filter((h) => h.gender === 'Mare' && h.age >= 3 && !h.pregnantBy && !h.pregnantEmbryo).forEach((mare) => {
+      if (rnd(1, 100) <= 50) { mare.pregnantBy = pick(stallions).name; mare.pregnancyDays = 0; mare.gestationLengthDays = rnd(320, 360); pushReport(`${mare.name} became pregnant after sharing ${p.name} with a stallion.`); }
+    });
+  }
+}
+function autoConformationControls(h) {
+  const config = h.autoConformation || {};
+  return `<details><summary>Recurring conformation entries</summary><label><input data-auto-conf-enabled='${h.id}' type='checkbox' ${config.enabled ? 'checked' : ''}>Automatically enter this horse</label><label>Every <input data-auto-conf-months='${h.id}' type='number' min='1' step='1' value='${config.months || 1}'> months</label><label>Show / division<select data-auto-conf-type='${h.id}'>${CONFORMATION_SHOW_TYPES.map((t) => `<option value='${t.key}' ${config.type === t.key ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label><p class='small'>Conformation only. Ineligible entries wait until eligible; annual shows wait for their scheduled month.</p></details>`;
+}
+function bindAutoConformationControls(panel) {
+  panel.querySelectorAll('[data-auto-conf-enabled]').forEach((input) => {
+    const id = input.dataset.autoConfEnabled;
+    const months = panel.querySelector(`[data-auto-conf-months='${id}']`);
+    const type = panel.querySelector(`[data-auto-conf-type='${id}']`);
+    const update = () => { const h = app.horses.find((h) => h.id === id); const interval = Math.max(1, Math.floor(Number(months.value) || 1)); months.value = interval; h.autoConformation = { enabled: input.checked, months: interval, type: type.value, nextMonth: currentMonthIndex() + interval }; };
+    input.onchange = months.onchange = type.onchange = update;
+  });
+}
+function processAutoConformation(h) {
+  const c = h.autoConformation;
+  if (!c?.enabled || !Number.isFinite(c.nextMonth) || currentMonthIndex() < c.nextMonth) return;
+  const type = CONFORMATION_SHOW_TYPES.find((t) => t.key === c.type);
+  if (!type || h.deceased || h.retiredForever || !['Mare', 'Stallion'].includes(h.gender) || !pregnancyStage(h).canCompete || (type.specialMonth && type.specialMonth !== app.month)) return;
+  if (!(h.pendingConformationShows || []).some((e) => e.monthIndex === currentMonthIndex())) registerConformationShow(h, type.key);
+  c.nextMonth = currentMonthIndex() + Math.max(1, Math.floor(Number(c.months) || 1));
 }
 
 if (document.readyState === 'loading') {
