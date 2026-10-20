@@ -186,7 +186,7 @@ const options = {};
 const SAVE_KEY = 'horse_game_save_v1';
 const SAVE_SLOTS_KEY = 'horse_game_saves_v2';
 const DEFAULT_SAVE_SLOT = 'Main Save';
-const tabs = ['dashboard', 'horses', 'barn', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
+const tabs = ['dashboard', 'horses', 'barn', 'town', 'market', 'sales', 'stud', 'shows', 'vet', 'farrier', 'training', 'breeding', 'registries', 'breeders', 'freezer', 'rescue', 'calendar', 'settings'];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -398,6 +398,8 @@ function createLessonHorse(barn) {
   horse.leaseLocked = true;
   horse.feedPlan = [];
   horse.turnoutAssignmentHours = 0;
+  stallPreferences(horse);
+  mgSizing(horse);
   return horse;
 }
 
@@ -1155,7 +1157,7 @@ const WEIGHTS = ['Very Underweight', 'Underweight', 'Moderate', 'Fleshy', 'Overw
 const TACK = {
   bridle: ['Neckrope', 'Hackamore', 'Snaffle Bridle', 'Flash Bridle', 'Drop Noseband Bridle', 'Figure-8 Bridle', 'Double Bridle'],
   bit: ['Loose Ring Snaffle', 'Eggbutt Snaffle', 'D-Ring Bit', 'Pelham Bit', 'Gag Bit'],
-  saddle: ['All-Purpose Saddle', 'Jumping Saddle', 'Dressage Saddle', 'Racing / Close-Contact Saddle', 'Ill-Fitting Saddle'],
+  saddle: ['All-Purpose Saddle', 'Jumping Saddle', 'Dressage Saddle', 'Racing / Close-Contact Saddle'],
   pad: ['Basic Pad', 'Shock-Absorbing Pad', 'Incorrect Size Pad', 'Therapeutic Pad', 'No Pad'],
   footwear: ['Tendon Boots'],
   headwear: ['Halter', 'Ear-Bonnet', 'Race Mask'],
@@ -1944,7 +1946,7 @@ function buildTrainingActionText(action, horse, environment) {
 
 function pickTrainingVariant(action, horse, environment) {
   const pool = trainingActionPool(action);
-  const picked = pick(pool) || {};
+  const picked = eqSelectVariant(pool,horse,action) || {};
   const optionPool = Array.isArray(picked.options) && picked.options.length
     ? picked.options
     : (TRAINING_OPTION_LIBRARY[action] || TRAINING_OPTION_LIBRARY.trot);
@@ -1996,7 +1998,9 @@ function consumeHandTrainingSkillGain(horse, requested = 1) {
   return granted;
 }
 
-function markTrainingSession(horse, count = 1) {
+function markTrainingSession(horse, count = 1, context = 'groundwork') {
+  horse.lastHandlingHour=pastureCalendarHour();
+  eqRecordUse(horse, context, !['groundwork','lunging','Hand Work'].includes(context));
   const sessionCount = Math.max(1, Math.round(Number(count) || 1));
   horse.trainingSessionsThisMonth = (horse.trainingSessionsThisMonth || 0) + sessionCount;
   horse.trainingSessionsSinceReset = (horse.trainingSessionsSinceReset || 0) + sessionCount;
@@ -2107,7 +2111,7 @@ function trainingOptionChances(option, horse, session, optionIndex = 0) {
   const bondBonus = Math.round(((horse.bond || 0) - 50) * 0.14);
   const qualityOfLife = calculateHorseQualityOfLife(horse);
   const baseSuccess = qualityOfLife >= 60 ? 50 : 40;
-  const controlBonus = Math.round(((horse.controlability || 50) - 50) * 0.1);
+  const controlBonus = Math.round((equipmentModifiers(horse,session.discipline).effectiveControl - 50) * 0.1);
   const confidenceField = disciplineConfidenceField(session.discipline);
   const confidenceBonus = Math.round(((horse[confidenceField] ?? 50) - 50) * 0.12);
   const skillBonus = Math.round((effectiveDisciplineSkill(horse, session.discipline) - 50) * 0.14);
@@ -2123,7 +2127,7 @@ function trainingOptionChances(option, horse, session, optionIndex = 0) {
   );
   const neutralChance = clamp(option.neutral + Math.round((-moodOutcomeModifier(horse.mood) * 0.25) - (promptBias * 0.2)), 0, 95 - successChance);
   const failChance = Math.max(0, 100 - successChance - neutralChance);
-  return { successChance, neutralChance, failChance, baseSuccess };
+  return eqAdjustChances({successChance,neutralChance,failChance,baseSuccess},horse,session.discipline,/refus/i.test(session.variant?.text||'')?'refusal':/distract|focus/i.test(session.variant?.text||'')?'distraction':'general');
 }
 
 function trainingOptionFinalChances(session, horse, options) {
@@ -2175,7 +2179,8 @@ function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedCh
   const confidenceField = disciplineConfidenceField(session.discipline);
   const skillBase = option.effects?.skill || 0;
   const bondDelta = option.effects?.bond || 0;
-  const fatigueGain = outcome === 'success' ? rnd(2, 4) : outcome === 'neutral' ? rnd(3, 5) : rnd(4, 7);
+  let fatigueGain = outcome === 'success' ? rnd(2, 4) : outcome === 'neutral' ? rnd(3, 5) : rnd(4, 7);
+  fatigueGain *= 1-equipmentModifiers(horse,session.discipline).extendedFatigue/100;
   horse.fatigue = clamp((horse.fatigue || 0) + fatigueGain, 0, 100);
   horse.focus = clamp((horse.focus || 50) + (outcome === 'success' ? 3 : outcome === 'neutral' ? 0 : -4), 0, 100);
   let confidenceDelta = outcome === 'success' ? 2 : outcome === 'neutral' ? 0 : -1;
@@ -2187,8 +2192,9 @@ function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedCh
 
   horse[confidenceField] = clamp((horse[confidenceField] ?? 50) + confidenceDelta, 0, 100);
 
+  if(outcome==='fail'&&/resist|buck/i.test(session.variant?.text||''))horse.resistanceSessions=(horse.resistanceSessions||0)+1;
   if (outcome === 'success') {
-    horse.bond = clamp((horse.bond || 0) + Math.max(0, bondDelta), horse.isRescue ? -50 : 0, 100);
+    horse.bond = clamp((horse.bond || 0) + Math.max(0, bondDelta)*(1+equipmentModifiers(horse,'groundwork').bond/100), horse.isRescue ? -50 : 0, 100);
   } else if (outcome === 'fail') {
     horse.bond = clamp((horse.bond || 0) + Math.min(0, bondDelta), horse.isRescue ? -50 : 0, 100);
   }
@@ -2678,15 +2684,7 @@ function weightPerformanceDelta(weight) {
   return -4;
 }
 
-function hasWrongTackForMood(horse) {
-  const tack = horse.tack || {};
-  if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') return true;
-  if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') return true;
-  if (tack.bridle === 'Figure-8 Bridle') return true;
-  if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') return true;
-  if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') return true;
-  return false;
-}
+function hasWrongTackForMood(horse) { const m=equipmentModifiers(horse);return m.comfort<70&&(horse.equipmentDiscomfortSessions||0)>=2; }
 
 function moodCareAlignment(horse) {
   const turnoutLow = horse.lastTurnoutIssue === 'low';
@@ -2718,29 +2716,7 @@ function moodCareAlignment(horse) {
   };
 }
 
-function resolveMonthlyMoodFromCare(horse) {
-  const preferred = horse.preferredMood || pick(POSITIVE_MOODS.concat('Neutral'));
-  const alignment = moodCareAlignment(horse);
-  const hasMismatch = alignment.wrongFeed || alignment.wrongTack || alignment.turnoutLow;
-  if (alignment.trainingOver || alignment.calmFeedOnLazyHorse) {
-    horse.lastMoodReason = 'No energy from overtraining or calming feed mismatch.';
-    return 'No energy';
-  }
-  if (alignment.overlyActiveFeed || alignment.oldFeedTooYoung || (alignment.turnoutLow && rnd(1, 100) <= 50)) {
-    horse.lastMoodReason = 'Overly-Active from low turnout or high-energy feed mismatch.';
-    return 'Overly-Active';
-  }
-  if (hasMismatch) {
-    horse.lastMoodReason = 'Uncomfortable/Distress from feed, tack, or turnout mismatch.';
-    return rnd(1, 100) <= 55 ? 'Uncomfortable' : 'Distress';
-  }
-
-  const preferredCount = Number(horse.preferredMoodMonths || 0);
-  const randomNegativeChance = clamp(26 - (preferredCount * 4), 4, 26);
-  if (rnd(1, 100) <= randomNegativeChance) return rnd(1, 100) <= 45 ? 'Bad moods' : 'Grumpy';
-  if (rnd(1, 100) <= 22) return 'Neutral';
-  return preferred;
-}
+function resolveMonthlyMoodFromCare(horse) { return mgResolveMood(horse); }
 
 function moodAdvantageRoll(horse, context = 'training') {
   const alignment = moodCareAlignment(horse);
@@ -2874,6 +2850,7 @@ function trainerNotesForHorse(horse) {
   const recovering = horse.illnesses.some((i) => i.active);
   const bestFeed = recovering ? 'Calm nd Ez + Recovery (mix)' : recommendedFeedForHorse(horse);
   notes.push(`This is the best feedplan for this horse, ${bestFeed} ${feedMin}-${feedMax}g.`);
+  notes.push(...eqEquipmentNotes(horse));
   horse.trainerNotes = notes;
 }
 
@@ -3170,7 +3147,7 @@ function applyAutoTraining(horse) {
     }
     const skill = pick(EXERCISE_MENU[discipline]);
     const bonus = horse.trainingBoost ? Math.max(0, Math.round(horse.trainingBoost / 2)) : 0;
-    const gain = rnd(1, 3) + bonus;
+    const gain = eqLearning(horse,rnd(1, 3) + bonus,discipline);
     if (skillGains < skillCap) {
       if (discipline === 'dressage') {
         horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + gain);
@@ -3189,7 +3166,7 @@ function applyAutoTraining(horse) {
       skillGains += 1;
     }
     horse.managed.trained = true;
-    markTrainingSession(horse);
+    markTrainingSession(horse,1,discipline);
     trainedSessions += 1;
   }
   if (trainedSessions) {
@@ -3215,118 +3192,11 @@ function controlabilityFromPersonality(personality) {
   }
 }
 
-function tackControlabilityDelta(horse, discipline = 'flatwork') {
-  const tack = horse.tack || {};
-  let delta = horse.pastureControlBonus || 0;
-  if (tack.bridle === 'Neckrope') return delta + ((horse.bond || 0) >= 60 ? 10 : -100);
-  if (tack.bridle === 'Hackamore') return delta + (['Hot-Blooded', 'Sensitive', 'Spooky'].includes(horse.personality) ? 20 : 8);
-  if (tack.bridle === 'Snaffle Bridle' && ['Easy-Going', 'Bomb-proof'].includes(horse.personality)) delta += 15;
-  if (tack.bridle === 'Flash Bridle') {
-    delta += clamp(Math.round((horse.controlability || 50) * 0.12), 5, 20);
-    if (['Energetic', 'Unfocused', 'Excitable'].includes(horse.personality)) delta += 4;
-  }
-  if (tack.bridle === 'Drop Noseband Bridle') {
-    delta += clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25);
-    if (['Unfocused'].includes(horse.personality)) delta += 3;
-  }
-  if (tack.bridle === 'Figure-8 Bridle') {
-    delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? clamp(Math.round((horse.controlability || 50) * 0.2), 15, 25) : 3;
-    if (['Hot-Blooded'].includes(horse.personality)) delta += 3;
-  }
-  if (tack.bridle === 'Double Bridle') delta += (horse.bond || 0) >= 45 ? 25 : -20;
-
-  if (tack.bit === 'Loose Ring Snaffle') delta += 1;
-  if (tack.bit === 'Eggbutt Snaffle') {
-    delta += 5;
-    if (['Unfocused', 'Hot-Blooded', 'Excitable'].includes(horse.personality)) delta += 2;
-  }
-  if (tack.bit === 'D-Ring Bit') delta += 9;
-  if (tack.bit === 'Pelham Bit') {
-    delta += 15;
-    if (['Hot-Blooded', 'Spooky', 'Energetic'].includes(horse.personality)) delta += 3;
-  }
-  if (tack.bit === 'Gag Bit') delta += horse.personality === 'Spooky' ? -12 : ['Hot-Blooded', 'Excitable', 'Energetic'].includes(horse.personality) ? 16 : 14;
-
-  if (tack.saddle === 'Jumping Saddle') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 4 : -1;
-  if (tack.saddle === 'Dressage Saddle') delta += discipline === 'dressage' || discipline === 'flatwork' ? 4 : -1;
-  if (tack.saddle === 'Racing / Close-Contact Saddle') delta += -4;
-  if (tack.saddle === 'Ill-Fitting Saddle') delta += -12;
-
-  if (tack.pad === 'Shock-Absorbing Pad' || tack.pad === 'Therapeutic Pad') delta += 2;
-  if (tack.pad === 'Incorrect Size Pad') delta += -6;
-  if (tack.pad === 'No Pad') delta += -10;
-
-  if (tack.headwear === 'Ear-Bonnet') {
-    delta += 2;
-    if (horse.personality === 'Spooky' || horse.personality === 'Energetic' || ['Overly-Active', 'Distress'].includes(horse.mood)) delta += 3;
-  }
-  if (tack.headwear === 'Race Mask') {
-    delta += 2;
-    if (horse.personality === 'Unfocused' || horse.personality === 'Spooky') delta += 4;
-  }
-
-  if (tack.body === 'Martingal') delta += ['jumping', 'eventing', 'hunter'].includes(discipline) ? 6 : 1;
-  if (tack.body === 'Draw Reins') {
-    const hotBlooded = horse.personality === 'Energetic' || horse.personality === 'Spooky' || horse.mood === 'Overly-Active';
-    delta += hotBlooded ? 6 : -30;
-  }
-  return delta;
-}
-
-function tackFailurePenalty(horse, discipline = 'flatwork') {
-  const tack = horse.tack || {};
-  let penalty = 0;
-  if (tack.bridle === 'Snaffle Bridle') {
-    if ((horse.controlability || 0) < 50) penalty += 30;
-    if (['Excitable', 'Hot-Blooded', 'Energetic'].includes(horse.personality)) penalty += 10;
-  }
-  if (tack.bridle === 'Double Bridle' && (horse.bond || 0) < 45) penalty += 25;
-  if (tack.bit === 'Loose Ring Snaffle') penalty += 6;
-  if (discipline === 'dressage' && tack.bridle === 'Figure-8 Bridle') penalty += 10;
-  return clamp(penalty, 0, 60);
-}
-
+function tackControlabilityDelta(horse, discipline = 'flatwork') { return equipmentModifiers(horse, discipline).control; }
+function tackFailurePenalty() { return 0; }
 function applyBridleBitMoodRisk(horse, discipline = 'flatwork') {
-  const tack = horse.tack || {};
-  horse.lastTackIssue = null;
-  if (tack.bridle === 'Neckrope' && (horse.bond || 0) < 60) {
-    horse.mood = 'Uncontrollable';
-    horse.lastMoodReason = 'Neckrope requires at least 60% bond.';
-    return;
-  }
-  if (horse.mood === 'Uncontrollable') horse.mood = 'Neutral';
-  if (['Neckrope', 'Hackamore'].includes(tack.bridle)) return;
-  if (horse.personality === 'Sensitive' && ['Gag Bit', 'Pelham Bit'].includes(tack.bit)) {
-    horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: tack.bit, suggestedTack: 'Eggbutt Snaffle', reason: 'Sensitive horses dislike harsh bit pressure' };
-  }
-  if (!['Distress', 'Uncomfortable'].includes(horse.mood)) horse.lastMoodReason = '';
-  if (tack.bridle === 'Flash Bridle' && horse.personality === 'Easy-Going') {
-    horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Flash Bridle', suggestedTack: 'Snaffle Bridle', reason: 'Flash Bridle can be too restrictive for easy-going horses' };
-    horse.lastMoodReason = 'Uncomfortable because the Flash Bridle does not fit this horse.';
-  }
-  if (tack.bridle === 'Drop Noseband Bridle' && horse.personality === 'Spooky') {
-    horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Drop Noseband Bridle', suggestedTack: 'Flash Bridle', reason: 'Drop Noseband Bridle can cause discomfort for spooky horses' };
-    horse.lastMoodReason = 'Uncomfortable because the Drop Noseband Bridle does not fit this horse.';
-  }
-  if (['dressage', 'flatwork'].includes(discipline) && tack.bridle === 'Figure-8 Bridle') {
-    horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Figure-8 Bridle', suggestedTack: (horse.bond || 0) >= 45 ? 'Double Bridle' : 'Snaffle Bridle', reason: 'Figure-8 Bridle carries a discomfort risk in dressage/flatwork' };
-    horse.lastMoodReason = 'Uncomfortable because the Figure-8 Bridle is wrong for flatwork/dressage work.';
-  }
-  if (tack.bit === 'Pelham Bit' && horse.personality === 'Easy-Going') {
-    horse.mood = 'Uncomfortable';
-    horse.lastTackIssue = { badTack: 'Pelham Bit', suggestedTack: 'Loose Ring Snaffle', reason: 'Pelham Bit leverage can be uncomfortable for easy-going horses' };
-    horse.lastMoodReason = 'Uncomfortable because the Pelham Bit is too strong for this horse.';
-  }
-  if (tack.bit === 'Gag Bit' && horse.personality === 'Spooky') {
-    horse.mood = 'Distress';
-    horse.lastTackIssue = { badTack: 'Gag Bit', suggestedTack: 'Eggbutt Snaffle', reason: 'Gag Bit has a distress risk for spooky horses' };
-    horse.lastMoodReason = 'Distress because the Gag Bit does not suit this horse.';
-  }
-  if (tack.bit === 'Loose Ring Snaffle' && !NEGATIVE_MOODS.includes(horse.mood) && rnd(1, 100) <= 20) horse.mood = pick(['Happy', 'Motivated']);
+  const m=equipmentModifiers(horse,discipline),source=m.sources.find(s=>s.kind==='comfort'&&s.value<0);
+  horse.lastTackIssue=source?{badTack:source.item,suggestedTack:'a comfortable, correctly sized setup',reason:'Tack comfort is reduced by the current setup'}:null;
 }
 
 function trainingControlabilitySession(horse, focus) {
@@ -3342,10 +3212,12 @@ function trainingControlabilitySession(horse, focus) {
   const baseSuccess = 58;
   const moodMod = ['Motivated', 'Happy', 'Try-Hard'].includes(mood) ? 18 : ['Distress', 'Bad moods', 'Grumpy', 'No energy', 'Uncomfortable'].includes(mood) ? -18 : 0;
   const personalityMod = ['Easy-Going', 'Bomb-proof'].includes(horse.personality) ? 12 : ['Stubborn', 'Spooky', 'Unfocused'].includes(horse.personality) ? -12 : 0;
-  const tackMod = tackControlabilityDelta(horse, 'flatwork');
+  const controlContext=focus==='Hand Work'?'groundwork':'flatwork';
+  const tackMod = tackControlabilityDelta(horse,controlContext)+(horse.pastureControlBonus||0);
   const tackFailureRisk = tackFailurePenalty(horse, 'flatwork');
   const moodAdvantage = moodAdvantageRoll(horse, 'training');
-  const successChance = clamp(baseSuccess + moodMod + personalityMod + tackMod - tackFailureRisk + (moodAdvantage.active ? moodAdvantage.successBonus : 0), 10, 95);
+  const baseChance=clamp(baseSuccess + moodMod + personalityMod + tackMod - tackFailureRisk + (moodAdvantage.active ? moodAdvantage.successBonus : 0), 10, 95);
+  const successChance=eqAdjustChances({successChance:baseChance,neutralChance:0,failChance:100-baseChance},horse,controlContext).successChance;
   const roll = rnd(1, 100);
   if (roll <= successChance) {
     const gain = rnd(5, 10);
@@ -3464,6 +3336,8 @@ function safeRun(label, fn) {
 
 
 function serializeAppState() {
+  mgCleanupAssignments();
+  mgState();
   return JSON.stringify(app);
 }
 
@@ -3491,6 +3365,9 @@ function hydrateFromSave(data) {
   app.signedUpShows = Array.isArray(data.signedUpShows) ? data.signedUpShows : [];
   app.lastBarnRefreshMonth = Number.isFinite(data.lastBarnRefreshMonth) ? data.lastBarnRefreshMonth : 0;
   app.settings = typeof data.settings === 'object' && data.settings ? {
+    stallAssignments: data.settings.stallAssignments === true,
+    tackOwnership: data.settings.tackOwnership === true,
+    saddleFitting: data.settings.saddleFitting === true,
     barnName: data.settings.barnName || 'Oxer to Oxer Stable Manager',
     breedingCode: data.settings.breedingCode || '',
     breedingCodePosition: data.settings.breedingCodePosition === 'end' ? 'end' : 'front',
@@ -3524,6 +3401,8 @@ function hydrateFromSave(data) {
   app.barnHorseSelectionId = data.barnHorseSelectionId || '';
   app.marketSelections = typeof data.marketSelections === 'object' && data.marketSelections ? data.marketSelections : {};
   app.stablehandHired = data.stablehandHired === true;
+  app.management = data.management && typeof data.management === 'object' ? data.management : null;
+  mgState();
   app.pastureRelationships = data.pastureRelationships?.version === 1 ? data.pastureRelationships : null;
   ensurePastureRelationships();
   ensureBarnState();
@@ -3734,6 +3613,7 @@ function hydrateFromSave(data) {
 
 function resetGame() {
   app.pastureRelationships = null;
+  app.management = null;
   app.money = 50000;
   app.month = 1;
   app.day = 1;
@@ -4443,7 +4323,7 @@ function horseDisciplineAverage(horse, discipline) {
 
 function clampSkill(horse, discipline, value) {
   const capValue = horse?.potential?.[discipline] ?? 100;
-  return Math.min(capValue, value);
+  return clamp(value,0,Math.min(100,capValue));
 }
 
 function disciplineStatsGroup(horse, discipline) {
@@ -4790,6 +4670,8 @@ function baseHorse(type = 'trained', origin = 'player') {
       horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
     });
   }
+  stallPreferences(horse);
+  mgSizing(horse);
   return horse;
 }
 
@@ -5313,7 +5195,7 @@ function renderDashboard() {
     .reverse();
   const competitionReports = app.competitionReports.slice().reverse().map((report) => `
     <details class='report'>
-      <summary>${report.horseName} — ${cap(report.discipline)} ${report.level} (#${report.placing}/${report.fieldSize})</summary>
+      <summary>${report.horseName} — ${cap(report.discipline)} ${report.level} (${['DQ','ELIMINATED'].includes(report.penaltiesText)?report.penaltiesText:'#'+report.placing+'/'+report.fieldSize})</summary>
       <div class='box'>
         <p><strong>Competition:</strong> ${report.competitionName}</p>
         <p><strong>Penalties:</strong> ${report.penaltiesText || '-'}</p>
@@ -5493,13 +5375,7 @@ function createHorseCard(horse) {
     <p class='small'>${horse.controlability || 0}%</p>
     <label>Quality Of Life</label>
     <p class='small'>${calculateHorseQualityOfLife(horse)}%</p>
-    <label>Tack: Bridle</label><select class='tack-bridle'>${TACK.bridle.map((x) => `<option ${horse.tack?.bridle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <label>Tack: Bit</label><select class='tack-bit'>${TACK.bit.map((x) => `<option ${horse.tack?.bit === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <label>Tack: Saddle</label><select class='tack-saddle'>${TACK.saddle.map((x) => `<option ${horse.tack?.saddle === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <label>Tack: Saddle Pad</label><select class='tack-pad'>${TACK.pad.map((x) => `<option ${horse.tack?.pad === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <label>Tack: Headwear</label><select class='tack-headwear'>${TACK.headwear.map((x) => `<option ${horse.tack?.headwear === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <label>Tack: Body</label><select class='tack-body'>${TACK.body.map((x) => `<option ${horse.tack?.body === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
-    <button data-action='save-tack'>Save Tack</button>
+    ${eqEditorMarkup(horse)}
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
     <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Stamina: ${horse.trainingPreference} (${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills / per month) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
@@ -5631,20 +5507,6 @@ function createHorseCard(horse) {
         horse.notes = text;
       }
       if (action === 'toggle-notes') horse.showNotes = !horse.showNotes;
-      if (action === 'save-tack') {
-        if (horse.leaseLocked) {
-          alert('Leased horses use barn-managed tack and cannot be changed.');
-          return;
-        }
-        horse.tack = horse.tack || {};
-        horse.tack.bridle = node.querySelector('.tack-bridle')?.value || horse.tack.bridle;
-        horse.tack.bit = node.querySelector('.tack-bit')?.value || horse.tack.bit;
-        horse.tack.saddle = node.querySelector('.tack-saddle')?.value || horse.tack.saddle;
-        horse.tack.pad = node.querySelector('.tack-pad')?.value || horse.tack.pad;
-        horse.tack.headwear = node.querySelector('.tack-headwear')?.value || horse.tack.headwear;
-        horse.tack.body = node.querySelector('.tack-body')?.value || horse.tack.body;
-        pushReport(`Updated tack for ${horse.name}.`);
-      }
       if (action === 'test-ph') {
         if (!eligibleForPhTest(horse)) {
           alert('pH test is only available for mares over 320 pregnancy days.');
@@ -5698,8 +5560,10 @@ function createHorseCard(horse) {
     };
   });
   if (app.horses.some((h) => h.id === horse.id)) {
-    node.insertAdjacentHTML('beforeend', turnoutPreferenceControls(horse) + autoConformationControls(horse) + horseRelationshipMarkup(horse));
+    node.insertAdjacentHTML('beforeend', turnoutPreferenceControls(horse) + autoConformationControls(horse) + horseRelationshipMarkup(horse) + stallHistoryMarkup(horse) + behaviorLogMarkup(horse) + moodReasonsMarkup(horse));
     bindPastureProfileControls(node);
+    bindEqEditor(node,horse);
+    bindBehaviorLog(node,horse);
     bindTurnoutPreferences(node);
     bindAutoConformationControls(node);
   }
@@ -5736,6 +5600,9 @@ function horseProfileMarkup(horse, options = {}) {
     <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine}</p>
     ${titlesLine}
     ${horseRelationshipMarkup(horse)}
+    ${stallHistoryMarkup(horse)}
+    ${behaviorLogMarkup(horse)}
+    ${moodReasonsMarkup(horse)}
     <p class='small'>Social: ${ensureHorseSocial(horse)}/100 • Turnout preference: ${horse.individualTurnout ? 'Individual' : 'Group'}</p>
     <div class='grid two'>
       <div><h4>Jump Training</h4><ul class='stats'>${jumping}</ul></div>
@@ -5745,7 +5612,7 @@ function horseProfileMarkup(horse, options = {}) {
     <p class='small'>Experience: ${experience.label} • Focus tolerance: ${focusTolerance} month(s) • Ring Performance: ${ringPerformancePercent}%</p>
     ${leaseLine}
     ${showRecordLine}
-    ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — #${latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
+    ${latest ? `<p class='small'>Latest show: ${latest.discipline} ${latest.level} — ${latest.status||'#'+latest.placing}</p>` : '<p class="small">No show record yet.</p>'}
     ${inspection}
   `;
 }
@@ -6089,9 +5956,11 @@ function simulateCompetitionRide(horse, discipline, level) {
   const log = [];
   let modifierTotal = 0;
   phases.forEach((phase) => {
-    const event = rnd(1, 100) <= 45 ? pick(COMPETITION_RANDOM_EVENTS) : null;
+    const event = rnd(1, 100) <= 45 ? eqCompetitionEvent(COMPETITION_RANDOM_EVENTS,horse,discipline) : null;
     const randomMod = event ? event.mod : rnd(-5, 8);
-    const successChance = clamp(Math.round((baseSkill * 0.45) + (moodMod * 2.2) + (personalityMod * 1.6) + bondMod + qualityMod - memoryPenalty + randomMod + ((horse[confidenceField] || 50) - 50) * 0.45), 8, 92);
+    const equipmentContext=discipline==='eventing'?(phase.toLowerCase().includes('dressage')?'eventing-dressage':phase.toLowerCase().includes('cross')?'eventing-cross-country':'eventing-jumping'):discipline;
+    const controlEffect=(equipmentModifiers(horse,equipmentContext).effectiveControl-(horse.controlability??50))*.1;
+    const successChance = clamp(Math.round(controlEffect+(baseSkill * 0.45) + (moodMod * 2.2) + (personalityMod * 1.6) + bondMod + qualityMod - memoryPenalty + randomMod + ((horse[confidenceField] || 50) - 50) * 0.45), 8, 92);
     const partialChance = clamp(100 - successChance - rnd(10, 25), 10, 70);
     const failChance = Math.max(5, 100 - successChance - partialChance);
     const roll = rnd(1, 100);
@@ -6190,7 +6059,7 @@ function selectCompetitionSuggestion(horse) {
   return pick(COMPETITION_SUGGESTIONS.health);
 }
 
-function calculateCompetitionResult(horse, discipline, level, interaction = null) {
+function calculateCompetitionResultLegacy(horse, discipline, level, interaction = null) {
   const [minReq, maxReq] = requiredSkillBand(discipline, level);
   const skill = effectiveDisciplineSkill(horse, discipline);
   const skillBandBoost = ((skill - minReq) / Math.max(1, maxReq - minReq)) * 18;
@@ -6210,7 +6079,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const baseCompetitionPercent = lowBondAndCare ? rnd(15, 25) : rnd(25, 50);
   const baseScore = clamp(Math.round(baseCompetitionPercent + skillBandBoost + conformationBoost + behaviorBoost + moodBoost + weightBoost + feedBoost + trainingBoost + turnoutBoost + temperament.showDelta + interactionBoost + (moodAdvantage.active ? moodAdvantage.performanceBonus : 0) + rnd(-6, 6)), 0, 100);
   const bridleBitFailureRisk = tackFailurePenalty(horse, discipline);
-  const hasDressageClearTestBoost = discipline === 'dressage' && horse.tack?.bridle === 'Flash Bridle';
+  const hasDressageClearTestBoost = false;
   const clearTestBoost = hasDressageClearTestBoost ? 20 : 0;
   const fieldSize = competitionFieldSize();
   let score = baseScore;
@@ -6233,40 +6102,11 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
   const excitablePenalty = horse.personality === 'Excitable' && rnd(1, 100) <= 25;
   let tackPenaltyBias = 0;
   let tackRefusalBias = 0;
-  if (tack.headwear === 'Ear-Bonnet') {
-    tackPenaltyBias -= 1;
-    tackRefusalBias -= 2;
-    if (horse.personality === 'Spooky' || horse.personality === 'Energetic') tackRefusalBias -= 2;
-  }
-  if (tack.headwear === 'Race Mask') {
-    tackRefusalBias -= horse.personality === 'Unfocused' || horse.personality === 'Spooky' ? 3 : 1;
-    if (horse.personality === 'Unfocused' || horse.personality === 'Spooky') tackPenaltyBias -= 1;
-  }
-  if (tack.body === 'Martingal' && ['jumping', 'eventing', 'hunter'].includes(discipline)) {
-    tackPenaltyBias -= 1;
-    tackRefusalBias -= 2;
-  }
-  if (tack.body === 'Draw Reins' && !hotBlooded) {
-    tackPenaltyBias += 3;
-    tackRefusalBias += 6;
-  }
-  if (tack.bridle === 'Flash Bridle') {
-    tackPenaltyBias -= 1;
-    tackRefusalBias -= 1;
-  }
-  if (tack.bridle === 'Drop Noseband Bridle' && discipline === 'jumping') {
-    tackPenaltyBias -= 2;
-  }
-  if (tack.bridle === 'Figure-8 Bridle' && ['jumping', 'eventing'].includes(discipline)) {
-    tackPenaltyBias -= 2;
-    tackRefusalBias -= 3;
-  }
-
   if (discipline === 'jumping') {
     rails = Array.from({ length: jumpCount }, () => Math.random() < showjumpingPoleChance(horse, level)).filter(Boolean).length;
-    const refusalChance = clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60);
+    const refusalChance = clamp(clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60) + equipmentModifiers(horse,discipline).refusal, 0, 100);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
-    const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8));
+    const fall = Math.random()*100 < Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8))*(1-equipmentModifiers(horse,discipline).fallReduction/100);
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
     overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
     if (rpgRoundStats) {
@@ -6316,7 +6156,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     }
   } else if (discipline === 'eventing') {
     rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias)) + (hotBloodedPenalty ? 2 : 0) + (excitablePenalty ? 1 : 0), 0, 6);
-    const refusalChance = clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 55);
+    const refusalChance = clamp(clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 55) + equipmentModifiers(horse,discipline).refusal, 0, 100);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
@@ -6366,9 +6206,7 @@ function calculateCompetitionResult(horse, discipline, level, interaction = null
     }
   }
 
-  if (horse.mood === 'Uncontrollable' || (horse.tack?.bridle === 'Neckrope' && (horse.bond || 0) < 60)) {
-    eliminated = true; score = 0; penaltiesText = 'Eliminated'; resultText = 'Eliminated (uncontrollable)'; timeScoreText = 'Eliminated';
-  }
+  if(discipline==='dressage'&&!eliminated){pct=clamp(pct+equipmentModifiers(horse,'dressage').dressScore,0,100);score=pct;penaltiesText=`${pct.toFixed(2)}%${faults?'':' (Clear Test)'}`;timeScoreText=`${pct.toFixed(2)}%`;resultText=penaltiesText;}
   const placingBase = Math.ceil(((100 - score) / 100) * fieldSize);
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
   const idx = levelIndex(discipline, level);
@@ -6424,7 +6262,10 @@ function applyNormalTrainingSession(horse, discipline, exercise) {
     pushReport(`${horse.name} is out of energy for hand-training skill gains this month.`);
     return;
   }
-  const gain = rnd(1, 4);
+  const m=equipmentModifiers(horse,disciplineKey);
+  const failure=clamp(m.fail+m.resistance+m.seriousResistance,0,100);
+  if(Math.random()*100<failure){pushReport(`${horse.name} did not complete this training exercise; equipment-related resistance or failure affected the session.`);return;}
+  const gain = eqLearning(horse,rnd(1, 4),disciplineKey);
   const confidenceGain = rnd(0, 2);
   if (disciplineKey === 'dressage') {
     horse.stats.dressage[exercise] = clampSkill(horse, disciplineKey, (horse.stats.dressage[exercise] || 0) + gain);
@@ -6443,6 +6284,7 @@ function applyRpgSkillGain(horse, discipline, exercise, gain) {
   if (!gain) return { actualGain: 0, skill: exercise || '' };
   if (!consumeHandTrainingSkillGain(horse, 1)) return { actualGain: 0, skill: exercise || '' };
   const disciplineKey = normalizeTrainingDisciplineKey(discipline);
+  gain=eqLearning(horse,gain,disciplineKey);
   const skillPool = EXERCISE_MENU[disciplineKey] || EXERCISE_MENU.jumping;
   const fallbackSkill = skillPool[0];
   const skill = skillPool.includes(exercise) ? exercise : fallbackSkill;
@@ -6690,7 +6532,7 @@ function competitionOptionChances(session, horse, option, step) {
   const randomAdjust = Math.round((stepRandom * 0.6) + (optionBias * 0.4));
   const randomSwing = randomAdjust;
   const baseSuccessChance = clamp(
-    Math.round(rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust + (moodAdvantage.active ? moodAdvantage.performanceBonus : 0)),
+    Math.round((equipmentModifiers(horse,session.discipline==='eventing'?(String(step?.phase).toLowerCase().includes('dressage')?'eventing-dressage':String(step?.phase).toLowerCase().includes('cross')?'eventing-cross-country':'eventing-jumping'):session.discipline).effectiveControl-(horse.controlability??50))*.1 + rangeBase + bondAdjust + careAdjust + skillAdjust + confidenceAdjust + (mods.personality * 1.0) + (mods.mood * 1.2) + (mods.warmup * 0.8) + (memoryMod * 0.7) + (horseBias * 0.8) + randomAdjust + (moodAdvantage.active ? moodAdvantage.performanceBonus : 0)),
     rangeMin,
     rangeMax
   );
@@ -6808,7 +6650,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
       } else {
         session.refusalCount += 1;
         rs.refusals += 1;
-        if (rnd(1, 100) <= 12) {
+        if (Math.random()*100 < 12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100)) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = 'fall';
@@ -6896,7 +6738,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
             rs.eliminationReason = 'cross-country refusals';
             displayOutcome = 'Elimination (XC refusals)';
           }
-          if (!rs.eliminated && rnd(1, 100) <= 10) {
+          if (!rs.eliminated && Math.random()*100 < 10*(1-equipmentModifiers(horse,'eventing-cross-country').fallReduction/100)) {
             session.eliminated = true;
             rs.eliminated = true;
             rs.eliminationReason = 'fall';
@@ -6978,6 +6820,7 @@ function registerShowEntry(horse, discipline, level) {
     pushReport(`${horse.name} cannot show while recovering from an injury/illness.`);
     return;
   }
+  const equipmentCheck=validateCompetitionEquipment(horse,discipline,level);if(!equipmentCheck.valid){equipmentCheck.messages.forEach(pushReport);return;}
   horse.managed.showEntry = true;
   const idx = levelIndex(discipline, level);
   const maxIdx = highestAllowedLevelIndex(horse, discipline);
@@ -7017,6 +6860,7 @@ function resolvePendingCompetitions(horse) {
   const currentHour = currentHourAbsolute();
   const pending = Array.isArray(horse.pendingCompetitions) ? horse.pendingCompetitions : [];
   const due = pending.filter((entry) => {
+    if (Number.isFinite(entry.calendarAt)) return entry.calendarAt <= pastureCalendarHour();
     if (Number.isFinite(entry.hourIndex)) return entry.hourIndex < currentHour;
     if (Number.isFinite(entry.dayIndex)) return entry.dayIndex < currentDay;
     return Number.isFinite(entry.monthIndex) && entry.monthIndex < currentMonth;
@@ -7024,8 +6868,8 @@ function resolvePendingCompetitions(horse) {
   horse.pendingCompetitions = pending.filter((entry) => !due.includes(entry));
   if (!due.length) return;
   due.forEach((entry) => {
-    const result = calculateCompetitionResult(horse, entry.discipline, entry.level, entry.interaction);
-    horse.totalPoints += Math.max(0, 30 - result.placing);
+    const result = calculateCompetitionResult(horse, entry.discipline, entry.level, entry.interaction, entry);
+    if(!result.status)horse.totalPoints += Math.max(0, 30 - result.placing);
     horse.earnings += result.prize;
     app.money += result.prize;
     if (result.placing === 1) horse.championships += 1;
@@ -7038,7 +6882,8 @@ function resolvePendingCompetitions(horse) {
       score: result.score,
       placing: result.placing,
       prize: result.prize,
-      resultText: result.resultText
+      resultText: result.resultText,
+      status: result.status || null
     });
     updateHorseTitles(horse);
     pushCompetitionReport({
@@ -7053,10 +6898,11 @@ function resolvePendingCompetitions(horse) {
       horseBreed: horse.breed,
       placing: result.placing,
       fieldSize: result.fieldSize,
-      highlights: [...(entry.interaction?.phases?.map((p) => `${cap(p.phase)}: ${p.outcome} (${p.eventText})`) || []).slice(0, 2), ...result.highlights].slice(0, 5),
+      highlights: result.status ? result.highlights : [...(entry.interaction?.phases?.map((p) => `${cap(p.phase)}: ${p.outcome} (${p.eventText})`) || []).slice(0, 2), ...result.highlights].slice(0, 5),
       comment: result.comment,
       suggestion: result.suggestion
     });
+    if(result.status){pushReport(`${horse.name}: ${result.resultText}`);return;}
     pushReport(`${horse.name} in ${entry.discipline} (${entry.level}) placed #${result.placing} with ${result.resultText} and won ${money(result.prize)}.`);
   });
 }
@@ -7919,8 +7765,9 @@ function renderTraining() {
       render();
       return alert('No energy: this horse reached the monthly hand-training skill cap.');
     }
+    const equipmentError=eqTrainingAllowed(h,d);if(equipmentError)return alert(equipmentError);
     h.managed.trained = true;
-    markTrainingSession(h);
+    markTrainingSession(h,1,d);
     h.manualTrainingThisMonth = true;
     if (app.settings?.trainingMode === 'normal') {
       applyNormalTrainingSession(h, d, exerciseSelect.value);
@@ -7937,9 +7784,10 @@ function renderTraining() {
     if (!h) return;
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
+    const equipmentError=eqTrainingAllowed(h,focus==='Hand Work'?'groundwork':'flatwork');if(equipmentError)return alert(equipmentError);
     trainingControlabilitySession(h, focus);
     h.managed.trained = true;
-    markTrainingSession(h);
+    markTrainingSession(h,1,focus==='Hand Work'?'groundwork':'flatwork');
     h.manualTrainingThisMonth = true;
     render();
   };
@@ -8050,6 +7898,8 @@ function renderBarn() {
   panel.innerHTML = `
     <h2>Barn</h2>
     ${pastureOverview(app.horses.filter((h) => !h.deceased))}
+    ${mgTackRoomMarkup()}
+    ${stallMarkup()}
     <div class='box'>
       <p><strong>Current Barn:</strong> ${currentBarn.name} | <strong>Location:</strong> ${currentBarn.country}, ${currentBarn.city}</p>
       <details>
@@ -8232,6 +8082,8 @@ function renderBarn() {
     });
   };
 
+  mgBindRoom(panel);
+  bindStalls(panel);
   bindPastureControls(panel);
   document.getElementById('barn-filter-country').onchange = renderCatalogList;
   document.getElementById('barn-refresh-list').onclick = () => {
@@ -8818,6 +8670,8 @@ function renderCalendar() {
   const conformationEntries = app.horses.flatMap((h) => (h.pendingConformationShows || []).filter((e) => e.monthIndex === currentMonthIndex()).map((e) => `${horseDisplayName(h)} — ${e.label}`));
   document.getElementById('calendar').innerHTML = `
     <h2>Calendar</h2>
+    ${calendarHorseShowsMarkup()}
+    <details class="box"><summary>Tack Shop Restock</summary><p>${pastureDateLabel(mgShop().nextRestock)}</p></details>
     <div class='box'>
       <label>Type</label>
       <select id='cal-type'><option>Vet Check</option><option>Farrier</option><option>Feed Change</option><option>Custom Note</option></select>
@@ -8841,6 +8695,7 @@ function renderCalendar() {
       ${shows.map((show) => {
         const tCost = showTransportFee(show);
         return `<div class='box'>
+          ${calendarRulesMarkup({discipline:show.discipline})}
           <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
           <p class='small'><strong>Show Fee:</strong> ${money(show.fee)} | <strong>Transport Fee:</strong> ${money(tCost)}</p>
           <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
@@ -8866,6 +8721,7 @@ function renderCalendar() {
         <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
         <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Level:</strong> ${show.level}</p>
         <p class='small'><strong>Date:</strong> Hidden (${show.daysUntilStart} day(s) remaining)</p>
+        ${calendarRulesMarkup(show)}
       </div>`).join('') || '<p class="small">No high-level upcoming events currently listed.</p>'}
     </div>
   `;
@@ -8892,6 +8748,7 @@ function renderCalendar() {
     app.calendarReminders.push(reminder);
     renderCalendar();
   };
+  bindCalendarHorseShows(document.getElementById('calendar'));
   document.querySelectorAll('[data-cal-del]').forEach((btn) => {
     btn.onclick = () => {
       app.calendarReminders = (app.calendarReminders || []).filter((r) => r.id !== btn.dataset.calDel);
@@ -9017,6 +8874,7 @@ function renderSettings() {
   const current = app.settings || { barnName: 'Oxer to Oxer Stable Manager', breedingCode: '', breedingCodePosition: 'front', trainingMode: 'rpg', competitionMode: 'rpg' };
   document.getElementById('settings').innerHTML = `
     <h2>Settings</h2>
+    ${mgSettingsMarkup()}
     <div class='box'>
       <label>Money</label>
       <input id='settings-money' type='number' min='0' step='1' value='${Math.max(0, Math.round(app.money || 0))}' />
@@ -9043,6 +8901,7 @@ function renderSettings() {
       <p class='small'>Barn name updates the top header. Breeding code is auto-applied to newborn foal names. Training/competition mode controls RPG prompts vs normal fast-click sessions.</p>
     </div>
   `;
+  mgBindSettings(document.getElementById('settings'));
   const saveBtn = document.getElementById('settings-save');
   if (saveBtn) {
     saveBtn.onclick = () => {
@@ -9053,6 +8912,7 @@ function renderSettings() {
       }
       app.money = Math.round(enteredMoney);
       app.settings = {
+        ...app.settings,
         barnName: (document.getElementById('settings-barn-name').value || '').trim() || 'Oxer to Oxer Stable Manager',
         breedingCode: (document.getElementById('settings-breeding-code').value || '').trim(),
         breedingCodePosition: document.getElementById('settings-code-position').value === 'end' ? 'end' : 'front',
@@ -9070,6 +8930,8 @@ function renderSettings() {
 
 
 function render() {
+  mgState();
+  mgCleanupAssignments();
   ensurePastureRelationships();
   syncPastureSeparations();
   ensurePanels();
@@ -9077,6 +8939,7 @@ function render() {
   safeRun('renderDashboard', renderDashboard);
   safeRun('renderHorses', renderHorses);
   safeRun('renderBarn', renderBarn);
+  safeRun('renderTown', renderTown);
   safeRun('renderMarket', renderMarket);
   safeRun('renderSales', renderSales);
   safeRun('renderStud', renderStud);
@@ -9377,3 +9240,10 @@ if (document.readyState === 'loading') {
 } else {
   bootstrap();
 }
+
+const EQ_BASE_SIMULATE_RIDE=simulateCompetitionRide;
+simulateCompetitionRide=function(h,d,level){return eqWithCompetitionScope(h,d,level,()=>EQ_BASE_SIMULATE_RIDE(h,d,level));};
+const EQ_BASE_RPG_CHOICE=resolveCompetitionRpgChoice;
+resolveCompetitionRpgChoice=function(session,h,index){return eqWithCompetitionScope(h,session.discipline,session.level,()=>EQ_BASE_RPG_CHOICE(session,h,index));};
+const EQ_BASE_FINAL_CHANCES=competitionOptionFinalChances;
+competitionOptionFinalChances=function(session,h,step,options){return eqWithCompetitionScope(h,session.discipline,session.level,()=>{const result=EQ_BASE_FINAL_CHANCES(session,h,step,options);if(step?.stage!=='main_round'||session.discipline==='dressage'||String(step.phase).toLowerCase().includes('dressage'))return result;const context=session.discipline==='eventing'?(String(step.phase).toLowerCase().includes('cross')?'eventing-cross-country':'eventing-jumping'):session.discipline,m=equipmentModifiers(h,context);return result.map(e=>{const success=e.successChance,neutral=Math.min(100-success,e.computed.neutralChance),fail=100-success-neutral,nextFail=clamp(fail+m.refusal,0,100),remaining=100-nextFail,total=success+neutral,newSuccess=total?success/total*remaining:remaining;return {...e,successChance:newSuccess,computed:{...e.computed,neutralChance:remaining-newSuccess,failChance:nextFail}};});});};

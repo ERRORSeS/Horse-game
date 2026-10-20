@@ -178,6 +178,7 @@ function getPasturePair(a,b,pasture,hour) {
     if(pastureRuntime)for(const h of [a,b]){const list=pastureRuntime.pairs.get(h.id)||[];list.push(pair);pastureRuntime.pairs.set(h.id,list);}
     pastureRecordEvent(PASTURE_EVENT_LIBRARY[85],[a,b],pasture,hour,[],true,pair);
   }
+  if(pair.firstMetSource==='stall'&&!pair.pastureMet){pair.pastureMet=true;pair.separated=false;pastureRecordEvent(PASTURE_EVENT_LIBRARY[85],[a,b],pasture,hour,[],true,pair);}
   pair.names = pair.ids.map((id,i) => pastureLiveHorse(id)?.name || pair.names[i]);
   return pair;
 }
@@ -420,7 +421,7 @@ function pastureDailyMaintenance(hour) {
   for(const h of app.horses){
     if((h.pastureDailyEvents||0)>0){
       const booking=effectivePastureBooking(h),p=app.currentBarn?.pastures?.find(p=>p.id===booking?.pastureId);
-      if(p)pastureRecordEvent({id:35,title:'Daily Turnout Summary',category:'Neutral',texts:[`{a} completed turnout with ${h.pastureDailyEvents} recorded ${h.pastureDailyEvents===1?'activity':'activities'}.`,`{a}’s turnout day included ${h.pastureDailyEvents} recorded ${h.pastureDailyEvents===1?'activity':'activities'}.`]},[h],p,hour-1,[]);
+      if(p)pastureRecordEvent({id:35,title:'Daily Turnout Summary',category:'Neutral',texts:[`{a} completed turnout with ${h.pastureDailyEvents} simulated ${h.pastureDailyEvents===1?'activity':'activities'}.`,`{a}’s turnout day included ${h.pastureDailyEvents} simulated ${h.pastureDailyEvents===1?'activity':'activities'}.`]},[h],p,hour-1,[]);
     }
     h.pastureDailyEvents=0;
     if(h.lastSoloTurnoutDay===day-1)h.solitaryTurnoutDays=(h.solitaryTurnoutDays||0)+1;else h.solitaryTurnoutDays=0;
@@ -447,6 +448,7 @@ function pasturePregnancy(a,b,p,hour,pair) {
   }
 }
 function simulatePastureHour(hour) {
+  mgSimulateHour(hour);
   for(const h of app.horses)if(h.pastureMoodUntil&&h.pastureMoodUntil<=hour){
     if(h.mood===h.pastureMood)h.mood=h.pastureMoodBeforeEvent||'Neutral';
     h.pastureMood='';h.pastureMoodUntil=0;
@@ -507,12 +509,14 @@ function simulatePastureHour(hour) {
       trainerNotesForHorse(h);
     }
   }
+  if(typeof behaviorAfterPastureHour==='function')behaviorAfterPastureHour(hour);
 }
 function pastureHourFraction(h,hour){
   const start=Number.isFinite(h.turnoutStartHour)?Math.max(0,Math.min(23,h.turnoutStartHour)):8;
   return Math.max(0,Math.min(hour%24+1,start+pastureTurnoutHours(h))-Math.max(hour%24,start));
 }
 function simulatePastureUntil(targetHour) {
+  mgAdvanceTime(targetHour);
   const s=ensurePastureRelationships();
   if(!Number.isFinite(targetHour)||targetHour<=s.cursor)return;
   const previousRuntime=pastureRuntime;
@@ -524,6 +528,7 @@ function simulatePastureUntil(targetHour) {
       if(s.cursor%24===0&&app.currentBarn?.pasturesEnabled)pastureDailyMaintenance(s.cursor);
     }
     syncPastureSeparations(targetHour);
+    if(typeof behaviorCleanup==='function')behaviorCleanup();
   } finally { pastureRuntime=previousRuntime; }
 }
 function pastureEntryMarkup(entry) {
@@ -549,6 +554,7 @@ function horseRelationshipMarkup(h) {
     <details data-pasture-toggle='${pastureEscape(h.id)}' data-pasture-field='pastureLogOpen' ${h.pastureLogOpen?'open':''}><summary>Pasture Log</summary><label>Filter<select data-pasture-log-filter='${pastureEscape(h.id)}'>${['All Events','Positive','Neutral','Negative','Important'].map(x=>`<option ${x===filter?'selected':''}>${x}</option>`).join('')}</select></label><p class='small'>Last 100 ordinary entries; important milestones are retained separately.</p><ul class='pasture-diary'>${entries.slice(0,150).map(pastureEntryMarkup).join('')||'<li>No matching pasture activities.</li>'}</ul></details>`;
 }
 function bindPastureProfileControls(panel) {
+  if(typeof bindBehaviorLog==='function')panel.querySelectorAll('[data-behavior-filter]').forEach(el=>{const h=pastureLiveHorse(el.dataset.behaviorFilter);if(h)bindBehaviorLog(el.closest('details').parentElement,h);});
   panel.querySelectorAll('[data-pasture-toggle]').forEach(el=>{el.ontoggle=()=>{const h=pastureLiveHorse(el.dataset.pastureToggle);if(h)h[el.dataset.pastureField]=el.open;};});
   panel.querySelectorAll('[data-pasture-log-filter]').forEach(select=>{select.onchange=()=>{const h=pastureLiveHorse(select.dataset.pastureLogFilter);if(!h)return;h.pastureLogFilter=select.value;h.pastureLogOpen=true;const list=select.closest('details').querySelector('ul.pasture-diary');if(list)list.innerHTML=filteredPastureEntries(h).slice(0,150).map(pastureEntryMarkup).join('')||'<li>No matching pasture activities.</li>';};});
 }

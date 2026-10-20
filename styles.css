@@ -181,3 +181,5 @@ textarea {
 .pasture-diary { padding-left: 1.25rem; max-height: 28rem; overflow: auto; }
 .pasture-diary-entry { padding: .5rem 0; border-bottom: 1px solid #465766; }
 .pasture-diary-entry p { margin: .3rem 0; }
+
+.equipment-color { display:inline-block; width:.8rem; height:.8rem; border-radius:50%; border:1px solid #aaa; vertical-align:middle; }

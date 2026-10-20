@@ -51,3 +51,24 @@ Existing saves acquire empty relationship defaults without resetting horses, car
 ### Validation
 
 Run `node tests/pasture.test.cjs` with Node.js to execute 16 regression tests. These cover all 90 event templates and milestones, batching parity, reciprocal scores, daily caps, injury restrictions, foals/mothers, retired horses, missing companions, save migration, full save/load, diary limits, real time-advance functions, and a 100-horse stable. Browser checks cover diary filtering, compatibility warnings, pasture history and the three skip buttons.
+
+## Optional stall, tack and fitting management
+
+Open **Town → Tack Shop** to buy in-stock equipment and Stable Supplies. Select Size, then Color, and add items to the shopping cart. Stock and the next restock date persist in the save. Barn → Tack Room manages owned items, repairs, resale and horse assignments.
+
+Settings → Optional Horse Management contains three independent switches: Stall Assignments, Tack Ownership & Inventory, and Saddle Fitting. They default to OFF on new and older saves. Switching a system off preserves its saved data. When ownership is off, compatible tack remains freely selectable.
+
+Barn → Stall Management assigns numbered stalls, swaps neighbors and installs enrichment. Foals under one year share their mother’s stall. Horse profiles contain collapsed Tack & Equipment, fitting services, discipline presets, Stall History and Daily Behavior Log sections, plus an explanation of active mood factors.
+
+Calendar → Create Calendar Horse Show provides event-specific equipment formats, including neck-rope, bitless and bareback events. Expand Equipment Rules / Permitted Tack on an event to review its own rules. Ordinary Shows retain the normal discipline restrictions.
+
+Use all the JavaScript modules shipped with this version together. Do not mix the new index with older modules. Existing save/export/import paths are retained; no player save file is bundled or reset by this update.
+
+Run the regression suites with Node.js:
+
+```bash
+node tests/management.test.cjs
+node tests/pasture.test.cjs
+```
+
+See MANAGEMENT-VALIDATION.md for validation coverage and integration details.
