@@ -25,3 +25,11 @@ Then open `http://localhost:4173`.
 - Vet, farrier, training, shows, registries, breeders show pages.
 - Interactive text-RPG training sessions with discipline-specific choices and weighted outcomes.
 - Training clinic-style report generation and in-app report feed.
+
+## Pastures and conformation schedules
+
+Enable optional pasture management in Barn. Every owned horse can be assigned, including retired horses and young horses. Foals under one year follow their mother automatically. Select individual turnout in the horse profile or Barn to choose a private pasture; changing this preference clears a booking of the other type. A mare may share a private pasture with her foals under one year. Other horses cannot book it. Individual pasture count is one per three group pastures, rounded up.
+
+Each horse has a persistent Social score from 0 to 100. Scores below 25 prefer being alone; 25–49 tolerate either arrangement but have a 15% fight risk with companions; 50–74 need at least one companion; 75–100 need at least two. Unsuitable turnout produces Uncomfortable or Stressed mood and a trainer note. Scores 0–10 have a 30% aggression risk with companions; Hot-Blooded and Excitable horses have a separate 15% fight risk. These risks apply only during shared turnout. Existing staff, crowding, and stallion risks still apply.
+
+Recurring conformation settings are individual to each horse. Choose every X months, selected calendar months, or every month except selected months. Month selections repeat yearly, and show eligibility still applies. Old interval schedules remain supported. New Social scores, turnout preferences, bookings, and schedule settings are included in saves.

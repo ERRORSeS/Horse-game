@@ -172,3 +172,8 @@ textarea {
   color: #dfe9f5;
 }
 .pedigree-relation { margin-bottom: .35rem; font-weight: 600; color: var(--accent); }
+
+.checkbox-label { display: flex; align-items: center; gap: .5rem; margin: .5rem 0; }
+.checkbox-label input[type="checkbox"] { display: inline-block; width: auto; margin: 0; flex: 0 0 auto; }
+.conformation-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .25rem .75rem; margin: .75rem 0; }
+.conformation-months legend { padding: 0 .4rem; }
