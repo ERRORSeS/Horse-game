@@ -2818,7 +2818,7 @@ function applyStablehandCare(horse) {
 }
 
 function trainerNotesForHorse(horse) {
-  const notes = [];
+  const notes = pastureRelationshipTrainerNotes(horse);
   if (app.currentBarn?.pasturesEnabled && horse.turnoutSocialIssue) notes.push("this horse isn't enjoying its turnout");
   const { subject, object, possessive } = genderPronouns(horse);
   const [feedMin, feedMax] = feedRangeBounds(horse);
@@ -3524,6 +3524,8 @@ function hydrateFromSave(data) {
   app.barnHorseSelectionId = data.barnHorseSelectionId || '';
   app.marketSelections = typeof data.marketSelections === 'object' && data.marketSelections ? data.marketSelections : {};
   app.stablehandHired = data.stablehandHired === true;
+  app.pastureRelationships = data.pastureRelationships?.version === 1 ? data.pastureRelationships : null;
+  ensurePastureRelationships();
   ensureBarnState();
 
   app.horses.forEach((h) => {
@@ -3731,6 +3733,7 @@ function hydrateFromSave(data) {
 }
 
 function resetGame() {
+  app.pastureRelationships = null;
   app.money = 50000;
   app.month = 1;
   app.day = 1;
@@ -5331,6 +5334,7 @@ function renderDashboard() {
   `).join('') || '<p class="small">No competition reports yet.</p>';
   document.getElementById('dashboard').innerHTML = `
     ${reminders.length ? `<div class='box' style='border:2px solid #c40000;background:#ffe7e7'><h3 style='color:#c40000'>Reminders</h3>${reminders.map((r) => `<p><strong>${r.type}:</strong> ${r.note || 'No note'} <button data-rem-close='${r.id}'>Close</button></p>`).join('')}</div>` : ''}
+    ${pastureDashboardMarkup()}
     <div class="grid two">
       <div class="box">
         <h2>Stable Snapshot</h2>
@@ -5694,7 +5698,8 @@ function createHorseCard(horse) {
     };
   });
   if (app.horses.some((h) => h.id === horse.id)) {
-    node.insertAdjacentHTML('beforeend', turnoutPreferenceControls(horse) + autoConformationControls(horse));
+    node.insertAdjacentHTML('beforeend', turnoutPreferenceControls(horse) + autoConformationControls(horse) + horseRelationshipMarkup(horse));
+    bindPastureProfileControls(node);
     bindTurnoutPreferences(node);
     bindAutoConformationControls(node);
   }
@@ -5730,6 +5735,7 @@ function horseProfileMarkup(horse, options = {}) {
   return `
     <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine}</p>
     ${titlesLine}
+    ${horseRelationshipMarkup(horse)}
     <p class='small'>Social: ${ensureHorseSocial(horse)}/100 • Turnout preference: ${horse.individualTurnout ? 'Individual' : 'Group'}</p>
     <div class='grid two'>
       <div><h4>Jump Training</h4><ul class='stats'>${jumping}</ul></div>
@@ -7103,10 +7109,11 @@ function progressUpcomingEventsByDays(days) {
 }
 
 function advanceOneDay() {
+  simulatePastureUntil(pastureCalendarHour(app.year, app.month, (app.day || 1) + 1, 0));
   app.hour = 0;
   app.day += 1;
   if (app.day > 30) {
-    monthlyProgress();
+    monthlyProgress(true);
     return;
   }
   const newborns = [];
@@ -7126,6 +7133,7 @@ function advanceOneDay() {
 }
 
 function advanceOneHour() {
+  simulatePastureUntil(pastureCalendarHour() + 1);
   app.hour += 1;
   if (app.hour >= 24) {
     advanceOneDay();
@@ -8245,8 +8253,10 @@ function processAgingAndMortality(horse) {
   return false;
 }
 
-function monthlyProgress() {
+function monthlyProgress(fromDayRollover = false) {
   ensureBarnState();
+  const elapsedDays = fromDayRollover ? 1 : 31 - (app.day || 1);
+  if (!fromDayRollover) simulatePastureUntil(pastureCalendarHour(app.year, app.month + 1, 1, 0));
   app.day = 1;
   app.hour = 0;
   app.month += 1;
@@ -8266,14 +8276,13 @@ function monthlyProgress() {
     });
   }
 
-  processPastures();
   const survivors = [];
   const newborns = [];
   const conformationBreedPlacings = new Set();
   app.horses.forEach((h) => {
-    processPregnancy(h, newborns);
+    processPregnancy(h, newborns, elapsedDays);
     applyPostFoalingRecovery(h);
-    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += 30;
+    if (h.foalVitality && Number.isFinite(h.foalVitality.ageDays)) h.foalVitality.ageDays += elapsedDays;
     applyStablehandCare(h);
     maybeAddRandomIllness(h);
     if (h.deceased) {
@@ -9061,6 +9070,8 @@ function renderSettings() {
 
 
 function render() {
+  ensurePastureRelationships();
+  syncPastureSeparations();
   ensurePanels();
   safeRun('updateHeader', updateHeader);
   safeRun('renderDashboard', renderDashboard);
@@ -9281,16 +9292,18 @@ function pastureOverview(horses) {
   const rules = ensurePastures(), barn = app.currentBarn;
   return `<div class='box'><h3>Pastures</h3><label class='checkbox-label'><input id='pastures-enabled' type='checkbox' ${barn.pasturesEnabled ? 'checked' : ''}>Enable optional pasture management</label>
     <p class='small'>${barn.pastures.filter((p) => !p.individual).length} group pastures and ${barn.pastures.filter((p) => p.individual).length} individual pastures • ${rules[2]}% booking availability • Up to ${rules[3]} horses per group pasture. Bookings persist. Individual pastures exclude other horses, except a mare's foals under one year. Changing turnout preference clears an incompatible booking. All ages and retired horses can have bookings. Below 3 care stars, staff miss turnout 30% of the time. Shared turnout can cause fights; mares with stallions risk pregnancy.</p>
-    ${barn.pasturesEnabled ? barn.pastures.map((p) => { const assigned = pastureOccupants(p); return `<p>${p.name}: ${p.available ? 'Booking available' : 'Fully booked'} • ${assigned.length + (p.guests || 0)} occupants • ${assigned.map((h) => h.name).join(', ') || 'No assigned horses'}</p>`; }).join('') + horses.map((h) => {
+    ${barn.pasturesEnabled ? barn.pastures.map((p) => { const assigned = pastureOccupants(p); return `<div><p>${p.name}: ${p.available ? 'Booking available' : 'Fully booked'} • ${assigned.length + (p.guests || 0)} occupants • ${assigned.map((h) => h.name).join(', ') || 'No assigned horses'}</p>${pastureCompatibilityMarkup(p)}</div>`; }).join('') + horses.map((h) => {
       const mother = turnoutMother(h), booking = effectivePastureBooking(h);
       return `<div class='box'><strong>${horseDisplayName(h)}</strong>${turnoutPreferenceControls(h)}<label>Pasture<select data-pasture-horse='${h.id}' ${mother ? 'disabled' : ''}><option value=''>No pasture</option>${barn.pastures.filter((p) => mother || Boolean(p.individual) === Boolean(h.individualTurnout)).map((p) => `<option value='${p.id}' ${booking?.barnId === barn.id && booking?.pastureId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></label></div>`;
-    }).join('') : ''}</div>`;
+    }).join('') + pastureBarnHistoryMarkup() : ''}</div>`;
 }
 function bindPastureControls(panel) {
+  bindPastureHistoryControls(panel);
   bindTurnoutPreferences(panel);
   panel.querySelector('#pastures-enabled').onchange = (event) => {
     app.currentBarn.pasturesEnabled = event.target.checked;
     if (!event.target.checked) app.horses.forEach((h) => { h.pastureControlBonus = 0; h.pastureMood = ''; h.turnoutSocialIssue = false; });
+    syncPastureSeparations();
     renderBarn();
   };
   panel.querySelectorAll('[data-pasture-horse]').forEach((select) => { select.onchange = () => {
@@ -9316,48 +9329,6 @@ function socialTurnoutEffect(h, companions) {
   if (social >= 75 && companions < 2 || social >= 50 && social < 75 && companions < 1) return { mood: 'Stressed', fightChance: 0 };
   return { mood: '', fightChance: social >= 25 && social < 50 && companions > 0 ? 0.15 : 0 };
 }
-function processPastures() {
-  app.horses.forEach((h) => { h.pastureControlBonus = 0; h.pastureMood = ''; h.turnoutSocialIssue = false; ensureHorseSocial(h); });
-  const barn = app.currentBarn;
-  if (!barn.pasturesEnabled) return;
-  const rules = ensurePastures();
-  for (const p of barn.pastures) {
-    const assigned = pastureOccupants(p);
-    p.available = rnd(1, 100) <= rules[2];
-    p.guests = p.individual ? 0 : p.available ? rnd(0, Math.max(0, rules[3] - assigned.length)) : rnd(1, rules[3]);
-    const attending = assigned.filter((h) => {
-      const mother = turnoutMother(h);
-      if (mother && assigned.includes(mother)) return false;
-      if (barn.careStars < 3 && rnd(1, 100) <= 30) {
-        h.pastureControlBonus = -8; h.pastureMood = h.mood = 'Grumpy'; pushReport(`${h.name}: staff forgot pasture turnout; mood and controlability suffered.`); return false;
-      }
-      return true;
-    });
-    assigned.filter((h) => turnoutMother(h) && attending.includes(turnoutMother(h))).forEach((h) => attending.push(h));
-    assigned.filter((h) => turnoutMother(h) && !attending.includes(turnoutMother(h))).forEach((h) => { h.pastureControlBonus = -8; h.pastureMood = h.mood = 'Grumpy'; });
-    const fight = new Set();
-    for (const h of attending) {
-      const companions = attending.length - 1 + p.guests;
-      const effect = socialTurnoutEffect(h, companions);
-      h.turnoutSocialIssue = Boolean(effect.mood);
-      h.pastureMood = h.mood = effect.mood || 'Happy'; h.pastureControlBonus = effect.mood ? -8 : 8;
-      const personalityRisk = ['Hot-Blooded', 'Excitable'].includes(h.personality) ? 0.15 : 0;
-      const crowdRisk = !p.individual && attending.length + p.guests > rules[3] ? 0.15 * (6 - barn.careStars) / 5 : 0;
-      const stallionRisk = h.gender === 'Stallion' && h.age >= 3 && attending.some((other) => other.id !== h.id && other.gender === 'Stallion' && other.age >= 3) ? 0.15 * (6 - barn.careStars) / 5 : 0;
-      if (companions > 0 && (Math.random() < effect.fightChance || Math.random() < personalityRisk || Math.random() < crowdRisk || Math.random() < stallionRisk)) {
-        fight.add(h);
-        const other = attending.find((other) => other.id !== h.id);
-        if (other) fight.add(other);
-      }
-    }
-    fight.forEach((h) => { h.pastureMood = h.mood = 'Distress'; h.pastureControlBonus = -8; if (Math.random() < 0.6) addIllness(h, { name: 'Pasture Fight Injury', severity: 'Easy', impact: 6 }); pushReport(`${h.name} was involved in a fight in ${p.name}.`); });
-    const stallions = attending.filter((h) => h.gender === 'Stallion' && h.age >= 3);
-    if (stallions.length) attending.filter((h) => h.gender === 'Mare' && h.age >= 3 && !h.pregnantBy && !h.pregnantEmbryo).forEach((mare) => {
-      if (rnd(1, 100) <= 50) { mare.pregnantBy = pick(stallions).name; mare.pregnancyDays = 0; mare.gestationLengthDays = rnd(320, 360); pushReport(`${mare.name} became pregnant after sharing ${p.name} with a stallion.`); }
-    });
-  }
-}
-
 function autoConformationControls(h) {
   const c = h.autoConformation || {}, mode = c.mode || 'interval';
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
