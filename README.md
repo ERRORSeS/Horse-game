@@ -109,3 +109,9 @@ Open Training, choose a horse, discipline and location, then continue to the les
 Expandable sections provide riding attributes and traits, fence/course construction, weekly schedules, rugs, named tack sets and live stall nameplates. Quick Training uses the same progression rules. Weekly automatic work respects medical restrictions, weather, retirement and the existing monthly learning allowance; scheduled entries are retained when work is postponed.
 
 See `TRAINING2-AUDIT.md` for authoritative field mappings and `TRAINING2-VALIDATION.md` for limits, implementation choices and test coverage. Run `node tests/training2.test.cjs` for the new regression suite.
+
+### Additive riding progression and incidents
+
+Main Training Goal now selects a trainable attribute and boosts only relevant earned progress. The report shows relevance based on completed work, along with actual incidents, rider falls and qualifying recovery. Lunging offers with/without additional-aid modes and develops separate voice education. Existing builders and core RPG scenes remain available.
+
+Weather refreshes on each in-game day, including chronological month skips. Arena activity is randomized and saved per facility/day; it is no longer player-selected. See `TRAINING2-EXTENSION-VALIDATION.md` for mechanics, bounds and validation. Run `node tests/training2-extension.test.cjs` for additive tests.
