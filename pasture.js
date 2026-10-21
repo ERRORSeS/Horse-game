@@ -186,7 +186,7 @@ function changePastureRelationship(pair,delta,horses,pasture,hour,{serious=false
   const day = Math.floor(hour/24), old = pair.score;
   if (pair.daily.day !== day) pair.daily = {day,gain:0,loss:0};
   if (delta > 0) { delta = Math.min(delta,5-pair.daily.gain); pair.daily.gain += delta; }
-  if (delta < 0 && !serious) { delta = -Math.min(-delta,10-pair.daily.loss); pair.daily.loss -= delta; }
+  if (delta < 0 && !serious) { delta = -Math.min(-delta,5-pair.daily.loss); pair.daily.loss -= delta; }
   pair.score = Math.round(Math.max(-100,Math.min(100,pair.score + delta)));
   const thresholds = [{id:87,key:'friends',cross:old<=40&&pair.score>40},{id:88,key:'bonded',cross:old<=75&&pair.score>75},{id:89,key:'rival',cross:old>=-40&&pair.score< -40},{id:90,key:'enemies',cross:old>=-75&&pair.score< -75}];
   for (const t of thresholds) if (t.cross) {
@@ -392,7 +392,7 @@ function applyPastureEvent(e,c,{serious=false}={}) {
   const important=serious||e.mode==='reunion'||e.category==='Negative'&&actualDelta<=-5;
   const entry=pastureRecordEvent(e,participants,p,hour,effects,important,rel,override);
   if(e.mode==='group'&&important)for(const h of participants)for(const other of participants)if(h.id<other.id){const r=existingPasturePair(h,other);if(r&&!r.history.includes(entry.id))r.history.push(entry.id);}
-  for(const h of participants){h.pastureDailyEvents=(h.pastureDailyEvents||0)+1;trainerNotesForHorse(h);}
+  for(const h of participants){h.pastureDailyEvents=(h.pastureDailyEvents||0)+1;h.careDiagnosticsDirty=true;if(important)trainerNotesForHorse(h);}
   return entry;
 }
 function syncPastureSeparations(hour=pastureCalendarHour()) {
@@ -463,12 +463,10 @@ function simulatePastureHour(hour) {
       if(!pastureIsFoal(h,hour)&&h.inheritedPasture&&p.individual)return false;
       return pastureHorseAvailable(h);
     });
-    const group=assigned.filter(h=>pastureAttendance(h,p,hour)).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    const group=assigned.filter(h=>mgPastureFraction(h,hour)>0).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
     if(!group.length)continue;
     for(const h of group){
-      const suitable=group.filter(o=>o.id!==h.id&&(existingPasturePair(h,o)?.score||0)>=-40).length;
-      const effect=socialTurnoutEffect(h,h.social<50?group.length-1:suitable);h.turnoutSocialIssue=Boolean(effect.mood);
-      if((h.pastureMoodUntil||0)<=hour){h.pastureMood=h.mood=effect.mood||'Happy';h.pastureControlBonus=effect.mood?-8:8;}
+      careObserveSocial(h,group,p,hour);
       if(group.length===1)h.lastSoloTurnoutDay=day;
       const crowded=!p.individual&&group.length+(p.guests||0)>PASTURE_RULES[barn.facilityStars][3];
       const crowdHazard=1-Math.pow(1-.15*(6-barn.careStars)/5,pastureHourFraction(h,hour)/8);
@@ -483,8 +481,9 @@ function simulatePastureHour(hour) {
       let a=group[i],b=group[j];
       if(hour%2)[a,b]=[b,a];
       if(pastureMother(b,hour)?.id===a.id)[a,b]=[b,a];
+      if(careSharedHours(a,b,hour)<=0)continue;
       const rel=getPasturePair(a,b,p,hour);pastureReunion(rel,a,b,p,hour,group);
-      rel.sharedHours+=Math.min(pastureHourFraction(a,hour),pastureHourFraction(b,hour));rel.lastContact=hour;rel.lastDecay=hour;
+      rel.sharedHours+=careSharedHours(a,b,hour);rel.lastContact=hour;rel.lastDecay=hour;
       pasturePregnancy(a,b,p,hour,rel);
       pairContexts.push({a,b,group,rel,p,hour});
     }
@@ -493,12 +492,12 @@ function simulatePastureHour(hour) {
       const {a,b,rel}=c;
       if(!pastureMedicalEligible(a)||!pastureMedicalEligible(b))continue;
       // Injury-capable events only enter through this single pair fight gate.
-      if(!pastureIsFoal(a,hour)&&!pastureIsFoal(b,hour)&&rel.fightDay!==day&&pastureRandom()<1-Math.pow(1-pastureFightRisk(a,b,rel,p,group.length),Math.min(pastureHourFraction(a,hour),pastureHourFraction(b,hour)))){
+      if(!pastureIsFoal(a,hour)&&!pastureIsFoal(b,hour)&&rel.fightDay!==day&&pastureRandom()<1-Math.pow(1-pastureFightRisk(a,b,rel,p,group.length),careSharedHours(a,b,hour))){
         applyPastureEvent(pasturePick(PASTURE_EVENT_LIBRARY.filter(e=>e.mode==='fight')),c,{serious:true});interacted.add(a.id);interacted.add(b.id);continue;
       }
       if(interacted.has(a.id)||interacted.has(b.id))continue;
       const socialFrequency=(.06+(ensureHorseSocial(a)+ensureHorseSocial(b))/2000)*(rel.score>75?1.25:rel.score>40?1.1:1);
-      if(pastureRandom()<socialFrequency*Math.min(pastureHourFraction(a,hour),pastureHourFraction(b,hour))){
+      if(pastureRandom()<socialFrequency*careSharedHours(a,b,hour)){
         const e=selectPastureEvent(c,'social');
         const entry=applyPastureEvent(e,c);if(entry)entry.horses.forEach(h=>interacted.add(h.id));
       }
@@ -506,7 +505,7 @@ function simulatePastureHour(hour) {
     for(const h of group){
       if(!pastureMedicalEligible(h))continue;
       if(!interacted.has(h.id)&&pastureRandom()<.14*pastureHourFraction(h,hour))applyPastureEvent(selectPastureEvent({a:h,b:null,group,rel:null,p,hour},'solo'),{a:h,b:null,group,rel:null,p,hour});
-      trainerNotesForHorse(h);
+      if(h.showTrainerNotes&&h.lastPastureTrainerDay!==day){trainerNotesForHorse(h);h.lastPastureTrainerDay=day;}
     }
   }
   if(typeof behaviorAfterPastureHour==='function')behaviorAfterPastureHour(hour);
@@ -520,7 +519,7 @@ function simulatePastureUntil(targetHour) {
   const s=ensurePastureRelationships();
   if(!Number.isFinite(targetHour)||targetHour<=s.cursor)return;
   const previousRuntime=pastureRuntime;
-  pastureRuntime={horses:new Map(app.horses.map(h=>[h.id,h])),pairs:new Map()};
+  pastureRuntime={horses:new Map(carePastureHorses().map(h=>[h.id,h])),pairs:new Map()};
   for(const pair of Object.values(s.pairs))for(const id of pair.ids){const list=pastureRuntime.pairs.get(id)||[];list.push(pair);pastureRuntime.pairs.set(id,list);}
   try {
     while(s.cursor<targetHour){

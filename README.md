@@ -72,3 +72,32 @@ node tests/pasture.test.cjs
 ```
 
 See MANAGEMENT-VALIDATION.md for validation coverage and integration details.
+
+## Shop and panel usability update
+
+Every equipment type now has a 90% chance of being in stock at each scheduled restock. In-stock types offer every valid size/color combination, with larger total quantities. Existing sold-out variants, purchases, cart contents and restock dates survive the one-time stock expansion. Buying the final units can still deplete a variant normally.
+
+The redesigned Town shop groups equipment by category, shows availability and prices, retains selected variants, and supports removing individual cart lines. Use Close Tack Shop or its Town button to close it explicitly.
+
+Collapsible sections remember their open/closed state through actions, purchases, redraws and save/load. This includes carts, management settings, stall assignments, individual stall enrichment, Tack Room categories and horse details. Pastures is now collapsible. Stall horse, target and supply selections remain selected when still available.
+
+## Stable quality-of-life and Calendar fixes
+
+Management drawers, filters, horse selectors and scroll position now survive normal redraws. Pastures are collapsible. The Tack Shop includes an available-only filter, explicit missing variants and saved restock dates. Standard equipment rolls 80% stock availability; specialty equipment rolls 65%; every restock includes the four essential tack types. Existing stock is retained until its scheduled restock.
+
+Retired horses use actual completed light exercise rather than competition-training minimums. Healthy auto-exercised retirees receive a light routine three days each week; the suggested range is 2–4 sessions. Medical restrictions override exercise. Current feeding/trainer diagnostics identify the actual failed condition and stop showing corrected conditions as active warnings. Current Mood Factors and Current Mood Selection Weights explain calculated effects.
+
+Pasture companionship counts only suitable horses actually sharing overlapping turnout. Social 50–74 requires one companion and Social 75–100 requires two. Loneliness applies once per evaluation: +8 pp Distress for Social 50–74 with none; +10 pp for Social 75+ with none; +3 pp for Social 75+ with one. Loneliness diary observations add no second penalty. Ordinary pair losses cap at −5/day; positive gains remain capped at +5/day. Existing relationships remain saved.
+
+Barn → Pastures → NPC Pasture Companions offers optional boarding-facility companions without buying more horses. They use real capacity, schedules and reciprocal relationships; scheduled departures are recorded, and identities/history survive separation and temporary returns.
+
+New game-hosted Calendar events roll a saved 20% special-format selection, subject to discipline/level compatibility. Ordinary events and Shows-tab rules remain separate. Age categories, star indicators and Equipment Rules belong to each event. User-hosted shows move out of Upcoming after completion or expiry without losing records. Incorrect Calendar tack is checked during the existing result flow and appears as Disqualified, without placing, money or points.
+
+Puissance Wall is isolated to its Calendar format. The event saves its start/increment/maximum, attempts, entry order, wall rounds and results. It reuses existing eligibility, equipment, rail/refusal/fall, health and fatigue values; rankings use cleared height and saved tie-breaks. Ordinary Showjumping remains unchanged.
+
+Additional regression suites:
+
+```bash
+node tests/quality.test.cjs
+node tests/calendar-expansion.test.cjs
+```

@@ -2881,7 +2881,7 @@ function evaluateFeedEffects(horse) {
         competitionBoost += 1;
         break;
       case 'Sports Feed':
-        if (!activeTraining || competitionCount === 0) {
+        if (!activeTraining || careTrainingStatus(horse)!=='Active Competition Horse') {
           weightDelta += 1;
           moodOverride = 'Distress';
           wrongFeedUsed = true;
@@ -2916,7 +2916,7 @@ function evaluateFeedEffects(horse) {
         }
         break;
       case 'Calm nd Ez':
-        if (['Lazy', 'Easy-Going', 'Bomb-proof'].includes(horse.personality)) {
+        if (!hasInjury&&['Lazy', 'Easy-Going', 'Bomb-proof', 'Bomb-Proof'].includes(horse.personality)) {
           moodOverride = 'Distress';
           competitionBoost -= 1;
           trainingBoost -= 1;
@@ -3232,7 +3232,7 @@ function trainingControlabilitySession(horse, focus) {
 }
 
 function updateMonthlyCare(horse) {
-  if (horse.retiredForever && !horse.retiredToBreeding) return;
+  const careStatus=careNormalizeRoutine(horse);
   evaluateFeedEffects(horse);
   const [minTurnout, maxTurnout] = resolvedTurnoutBounds(horse);
   const stamina = horse.trainingPreference || 'Medium';
@@ -3247,18 +3247,20 @@ function updateMonthlyCare(horse) {
   const shows = horse.showEntriesThisMonth || 0;
   horse.lastTrainingSessions = sessions;
   horse.lastShowEntries = shows;
-  if (sessionsInCurrentWindow > horse.preferredTrainingSessions || shows > 3) {
+  if (careStatus==='Active Competition Horse'&&(sessionsInCurrentWindow > horse.preferredTrainingSessions || shows > 3)) {
     horse.lastTrainingIssue = 'high';
     horse.overTrainingCountYear = (horse.overTrainingCountYear || 0) + 1;
     if ([4, 8].includes(horse.overTrainingCountYear)) {
       horse.pendingOvertrainingInjury = true;
     }
-  } else if (sessionsInCurrentWindow < minTrainingSessions) {
+  } else if (careStatus==='Active Competition Horse'&&sessionsInCurrentWindow < minTrainingSessions) {
     horse.lastTrainingIssue = 'low';
   }
 
+  if(careExerciseSufficiency(horse).low)horse.lastTrainingIssue='light-low';
+  if(careStatus==='Medically Restricted / Unrideable')horse.lastTurnoutIssue='';
   let mood = resolveMonthlyMoodFromCare(horse);
-  if (horse.turnoutHours < minTurnout && !(horse.illnesses || []).some((i) => i.active)) {
+  if (careStatus!=='Medically Restricted / Unrideable'&&horse.turnoutHours < minTurnout && !(horse.illnesses || []).some((i) => i.active)) {
     horse.lastTurnoutIssue = 'low';
     updateWeight(horse, 1);
   } else if (horse.turnoutHours > maxTurnout) {
@@ -3344,6 +3346,10 @@ function serializeAppState() {
 function hydrateFromSave(data) {
   if (!data || typeof data !== 'object') throw new Error('Invalid save data.');
   app.money = Number(data.money) || 50000;
+  app.uiDisclosures = data.uiDisclosures && typeof data.uiDisclosures==='object' ? data.uiDisclosures : {};
+  app.uiSelections = data.uiSelections && typeof data.uiSelections==='object' ? data.uiSelections : {};
+  app.townView = data.townView === 'shop' ? 'shop' : '';
+  app.uiActiveTab = tabs.includes(data.uiActiveTab) ? data.uiActiveTab : 'dashboard';
   app.month = Number(data.month) || 1;
   app.day = clamp(Number(data.day) || 1, 1, 30);
   app.hour = clamp(Number(data.hour) || 0, 0, 23);
@@ -3614,6 +3620,10 @@ function hydrateFromSave(data) {
 function resetGame() {
   app.pastureRelationships = null;
   app.management = null;
+  app.uiDisclosures = {};
+  app.uiSelections = {};
+  app.townView = '';
+  app.uiActiveTab = 'dashboard';
   app.money = 50000;
   app.month = 1;
   app.day = 1;
@@ -5132,6 +5142,7 @@ function releaseLeasedHorseToLessonProgram(horse) {
 }
 
 function changeTab(tab) {
+  app.uiActiveTab = tab;
   tabs.forEach((t) => {
     const panel = document.getElementById(t);
     panel?.classList.toggle('hidden', t !== tab);
@@ -5173,7 +5184,7 @@ function buildTabs() {
     btn.onclick = () => changeTab(tab);
     wrap.append(btn);
   });
-  changeTab('dashboard');
+  changeTab(tabs.includes(app.uiActiveTab) ? app.uiActiveTab : 'dashboard');
 }
 
 function renderDashboard() {
@@ -5264,6 +5275,7 @@ function renderDashboard() {
 }
 
 function createHorseCard(horse) {
+  if(horse.showTrainerNotes)trainerNotesForHorse(horse);
   horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
   horse.managed = horse.managed || { fed: false, vet: false, farrier: false, trained: false, shown: false };
   horse.stats = horse.stats || { dressage: {}, jumping: {} };
@@ -5301,6 +5313,7 @@ function createHorseCard(horse) {
   ].map((option) => `<option value='${option.value}' ${horse.autoTrainingFocus === option.value ? 'selected' : ''}>${option.label}</option>`).join('');
 
   node.querySelector('.horse-name').textContent = horseDisplayName(horse);
+  node.dataset.uiOwner=horse.id;
   let titleEl = node.querySelector('.horse-title');
   if (!titleEl) {
     titleEl = document.createElement('p');
@@ -5560,6 +5573,7 @@ function createHorseCard(horse) {
     };
   });
   if (app.horses.some((h) => h.id === horse.id)) {
+    node.dataset.uiOwner=horse.id;
     node.insertAdjacentHTML('beforeend', turnoutPreferenceControls(horse) + autoConformationControls(horse) + horseRelationshipMarkup(horse) + stallHistoryMarkup(horse) + behaviorLogMarkup(horse) + moodReasonsMarkup(horse));
     bindPastureProfileControls(node);
     bindEqEditor(node,horse);
@@ -6820,7 +6834,7 @@ function registerShowEntry(horse, discipline, level) {
     pushReport(`${horse.name} cannot show while recovering from an injury/illness.`);
     return;
   }
-  const equipmentCheck=validateCompetitionEquipment(horse,discipline,level);if(!equipmentCheck.valid){equipmentCheck.messages.forEach(pushReport);return;}
+  const equipmentCheck=calendarRegistrationContext?validateCalendarEquipment(horse,discipline,level,calendarEntrySnapshot(calendarRegistrationContext.event)):validateCompetitionEquipment(horse,discipline,level);if(!equipmentCheck.valid){equipmentCheck.messages.forEach(pushReport);if(!calendarRegistrationContext)return;}
   horse.managed.showEntry = true;
   const idx = levelIndex(discipline, level);
   const maxIdx = highestAllowedLevelIndex(horse, discipline);
@@ -6865,9 +6879,12 @@ function resolvePendingCompetitions(horse) {
     if (Number.isFinite(entry.dayIndex)) return entry.dayIndex < currentDay;
     return Number.isFinite(entry.monthIndex) && entry.monthIndex < currentMonth;
   });
+  due.sort((a,b)=>Number.isFinite(a.calendarAt)&&Number.isFinite(b.calendarAt)?a.calendarAt-b.calendarAt:0);
   horse.pendingCompetitions = pending.filter((entry) => !due.includes(entry));
   if (!due.length) return;
+  horse.processedCompetitionIds=horse.processedCompetitionIds||[];
   due.forEach((entry) => {
+    if(horse.processedCompetitionIds.includes(entry.id))return;
     const result = calculateCompetitionResult(horse, entry.discipline, entry.level, entry.interaction, entry);
     if(!result.status)horse.totalPoints += Math.max(0, 30 - result.placing);
     horse.earnings += result.prize;
@@ -6875,7 +6892,9 @@ function resolvePendingCompetitions(horse) {
     if (result.placing === 1) horse.championships += 1;
     if (result.placing === 2) horse.reserves += 1;
     horse.topWins.highestScore = Math.max(horse.topWins.highestScore, result.score);
+    horse.processedCompetitionIds.push(entry.id);
     horse.showResults.push({
+      entryId:entry.id,
       date: dateLabel(),
       discipline: entry.discipline,
       level: entry.level,
@@ -6883,7 +6902,10 @@ function resolvePendingCompetitions(horse) {
       placing: result.placing,
       prize: result.prize,
       resultText: result.resultText,
-      status: result.status || null
+      status: result.status || null,
+      eventId: entry.eventId, eventName: entry.eventName,
+      disqualificationReason: result.disqualificationReason,
+      penaltiesText: result.penaltiesText, timeScoreText: result.timeScoreText, wall: result.wall
     });
     updateHorseTitles(horse);
     pushCompetitionReport({
@@ -6891,7 +6913,8 @@ function resolvePendingCompetitions(horse) {
       date: dateLabel(),
       discipline: entry.discipline,
       level: entry.level,
-      competitionName: `${cap(entry.discipline)} ${entry.level}`,
+      competitionName: entry.eventName||`${cap(entry.discipline)} ${entry.level}`,
+      status: result.status, disqualificationReason: result.disqualificationReason, wall: result.wall,
       penaltiesText: result.penaltiesText,
       timeScoreText: result.timeScoreText,
       horseName: horse.name,
@@ -8694,8 +8717,8 @@ function renderCalendar() {
       <h3>Events Happening Right Now</h3>
       ${shows.map((show) => {
         const tCost = showTransportFee(show);
-        return `<div class='box'>
-          ${calendarRulesMarkup({discipline:show.discipline})}
+        return `<div class='box' data-ui-owner='calendar-${show.id}'>
+          <h4>${calendarSpecialLabel(show)}</h4>${calendarRulesMarkup(show)}${calendarEventResultsMarkup(calendarFindEvent(show.id)||show)}
           <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
           <p class='small'><strong>Show Fee:</strong> ${money(show.fee)} | <strong>Transport Fee:</strong> ${money(tCost)}</p>
           <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Discipline Level:</strong> ${show.level} | <strong>Max Skill:</strong> ${show.maxSkill}</p>
@@ -8718,7 +8741,7 @@ function renderCalendar() {
     <div class='box'>
       <h3>Upcoming Events (Higher Skill Levels)</h3>
       ${upcomingEvents.map((show) => `<div class='box'>
-        <p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
+        <h4>${calendarSpecialLabel(show)}</h4><p><strong>Location:</strong> ${show.barnName} | ${show.country}/${show.city}</p>
         <p class='small'><strong>Discipline:</strong> ${cap(show.discipline)} | <strong>Level:</strong> ${show.level}</p>
         <p class='small'><strong>Date:</strong> Hidden (${show.daysUntilStart} day(s) remaining)</p>
         ${calendarRulesMarkup(show)}
@@ -8765,8 +8788,8 @@ function renderCalendar() {
       if (!horse) return alert('Select a horse first.');
       const tCost = showTransportFee(show);
       const total = show.fee + tCost;
-      if (!tryCharge(total)) return;
-      registerShowEntry(horse, show.discipline, show.level);
+      const registration=calendarRegisterGameShow(horse,show);
+      if(!registration.ok)return alert(registration.message);
       pushReport(`${horse.name} signed up for ${cap(show.discipline)} at ${show.barnName}. Fees paid: ${money(total)}.`);
       if (app.settings?.competitionMode === 'rpg' && app.competitionRpg) {
         changeTab('shows');
@@ -9153,12 +9176,12 @@ function bindTurnoutPreferences(panel) {
 }
 function pastureOverview(horses) {
   const rules = ensurePastures(), barn = app.currentBarn;
-  return `<div class='box'><h3>Pastures</h3><label class='checkbox-label'><input id='pastures-enabled' type='checkbox' ${barn.pasturesEnabled ? 'checked' : ''}>Enable optional pasture management</label>
+  return `<details class='box pasture-management' data-ui-key='pasture-management'><summary>Pastures</summary><label class='checkbox-label'><input id='pastures-enabled' type='checkbox' ${barn.pasturesEnabled ? 'checked' : ''}>Enable optional pasture management</label>
     <p class='small'>${barn.pastures.filter((p) => !p.individual).length} group pastures and ${barn.pastures.filter((p) => p.individual).length} individual pastures • ${rules[2]}% booking availability • Up to ${rules[3]} horses per group pasture. Bookings persist. Individual pastures exclude other horses, except a mare's foals under one year. Changing turnout preference clears an incompatible booking. All ages and retired horses can have bookings. Below 3 care stars, staff miss turnout 30% of the time. Shared turnout can cause fights; mares with stallions risk pregnancy.</p>
     ${barn.pasturesEnabled ? barn.pastures.map((p) => { const assigned = pastureOccupants(p); return `<div><p>${p.name}: ${p.available ? 'Booking available' : 'Fully booked'} • ${assigned.length + (p.guests || 0)} occupants • ${assigned.map((h) => h.name).join(', ') || 'No assigned horses'}</p>${pastureCompatibilityMarkup(p)}</div>`; }).join('') + horses.map((h) => {
       const mother = turnoutMother(h), booking = effectivePastureBooking(h);
       return `<div class='box'><strong>${horseDisplayName(h)}</strong>${turnoutPreferenceControls(h)}<label>Pasture<select data-pasture-horse='${h.id}' ${mother ? 'disabled' : ''}><option value=''>No pasture</option>${barn.pastures.filter((p) => mother || Boolean(p.individual) === Boolean(h.individualTurnout)).map((p) => `<option value='${p.id}' ${booking?.barnId === barn.id && booking?.pastureId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></label></div>`;
-    }).join('') + pastureBarnHistoryMarkup() : ''}</div>`;
+    }).join('') + pastureBarnHistoryMarkup() : ''}</details>`;
 }
 function bindPastureControls(panel) {
   bindPastureHistoryControls(panel);
