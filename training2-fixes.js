@@ -2,7 +2,6 @@
 function t2refreshDiscipline(draft,h){
  const eligible=T2_EXERCISES.filter(e=>t2disciplineExercise(e,draft.discipline)&&!t2eligibility(h,e,{height:.5,location:t2facilities().find(f=>f.id===draft.facilityId)?.location||'Outdoor'}));
  draft.lesson=(draft.lesson||[]).filter(id=>eligible.some(e=>e.id===id));
- if(draft.discipline!=='lunging')draft.lesson=draft.lesson.filter(id=>!id.startsWith('lunge-'));
  if(!draft.lesson.length){const preferred=draft.discipline==='lunging'?'lunge-walk':['flatwork','dressage'].includes(draft.discipline)?'large-circle':['jumping','hunter','eventing'].includes(draft.discipline)?'crossrail':'leading';draft.lesson=[eligible.find(e=>e.id===preferred)?.id||eligible.find(e=>draft.discipline==='lunging'||!e.id.startsWith('lunge-'))?.id].filter(Boolean);}
 }
 const T2_FIX_FINISH=t2finish;
