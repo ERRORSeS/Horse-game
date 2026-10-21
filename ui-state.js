@@ -19,3 +19,20 @@ document.addEventListener('toggle',event=>{const el=event.target;if(el.tagName!=
 document.addEventListener('change',()=>uiCapturePanels(),true);
 function uiUpdateHeaderOffsets(){const header=document.querySelector('.topbar'),nav=document.querySelector('.tabs');if(!header||!nav)return;const height=header.getBoundingClientRect().height;document.documentElement.style.setProperty('--topbar-height',height+'px');document.documentElement.style.setProperty('--ui-obstruction',(height+nav.getBoundingClientRect().height+16)+'px');}
 document.addEventListener('DOMContentLoaded',()=>{uiUpdateHeaderOffsets();if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(uiUpdateHeaderOffsets);for(const node of document.querySelectorAll('.topbar, .tabs'))observer.observe(node);}window.addEventListener('resize',uiUpdateHeaderOffsets);});
+
+// Keep navigation disclosure independent of gameplay renders and save data.
+let uiTabsCollapsed=false;
+function uiSetTabsCollapsed(collapsed){
+ const nav=document.getElementById('tabs'),button=document.getElementById('toggleTabsBtn');
+ if(!nav||!button)return;
+ uiTabsCollapsed=Boolean(collapsed);
+ nav.hidden=uiTabsCollapsed;
+ button.setAttribute('aria-expanded',String(!uiTabsCollapsed));
+ button.textContent=uiTabsCollapsed?'Show Tabs ▾':'Hide Tabs ▴';
+ uiUpdateHeaderOffsets();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+ const button=document.getElementById('toggleTabsBtn');
+ if(button)button.addEventListener('click',()=>uiSetTabsCollapsed(!uiTabsCollapsed));
+ uiSetTabsCollapsed(uiTabsCollapsed);
+});

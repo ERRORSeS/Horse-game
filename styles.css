@@ -281,3 +281,9 @@ details[open] > summary { margin-bottom:.8rem; }
 .equipment-color { width:1rem; height:1rem; flex-shrink:0; border:1px solid #ffffff80; box-shadow:0 0 0 3px #ffffff08; }
 @media(max-width:600px) { .topbar { padding:1rem; } main { padding:1rem .75rem 2rem; } .cards { grid-template-columns:minmax(0,1fr); } .horse-card,.box { padding:.85rem; } }
 @media(prefers-reduced-motion:reduce) { button { transition:none; } }
+
+.topbar-heading { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.5rem; }
+.topbar-heading h1 { margin:0; }
+.tabs-toggle { flex-shrink:0; font-size:.8rem; padding:.4rem .7rem; background:#1c3438; }
+.tabs[hidden] { display:none; }
+@media(max-width:450px) { .topbar-heading { align-items:flex-start; } .topbar-heading h1 { font-size:1.2rem; } }
