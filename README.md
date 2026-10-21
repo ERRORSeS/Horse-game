@@ -115,3 +115,7 @@ See `TRAINING2-AUDIT.md` for authoritative field mappings and `TRAINING2-VALIDAT
 Main Training Goal now selects a trainable attribute and boosts only relevant earned progress. The report shows relevance based on completed work, along with actual incidents, rider falls and qualifying recovery. Lunging offers with/without additional-aid modes and develops separate voice education. Existing builders and core RPG scenes remain available.
 
 Weather refreshes on each in-game day, including chronological month skips. Arena activity is randomized and saved per facility/day; it is no longer player-selected. See `TRAINING2-EXTENSION-VALIDATION.md` for mechanics, bounds and validation. Run `node tests/training2-extension.test.cjs` for additive tests.
+
+### Small training fixes
+
+Normal training skills display whole numbers and each genuinely earned normal skill receives at least +1 per lesson, subject to existing potential ceilings. Riding attributes keep their precision and original gains. Monthly training caps are removed; fatigue and medical restrictions remain. Mood now refreshes after every elapsed time skip. Changing discipline refreshes the lesson and exercise options immediately. See `TRAINING-SMALL-FIXES.md`.

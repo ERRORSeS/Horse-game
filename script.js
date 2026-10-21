@@ -1988,13 +1988,8 @@ function ensureHandTrainingSkillCap(horse) {
 
 function consumeHandTrainingSkillGain(horse, requested = 1) {
   if (!horse) return 0;
-  const capThisMonth = ensureHandTrainingSkillCap(horse);
-  const gainsSoFar = Number.isFinite(horse.handTrainingSkillGainsThisMonth) ? horse.handTrainingSkillGainsThisMonth : 0;
-  const remaining = Math.max(0, capThisMonth - gainsSoFar);
-  const wanted = Math.max(0, Math.round(Number(requested) || 0));
-  const granted = Math.min(remaining, wanted);
-  if (granted <= 0 && wanted > 0) horse.mood = 'No energy';
-  if (granted > 0) horse.handTrainingSkillGainsThisMonth = gainsSoFar + granted;
+  const granted = Math.max(0, Math.round(Number(requested) || 0));
+  horse.handTrainingSkillGainsThisMonth = (horse.handTrainingSkillGainsThisMonth || 0) + granted;
   return granted;
 }
 
@@ -3104,8 +3099,6 @@ function applyAutoTraining(horse) {
   const stamina = horse.trainingPreference || 'Medium';
   const [minTrainingSessions, maxTrainingSessions] = trainingSessionBounds(stamina);
   const preferred = clamp(Math.round(horse.preferredTrainingSessions || maxTrainingSessions), minTrainingSessions, maxTrainingSessions);
-  const [minSkillCap, maxSkillCap] = autoTrainingSkillCapRange(stamina);
-  const skillCap = rnd(minSkillCap, maxSkillCap);
   let skillGains = 0;
   let trainedSessions = 0;
   if (horse.autoTrainingFocus === 'Light Exercise') {
@@ -3148,7 +3141,7 @@ function applyAutoTraining(horse) {
     const skill = pick(EXERCISE_MENU[discipline]);
     const bonus = horse.trainingBoost ? Math.max(0, Math.round(horse.trainingBoost / 2)) : 0;
     const gain = eqLearning(horse,rnd(1, 3) + bonus,discipline);
-    if (skillGains < skillCap) {
+    { // Earned auto-training gains are no longer limited by a monthly budget.
       if (discipline === 'dressage') {
         horse.stats.dressage[skill] = clampSkill(horse, discipline, horse.stats.dressage[skill] + gain);
       }
@@ -5329,12 +5322,12 @@ function createHorseCard(horse) {
   const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
   horse.focusToleranceMonths = focusTolerance;
   const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${Math.round(horse.behavior || 0)} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
-  Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${Number(v).toFixed(1)}</li>`; });
+  Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${Number(v).toFixed(0)}</li>`; });
   const jList = node.querySelector('.jump-stats');
-  Object.entries(horse.stats.jumping).forEach(([k, v]) => { jList.innerHTML += `<li>${k}: ${Number(v).toFixed(1)}</li>`; });
+  Object.entries(horse.stats.jumping).forEach(([k, v]) => { jList.innerHTML += `<li>${k}: ${Number(v).toFixed(0)}</li>`; });
 
   const record = showRecordSummary(horse);
   const bondValue = Number.isFinite(horse.bond) ? horse.bond : 0;
@@ -5385,13 +5378,13 @@ function createHorseCard(horse) {
     ${horse.feedPlan.length ? `<div class='box'><p class='small'>${horse.feedPlan.map((f) => `${f.type} (${f.grams}g)`).join(', ')}</p></div>` : '<p class="small">No feed assigned.</p>'}
     <p class='small'>Preferred feed range: ${feedRangeBounds(horse)[0]}-${feedRangeBounds(horse)[1]}g (you don’t need to be exact, just within range).</p>
     <label>Controlability</label>
-    <p class='small'>${horse.controlability || 0}%</p>
+    <p class='small'>${Math.round(horse.controlability || 0)}%</p>
     <label>Quality Of Life</label>
     <p class='small'>${calculateHorseQualityOfLife(horse)}%</p>
     ${eqEditorMarkup(horse)}
     <label>Turn-out assignment (hours)</label>
     <input type='number' class='turnout-hours' min='0.5' max='14' step='0.5' value='${horse.turnoutAssignmentHours || ''}' placeholder='0.5 - 14' />
-    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Stamina: ${horse.trainingPreference} (${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills / per month) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
+    <p class='small'>Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Stamina: ${horse.trainingPreference} (no monthly training cap) • Turnout range: ${turnoutRange(horse.trainingPreference)} hrs</p>
     ${isPregnantMare(horse) ? `<p class='small'>Pregnancy: Confirmed (timeline hidden — use pH testing only).</p>` : ''}
     ${eligibleForPhTest(horse) ? `<button data-action='test-ph'>Test pH</button>${horse.lastPhReading ? `<p class='small'>Last pH reading: ${horse.lastPhReading}</p>` : ''}` : ''}
     ${horse.foalVitality && (horse.foalVitality.ageDays || 0) <= (horse.foalVitality.shownUntilDay || 180) ? `<p class='small'>Foal Vitality Score: ${horse.foalVitality.score} / 100${(horse.foalVitality.rareEvents || []).length ? ` • Rare: ${(horse.foalVitality.rareEvents || []).join(', ')}` : ''}</p>` : ''}
@@ -5407,9 +5400,9 @@ function createHorseCard(horse) {
     ${horse.showTrainerNotes ? `<div class='box'>${horse.trainerNotes.length ? horse.trainerNotes.map((n) => `<p class='small'>${n}</p>`).join('') : '<p class="small">No trainer notes this month.</p>'}</div>` : ''}
     <label>Auto Training Focus (monthly)</label>
     <select class='auto-focus'>${autoFocusOptions}</select>
-    <p class='small'>Auto training stamina cap: ${horse.trainingPreference} (${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills / per month).</p>
-    <p class='small'>Auto-training monthly skill cap: ${autoTrainingSkillCapRange(horse.trainingPreference).join('-')} skills.</p>
-    <p class='small'>Hand training skill gains this month: ${horse.handTrainingSkillGainsThisMonth || 0}/${ensureHandTrainingSkillCap(horse)}.</p>
+    <p class='small'>Training workload preference: ${horse.trainingPreference} (no monthly training cap).</p>
+
+    <p class='small'>Hand training skill gains this month: ${Math.round(horse.handTrainingSkillGainsThisMonth || 0)} (uncapped).</p>
     <button data-action='save-auto-focus'>Save Auto Training</button>
     ${canAutoCare ? `<button data-action='toggle-auto-stall'>Auto Stall Cleaning: ${horse.autoStallCleaning ? 'On' : 'Off'}</button><button data-action='toggle-auto-groom'>Auto Grooming: ${horse.autoGrooming ? 'On' : 'Off'}</button>` : ''}
     ${horse.autoTrainingFocus ? `<p class='small'>Auto training set to: ${horse.autoTrainingFocus}</p>` : '<p class="small">No auto training assigned.</p>'}
@@ -5587,8 +5580,8 @@ function createHorseCard(horse) {
 function horseProfileMarkup(horse, options = {}) {
   const activeIssue = horse.illnesses?.find((i) => i.active);
   const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name} (${activeIssue.severity || 'Unknown'})` : '';
-  const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(1)}</li>`).join('');
-  const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(1)}</li>`).join('');
+  const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(0)}</li>`).join('');
+  const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(0)}</li>`).join('');
   const latest = horse.showResults?.length ? horse.showResults[horse.showResults.length - 1] : null;
   const inspection = horse.registryInspection
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'} • Condition: ${horse.registryInspection.condition.toFixed(1)} • Pedigree: ${horse.registryInspection.pedigree == null ? 'N/A' : horse.registryInspection.pedigree.toFixed(1)}</p>`
@@ -5611,7 +5604,7 @@ function horseProfileMarkup(horse, options = {}) {
     : 'None';
   const hiddenNote = !revealAll && hiddenCount > 0 ? ` (+${hiddenCount} hidden)` : '';
   return `
-    <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${horse.behavior || 0}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine}</p>
+    <p class='small'>${horse.breed} • ${horse.age} • ${horse.gender} • Conformation: ${horse.conformation} • Behavior: ${Math.round(horse.behavior || 0)}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine}</p>
     ${titlesLine}
     ${horseRelationshipMarkup(horse)}
     ${stallHistoryMarkup(horse)}
@@ -7780,14 +7773,6 @@ function renderTraining() {
     if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle training.');
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
-    const handSkillCap = ensureHandTrainingSkillCap(h);
-    const handSkillGains = Number.isFinite(h.handTrainingSkillGainsThisMonth) ? h.handTrainingSkillGainsThisMonth : 0;
-    if (handSkillGains >= handSkillCap) {
-      h.mood = 'No energy';
-      pushReport(`${h.name} hit the hand-training monthly skill cap (${handSkillCap}) and has no energy left.`);
-      render();
-      return alert('No energy: this horse reached the monthly hand-training skill cap.');
-    }
     const equipmentError=eqTrainingAllowed(h,d);if(equipmentError)return alert(equipmentError);
     h.managed.trained = true;
     markTrainingSession(h,1,d);
