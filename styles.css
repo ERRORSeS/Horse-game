@@ -287,3 +287,11 @@ details[open] > summary { margin-bottom:.8rem; }
 .tabs-toggle { flex-shrink:0; font-size:.8rem; padding:.4rem .7rem; background:#1c3438; }
 .tabs[hidden] { display:none; }
 @media(max-width:450px) { .topbar-heading { align-items:flex-start; } .topbar-heading h1 { font-size:1.2rem; } }
+.training2-card { grid-column:1 / -1; }
+.training2 { max-width:100%; }
+.training-metrics { display:flex; flex-wrap:wrap; gap:.65rem; padding:.85rem 0; }
+.training-metrics > span { background:#14292d; border:1px solid #355450; border-radius:12px; padding:.6rem .8rem; color:var(--muted); font-size:.82rem; }
+.training-metrics strong { display:block; color:var(--text); }
+.training2 button { margin:.25rem .25rem .25rem 0; }
+.training-observation { border-left:3px solid #8fbaa5; background:#14292d; border-radius:0 12px 12px 0; padding:.3rem 1rem; margin:1rem 0; }
+.nameplate-preview { text-align:center; border:1px solid #917d55; border-radius:10px; padding:1rem; margin:.8rem 0; background:#262b28; color:#e1d7b8; letter-spacing:.035em; }

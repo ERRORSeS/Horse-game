@@ -101,3 +101,11 @@ Additional regression suites:
 node tests/quality.test.cjs
 node tests/calendar-expansion.test.cjs
 ```
+
+## Training 2.0
+
+Open Training, choose a horse, discipline and location, then continue to the lesson builder. Add or edit eligible exercises and start interactive training. Complete the warm-up before main work; repeat, simplify, change direction, edit fences or take breaks between attempts. End Session records actual work and progress. The optional calculation drawer explains bounded probabilities.
+
+Expandable sections provide riding attributes and traits, fence/course construction, weekly schedules, rugs, named tack sets and live stall nameplates. Quick Training uses the same progression rules. Weekly automatic work respects medical restrictions, weather, retirement and the existing monthly learning allowance; scheduled entries are retained when work is postponed.
+
+See `TRAINING2-AUDIT.md` for authoritative field mappings and `TRAINING2-VALIDATION.md` for limits, implementation choices and test coverage. Run `node tests/training2.test.cjs` for the new regression suite.

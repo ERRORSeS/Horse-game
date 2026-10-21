@@ -5332,9 +5332,9 @@ function createHorseCard(horse) {
   node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${horse.behavior || 0} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
-  Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${v}</li>`; });
+  Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${Number(v).toFixed(1)}</li>`; });
   const jList = node.querySelector('.jump-stats');
-  Object.entries(horse.stats.jumping).forEach(([k, v]) => { jList.innerHTML += `<li>${k}: ${v}</li>`; });
+  Object.entries(horse.stats.jumping).forEach(([k, v]) => { jList.innerHTML += `<li>${k}: ${Number(v).toFixed(1)}</li>`; });
 
   const record = showRecordSummary(horse);
   const bondValue = Number.isFinite(horse.bond) ? horse.bond : 0;
@@ -5587,8 +5587,8 @@ function createHorseCard(horse) {
 function horseProfileMarkup(horse, options = {}) {
   const activeIssue = horse.illnesses?.find((i) => i.active);
   const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name} (${activeIssue.severity || 'Unknown'})` : '';
-  const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
-  const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${v}</li>`).join('');
+  const dressage = Object.entries(horse.stats.dressage).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(1)}</li>`).join('');
+  const jumping = Object.entries(horse.stats.jumping).map(([k, v]) => `<li>${k}: ${Number(v).toFixed(1)}</li>`).join('');
   const latest = horse.showResults?.length ? horse.showResults[horse.showResults.length - 1] : null;
   const inspection = horse.registryInspection
     ? `<p class='small'>Inspection: ${horse.registryInspection.result} (${horse.registryInspection.totalScore.toFixed(2)}) • Branding: ${horse.registryInspection.branding || 'None'} • Condition: ${horse.registryInspection.condition.toFixed(1)} • Pedigree: ${horse.registryInspection.pedigree == null ? 'N/A' : horse.registryInspection.pedigree.toFixed(1)}</p>`
@@ -7808,7 +7808,7 @@ function renderTraining() {
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     const equipmentError=eqTrainingAllowed(h,focus==='Hand Work'?'groundwork':'flatwork');if(equipmentError)return alert(equipmentError);
-    trainingControlabilitySession(h, focus);
+    if (trainingControlabilitySession(h, focus) === null) return;
     h.managed.trained = true;
     markTrainingSession(h,1,focus==='Hand Work'?'groundwork':'flatwork');
     h.manualTrainingThisMonth = true;
