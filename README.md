@@ -119,3 +119,7 @@ Weather refreshes on each in-game day, including chronological month skips. Aren
 ### Small training fixes
 
 Normal training skills display whole numbers and each genuinely earned normal skill receives at least +1 per lesson, subject to existing potential ceilings. Riding attributes keep their precision and original gains. Monthly training caps are removed; fatigue and medical restrictions remain. Mood now refreshes after every elapsed time skip. Changing discipline refreshes the lesson and exercise options immediately. See `TRAINING-SMALL-FIXES.md`.
+
+### Ridden exercise availability restoration
+
+Ridden catalogs remain visible when an exercise is temporarily locked by equipment, health, fatigue or education. Locks show their reasons instead of emptying the list. If lunging equipment is still equipped, use Remove Lunging Equipment for Riding. Groundwork/Lunging retain their combined pool; ridden disciplines, Polework and Mixed have ridden choices. Existing progression and no-monthly-cap behavior are preserved. See `RIDDEN-EXERCISE-RESTORATION.md`.
