@@ -13,7 +13,7 @@ Severity outcomes use the user-approved 80:14:13:7 relative weights after an exi
 
 ## Verification
 
-- 24 pure-engine tests, including seeded probability distributions, repeat-event guards, hidden truth, diagnosis relevance, receipts, prescriptions, recovery, farrier care, vaccinations and transaction atomicity.
+- 26 pure-engine tests, including seeded probability distributions, repeat-event guards, hidden truth, diagnosis relevance, receipts, prescriptions, recovery, farrier care, vaccinations and transaction atomicity.
 - 14 integration checks against actual index script order, including migration, fractional skills, canonical exercises, trials, seller schooling/tack, optional equipment transfer, dates, visible wounds and rescue deadlines.
 - 139 grouped existing regression checks across ten suites: auto training, calendar, progression, management, pasture, quality of life, training roster, Training 2.0 extensions, small fixes and main training.
 - Syntax checks pass for all 24 JavaScript files. No native prompt calls remain in application JavaScript.
@@ -24,3 +24,7 @@ Run with `npm test` using Node.js.
 ## Remaining limits
 
 This is a reviewable integration phase, not a claim that every line of the original extensive design specification is complete. Expanded narrative pools, the full infection/exposure and recurrence design, all specialized fear triggers, exhaustive manual verification of every transaction combination, and native mobile Safari verification remain future acceptance work. Existing save backups and histories must be retained during further testing.
+
+## Sale-health and seller-reply adjustment
+
+New NPC sale horses receive a seeded 40% pre-existing issue opportunity, with 30% minor, 50% moderate and 20% major severity conditional on being affected (12%, 20% and 8% of all newly generated horses respectively). Existing processed or owned horses are not rerolled. This setting is separate from daily injury opportunities. A 20,000-horse seeded test verifies rates, persistence, valid diagnoses and no automatic disclosure. Seller loading profiles and alternative replies persist; medical and competition wording uses available confirmed diagnoses and actual result records.

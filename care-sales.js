@@ -216,9 +216,8 @@ const CS_SALE_SAY=HorseSales.say;
 HorseSales.say=function(app,tx,topic,day){if(topic!=='tack')return CS_SALE_SAY(app,tx,topic,day);if(!HorseSales.active(app,tx))return {ok:false,message:'This inquiry is closed.'};const l=HorseSales.listing(app,tx);csSellerTack(l);const text=`The current setup is ${(l.sellerTackItems||[]).map(i=>i.type+' ('+i.color+', '+i.condition+'/100 condition)').join(', ')||Object.values(l.horse.tack||{}).filter(Boolean).join(', ')}. ${(l.tackOffers||[]).length?'Selected items are available separately; choose them before preparing the contract.':'This equipment is not included in the sale.'} A trial and fitting assessment can help assess comfort.`;tx.conversation.push({day,topic,text});if(tx.status==='Inquiry Open')tx.status='Seller Contacted';return {ok:true,message:text};};
 
 function csPreexisting(h){
-  if(!h.careNewNPC||h.preexistingHealthProcessed||app.horses.some(o=>o.id===h.id))return;h.preexistingHealthProcessed=true;
-  const seed=HorseHealth.hash(h.id+'|preexisting-health'),r=HorseHealth.roll(seed,'opportunity');
-  if(r<.09){const choice=HorseHealth.roll(seed,'condition'),id=choice<.4?'strain':choice<.65?'dental':choice<.9?'rub':'tendon';HorseHealth.add(h,id,csDay(),{cause:'Persistent pre-sale history',severity:id==='tendon'?'minor':HorseHealth.catalog[id].severity});}
+  if(!h.careNewNPC||h.preexistingHealthProcessed||app.horses.some(o=>o.id===h.id))return;
+  HorseHealth.seedSaleHealth(h,csDay());
 }
 const CS_PREEXISTING_LIST=HorseSales.list;
 HorseSales.list=function(app,h,...args){csPreexisting(h);return CS_PREEXISTING_LIST(app,h,...args);};

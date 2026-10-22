@@ -242,6 +242,19 @@
     h.vaccinations.push(record);return {ok:true,record};
   }
   function documentation(h,policy,day) { const rules=vaccinePolicies[policy];return rules?rules.competition.filter(vaccine=>!h.vaccinations.some(v=>v.vaccine===vaccine&&v.courseStatus==='Complete'&&v.nextDue>=day)):[]; }
-  root.HorseHealth={injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
+  function seedSaleHealth(h,day){
+    ensure(h,day);if(h.preexistingHealthProcessed)return h.preSaleHealthProfile;
+    h.preexistingHealthProcessed=true;
+    const seed=hash(h.id+'|preexisting-health'),affected=roll(seed,'opportunity')<.40;
+    const severityRoll=roll(seed,'severity'),severity=severityRoll<.30?'minor':severityRoll<.80?'moderate':'major';
+    h.preSaleHealthProfile={version:2,affected,severity:affected?severity:null};
+    if(!affected)return h.preSaleHealthProfile;
+    const pools={minor:['scratch','rub','dental'],moderate:['strain','skin-infection','respiratory'],major:['tendon','laceration','cornea']};
+    const choices=pools[severity],id=choices[Math.floor(roll(seed,'condition')*choices.length)];
+    // Welfare-related rubs are physical history, not an automatic trauma/personality label.
+    const c=add(h,id,day,{cause:id==='rub'?'Pre-sale tack discomfort':'Persistent pre-sale health history',severity});
+    h.preSaleHealthProfile.conditionId=c.id;return h.preSaleHealthProfile;
+  }
+  root.HorseHealth={seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
   if(typeof module!=='undefined')module.exports=root.HorseHealth;
 })(globalThis);

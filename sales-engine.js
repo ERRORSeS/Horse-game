@@ -19,14 +19,43 @@
   }
   function listing(app,tx){return state(app).listings.find(l=>l.id===tx.listingId);}
   function active(app,tx){const l=listing(app,tx);return l&&l.status==='Listing Active'&&!['Cancelled','Withdrawn','Complete'].includes(tx.status)&&!tx.paid;}
+  function sellerVariant(l,topic,lines){return lines[Math.floor(H.roll(H.hash(l.horseId+'|seller-reply'),topic)*lines.length)];}
+  function travelReply(l){
+    const h=l.horse,traits=h.training2?.traits||[];
+    if(!l.travelProfile){
+      const nervous=traits.includes('Traffic Nervous')||traits.some(t=>/load|trailer|travel/i.test(t));
+      const u=H.roll(H.hash(h.id+'|travel'),'profile');
+      l.travelProfile=nervous?'nervous':u<.30?'easy':u<.55?'patient':u<.73?'company':u<.86?'inexperienced':'unverified';
+    }
+    const lines={
+      nervous:['The seller reports hesitation at the ramp and tension around traffic. Allow patient handling and assess loading yourself.','Loading can be difficult, especially around traffic; the seller describes stopping at the ramp.'],
+      easy:['The seller reports walking onto the trailer calmly and settling during familiar journeys.','According to the seller, loading is usually straightforward and the horse travels quietly.'],
+      patient:['The seller says loading usually takes a little time and a quiet approach, then the horse settles.','The horse reportedly pauses at the ramp but loads with patient, familiar handling.'],
+      company:['The seller reports better loading and travel with a familiar companion. Solo travel is less settled.','Travel is reportedly easier in company; the horse may call and hesitate when loaded alone.'],
+      inexperienced:['Travel experience is limited. The seller cannot promise consistent loading in a new trailer.','The horse has reportedly made few journeys, so loading and travel still need assessment.'],
+      unverified:['There is no verified loading or travel assessment in the supplied records.','The seller has not supplied reliable travel records; arrange a loading assessment if it matters to you.']};
+    return sellerVariant(l,'travel',lines[l.travelProfile]||lines.unverified);
+  }
+  function historyReply(l){
+    if(!l.recordsAvailable)return sellerVariant(l,'history',['Historical medical records are incomplete; an independent examination may help assess current concerns.','The seller cannot provide a complete medical history. Missing records do not establish soundness.','Only partial health records are available, so previous issues remain uncertain.']);
+    const known=[...new Set([...(l.disclosures||[]),...H.publicView(l.horse).confirmed].map(d=>d.name))];
+    return known.length?sellerVariant(l,'history',[`The available records document: ${known.join(', ')}. Ask the veterinarian about their relevance to your plans.`,`The disclosed medical history includes ${known.join(', ')}. The records do not rule out other problems.`,`Known, documented concerns are ${known.join(', ')}. A current assessment is still advisable.`]):sellerVariant(l,'history',['No confirmed condition is documented in the available records. An undiscovered issue is still possible.','The supplied history lists no confirmed medical issue, but this is not a guarantee of soundness.','There is no recorded diagnosis to disclose. Subtle or previously unrecorded problems may still exist.']);
+  }
+  function trainingReply(l){
+    const h=l.horse,results=h.showResults||[],intro=`The main discipline is ${l.mainDiscipline||'recorded in the listing'}. The advertised schooling is ${l.claimedLevel}. `;
+    if(!l.recordsAvailable)return intro+sellerVariant(l,'training',['Competition records are incomplete; the advertised schooling is a seller claim, not a verified competition result.','The seller has not supplied a complete competition record. Assess the advertised level during a suitable trial.']);
+    if(!results.length)return intro+sellerVariant(l,'training',['No competition results are recorded; schooling experience should be assessed separately.','There is no documented competition history. The horse may have schooling experience without show results.','The supplied record contains no show results, so the advertised level is not competition-proven here.']);
+    const latest=results.at(-1),wins=results.filter(r=>Number(r.placing)===1).length,detail=[latest.discipline,latest.level!==undefined?`level ${latest.level}`:'',latest.placing?`placing ${latest.placing}`:''].filter(Boolean).join(', ');
+    return intro+sellerVariant(l,'training',[`The supplied record contains ${results.length} results, including ${wins} wins. Latest recorded outing: ${detail||'details incomplete'}.`,`There are ${results.length} documented outings. The latest result lists ${detail||'incomplete details'}; ${wins} recorded wins overall.`,`Competition history shows ${results.length} results and ${wins} wins. Most recent entry: ${detail||'details incomplete'}.`]);
+  }
   function say(app,tx,topic,day){if(!active(app,tx))return {ok:false,message:'This inquiry is closed.'};const l=listing(app,tx),h=l.horse;let text;
     switch(topic){
       case 'available':text=`${h.name} is still available. The asking price is $${l.ask}.`;break;
       case 'temperament':text=`The disclosed temperament is ${h.personality||'not recorded'}. Individual behavior can vary with context.`;break;
-      case 'training':text=`The main discipline is ${l.mainDiscipline||'recorded in the listing'}. The advertised schooling is ${l.claimedLevel}. Competition records contain ${(h.showResults||[]).length} recorded results.`;break;
-      case 'history':text=l.recordsAvailable?(l.disclosures.length?`Available records document: ${l.disclosures.map(d=>d.name).join(', ')}.`:'There is no confirmed condition in the available records. This does not exclude an undiscovered issue.'):'Historical medical records are incomplete.';break;
+      case 'training':text=trainingReply(l);break;
+      case 'history':text=historyReply(l);break;
       case 'farrier':text=h.hoofHealth.history.length?`Last recorded service: ${h.hoofHealth.history.at(-1).service}.`:'The hoof-care history is incomplete.';break;
-      case 'travel':text=(h.training2?.traits||[]).includes('Traffic Nervous')?'The records mention Traffic Nervous behavior.':'There is no verified travel assessment in the supplied records.';break;
+      case 'travel':text=travelReply(l);break;
       case 'tack':text=`The supplied tack record lists ${Object.values(h.tack||{}).filter(Boolean).join(', ')||'no verified equipment'}. Included equipment must be agreed separately.`;break;
       case 'reason':text='The recorded reason for sale is a change in the owner’s available time.';break;
       case 'viewing':if(tx.contract)return {ok:false,message:'The contract is already prepared. Complete or cancel it before arranging another viewing.'};tx.viewed=true;tx.status='Viewing Completed';text='You watch the horse being handled. A personal trial and independent examination are optional.';H.observe(h,'walk',day,`${tx.id}:viewing`);break;
