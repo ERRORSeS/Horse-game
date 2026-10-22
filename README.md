@@ -137,3 +137,7 @@ Training always resolves the selected horse against the current owned roster. St
 Horse profiles and the clinic provide Stall/Pasture Observation, diagnosis-dependent findings and scheduled treatment compliance. Care consumes recorded supplies and prepared prescription courses through the shared hour/day/month clock. Severe conditions require diagnostics, professional treatment and follow-up.
 
 See `MEDICAL-REALISM-VALIDATION.md` for preserved incidence settings, residual-rate differences, emergency branches, validation and anatomical-model limits. Run `npm test`. Ship `medical-catalog.js` and `medical-ui.js` with the other modules.
+
+## Save/load checkpoints
+
+Save Game creates or explicitly replaces the named checkpoint. Normal actions autosave the current session separately, so they cannot overwrite a checkpoint you intend to reload. Load Game restores the selected checkpoint; reopening the game resumes the latest session. The Save/Load panel reports success and storage errors directly. Existing save slots remain supported. See `SAVE-LOAD-VALIDATION.md`.
