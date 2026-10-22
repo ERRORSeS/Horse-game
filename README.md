@@ -131,3 +131,9 @@ Scheduled Auto entries run at 09:00 when time advances. Weekly Training Schedule
 ### Current training horse selection
 
 Training always resolves the selected horse against the current owned roster. Stale saved selections are repaired, and temporary health/stamina restrictions show reasons instead of hiding owned horses. Optional current-barn lesson horses are labeled separately. The combined download retains the shared-stamina Auto-Training fix and no monthly progression cap. See `TRAINING-ROSTER-AUTO-VALIDATION.md`.
+
+## Condition-specific medical realism
+
+Horse profiles and the clinic provide Stall/Pasture Observation, diagnosis-dependent findings and scheduled treatment compliance. Care consumes recorded supplies and prepared prescription courses through the shared hour/day/month clock. Severe conditions require diagnostics, professional treatment and follow-up.
+
+See `MEDICAL-REALISM-VALIDATION.md` for preserved incidence settings, residual-rate differences, emergency branches, validation and anatomical-model limits. Run `npm test`. Ship `medical-catalog.js` and `medical-ui.js` with the other modules.

@@ -58,7 +58,8 @@
       case 'travel':text=travelReply(l);break;
       case 'tack':text=`The supplied tack record lists ${Object.values(h.tack||{}).filter(Boolean).join(', ')||'no verified equipment'}. Included equipment must be agreed separately.`;break;
       case 'reason':text='The recorded reason for sale is a change in the owner’s available time.';break;
-      case 'viewing':if(tx.contract)return {ok:false,message:'The contract is already prepared. Complete or cancel it before arranging another viewing.'};tx.viewed=true;tx.status='Viewing Completed';text='You watch the horse being handled. A personal trial and independent examination are optional.';H.observe(h,'walk',day,`${tx.id}:viewing`);break;
+      case 'trot-up':case 'lunge-observation':{if(H.allowed(h,'ridden',1)||H.lamenessGrade(h)>=4)return {ok:false,message:'Movement assessment requires veterinary clearance before further exercise.'};const found=H.observe(h,topic==='trot-up'?'trot':'circle',day,`${tx.id}:${topic}`);text=found.map(o=>o.text).join(' ')||'No new movement finding was observed; this does not establish soundness.';break;}
+      case 'viewing':if(tx.contract)return {ok:false,message:'The contract is already prepared. Complete or cancel it before arranging another viewing.'};tx.viewed=true;tx.status='Viewing Completed';text='You watch the horse being handled. A personal trial and independent examination are optional.';H.observe(h,'stall',day,`${tx.id}:viewing-close`);H.observe(h,'walk',day,`${tx.id}:viewing`);break;
       default:return {ok:false,message:'Choose an available conversation topic.'};
     }
     if(tx.status==='Inquiry Open')tx.status='Seller Contacted';tx.conversation.push({day,topic,text});return {ok:true,message:text};
