@@ -1,0 +1,11 @@
+/* Browser-native prompts are unsupported in embedded browsers. Use inline forms. */
+function csInlineInput(label,value,onSubmit,choices=null){
+  document.getElementById('cs-inline-input')?.remove();const form=document.createElement('form');form.id='cs-inline-input';form.className='box';
+  const title=document.createElement('h3');title.textContent=label;const input=document.createElement(choices?'select':'input');input.id='cs-inline-value';input.setAttribute('aria-label',label);if(choices)for(const choice of choices){const option=document.createElement('option');option.value=choice;option.textContent=choice;input.appendChild(option);}input.value=value;
+  const submit=document.createElement('button');submit.type='submit';submit.textContent='Apply';const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.onclick=()=>form.remove();form.append(title,input,submit,cancel);document.querySelector('main').prepend(form);
+  form.onsubmit=event=>{event.preventDefault();const result=onSubmit(input.value);if(result!==false)form.remove();};input.focus({preventScroll:true});return form;
+}
+function csOpenSaleForm(node,h){
+  node.querySelector('[data-inline-sale]')?.remove();const form=document.createElement('form');form.className='box';form.setAttribute('data-inline-sale','');
+  form.innerHTML=`<h4>List ${csEscape(h.name)} for sale</h4><label>Asking price<input data-inline-price type="number" min="1" step="1" value="${Math.round(horseWorth(h))}"></label><p data-inline-error role="status"></p><button type="submit">Create Sale Listing</button><button type="button" data-inline-cancel>Cancel</button>`;node.appendChild(form);form.querySelector('[data-inline-cancel]').onclick=()=>form.remove();form.onsubmit=event=>{event.preventDefault();const price=Number(form.querySelector('[data-inline-price]').value);if(!Number.isSafeInteger(price)||price<1){form.querySelector('[data-inline-error]').textContent='Choose a positive whole-number asking price.';return;}try{const l=HorseSales.list(app,h,price,csDay(),'sell');app.careSelectedTransaction=HorseSales.inquiry(app,l.id,csDay()).id;changeTab('sales');csNotice({});}catch(error){form.querySelector('[data-inline-error]').textContent=error.message;}};
+}

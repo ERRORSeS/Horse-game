@@ -295,3 +295,38 @@ details[open] > summary { margin-bottom:.8rem; }
 .training2 button { margin:.25rem .25rem .25rem 0; }
 .training-observation { border-left:3px solid #8fbaa5; background:#14292d; border-radius:0 12px 12px 0; padding:.3rem 1rem; margin:1rem 0; }
 .nameplate-preview { text-align:center; border:1px solid #917d55; border-radius:10px; padding:1rem; margin:.8rem 0; background:#262b28; color:#e1d7b8; letter-spacing:.035em; }
+
+/* Sales and care shops share the Tack Shop's dark teal surfaces. */
+.town-heading { flex-wrap:wrap; gap:1rem; }
+.town-heading .shop-actions { margin:0; }
+.shop-status:empty { display:none; }
+.shop-status { margin:1rem 2rem; color:#b0d8bb; }
+.horse-sales-shop .shop-hero h2 { margin:.25rem 0 .75rem; }
+.sales-balance { display:flex; flex-direction:column; gap:.4rem; color:#afc7c4; }
+.sales-balance strong { font-size:1.45rem; color:#b0d8bb; }
+.sales-filter-bar { display:grid; grid-template-columns:1fr 1.5fr auto; align-items:end; gap:1rem; padding:1.25rem 2rem; border-bottom:1px solid #34464e; }
+.sales-filter-bar button { margin-bottom:.4rem; }
+.sales-shop-body { padding:1.5rem 2rem; }
+.sales-listings { grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr)); align-items:stretch; }
+.sales-horse-card { background:linear-gradient(145deg,#203942,#1a2b32); padding:1.5rem; border:1px solid #3a5b5c; display:flex; flex-direction:column; }
+.sales-horse-card h3 { margin:.4rem 0 1rem; font-size:1.35rem; }
+.sales-horse-card button { margin-top:auto; background:#315e53; border-color:#598779; }
+.sales-horse-card .sales-listing-date { margin:.9rem 0 0; color:#97b3b4; }
+.sales-transaction { background:#192e34; border-color:#4f7771; margin-bottom:1.5rem; }
+.sales-transaction > h3 { margin-top:.5rem; }
+.sales-transaction label { max-width:680px; }
+.sales-stud-section { padding:1.25rem 2rem; border-top:1px solid #34464e; }
+@media(max-width:700px){.sales-filter-bar{grid-template-columns:1fr;padding:1rem;gap:.5rem}.sales-shop-body,.sales-stud-section{padding:1rem}.sales-horse-card{padding:1.1rem}.town-heading .shop-actions{width:100%}.sales-balance{font-size:.85rem}}
+.sales-horse-card:has(.sales-ad) { padding:0; }
+.sales-ad { border:0; background:transparent; padding:0; margin:0; }
+.sales-ad > summary { padding:1.1rem 1.3rem; color:#d8e7e7; font-weight:600; cursor:pointer; line-height:1.6; }
+.sales-ad[open] > summary { border-bottom:1px solid #3a5b5c; }
+.sales-ad-body { padding:1.3rem; }
+.sales-ad-body button { width:100%; margin-top:1rem; }
+.sales-conversation-fold { border:1px solid #4f7771; background:#192e34; padding:0; margin-bottom:1.5rem; }
+.sales-conversation-fold > summary { padding:1.1rem 1.4rem; cursor:pointer; font-weight:600; color:#d6e5e4; }
+.sales-conversation-fold .sales-transaction { margin:0; border:0; border-top:1px solid #395a5a; border-radius:0; }
+.sales-conversation-log { max-height:19rem; overflow-y:auto; overflow-anchor:none; margin:.9rem 0 1.2rem; padding:0 1rem; background:#14282d; border-left:3px solid #527d70; }
+.sales-conversation-log:empty { display:none; }
+.sales-conversation-log p { line-height:1.65; }
+.visible-injury-marker { font-size:.8rem; font-weight:600; color:#e5c59f; border:1px solid #967f64; border-radius:999px; padding:.2rem .6rem; white-space:nowrap; }

@@ -3341,7 +3341,7 @@ function hydrateFromSave(data) {
   app.money = Number(data.money) || 50000;
   app.uiDisclosures = data.uiDisclosures && typeof data.uiDisclosures==='object' ? data.uiDisclosures : {};
   app.uiSelections = data.uiSelections && typeof data.uiSelections==='object' ? data.uiSelections : {};
-  app.townView = data.townView === 'shop' ? 'shop' : '';
+  app.townView = ['shop','rider','supplies','pharmacy'].includes(data.townView) ? data.townView : '';
   app.uiActiveTab = tabs.includes(data.uiActiveTab) ? data.uiActiveTab : 'dashboard';
   app.month = Number(data.month) || 1;
   app.day = clamp(Number(data.day) || 1, 1, 30);
@@ -5267,7 +5267,7 @@ function renderDashboard() {
   }
 }
 
-function createHorseCard(horse) {
+function createHorseCard(horse, options = {}) {
   if(horse.showTrainerNotes)trainerNotesForHorse(horse);
   horse.illnesses = Array.isArray(horse.illnesses) ? horse.illnesses : [];
   horse.managed = horse.managed || { fed: false, vet: false, farrier: false, trained: false, shown: false };
@@ -5292,9 +5292,9 @@ function createHorseCard(horse) {
   const injuryLine = activeIssue ? ` • Injury: ${activeIssue.name} (${activeIssue.severity || 'Unknown'})` : '';
   const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
   const visible = visibleIllnesses(horse, revealAll);
-  const hiddenCount = Math.max(0, (horse.illnesses || []).length - visible.length);
+  const hiddenCount = 0;
   const illnessLine = visible.length
-    ? visible.map((i) => `${i.name}${i.active ? ` (${i.remaining} mo)` : ''}`).join(', ')
+    ? visible.map((i) => `${i.name}${i.active ? ' (documented)' : ''}`).join(', ')
     : 'None';
   const illnessLineWithHidden = !revealAll && hiddenCount > 0 ? `${illnessLine} (+${hiddenCount} hidden)` : illnessLine;
   const titleLabel = formattedHorseTitles(horse);
@@ -5486,14 +5486,8 @@ function createHorseCard(horse) {
         horse.retiredToBreeding = horse.recoveryReturnTab === 'retiredBreeding';
       }
       if (action === 'retire-forever') horse.retiredForever = true;
-      if (action === 'list-sale') {
-        const price = Number(prompt('Sale price?', String(horseWorth(horse))));
-        if (price > 0) app.saleBarn.push({ ...horse, owner: 'Your Stable', price, saleId: uid() });
-      }
-      if (action === 'npc-sell') {
-        app.money += horseWorth(horse);
-        app.horses = app.horses.filter((h) => h.id !== horse.id);
-        pushReport(`${horse.name} sold to NPC for ${money(horseWorth(horse))}.`);
+      if (action === 'list-sale' || action === 'npc-sell') {
+        csOpenSaleForm(node, horse);
       }
       if (action === 'rehome') {
         app.horses = app.horses.filter((h) => h.id !== horse.id);
@@ -5600,9 +5594,9 @@ function horseProfileMarkup(horse, options = {}) {
   const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
   const revealAll = options.revealAll ?? horse.owner === 'Your Stable';
   const visible = visibleIllnesses(horse, revealAll);
-  const hiddenCount = (horse.illnesses || []).length - visible.length;
+  const hiddenCount = 0;
   const illnessLine = visible.length
-    ? visible.map((i) => `${i.name}${i.active ? ` (${i.remaining} mo)` : ''}`).join(', ')
+    ? visible.map((i) => `${i.name}${i.active ? ' (documented)' : ''}`).join(', ')
     : 'None';
   const hiddenNote = !revealAll && hiddenCount > 0 ? ` (+${hiddenCount} hidden)` : '';
   return `
@@ -8149,7 +8143,7 @@ function monthlyProgress(fromDayRollover = false) {
     if (h.deceased) {
       return;
     }
-    h.illnesses.forEach((i) => {
+    h.illnesses.filter(i => !i.medicalId).forEach((i) => {
       if (i.active && i.remaining > 0) {
         if (!hasRecoveryFeed(h)) {
           pushReport(`${h.name} is still recovering from ${i.name}. Recovery feed is required before healing progresses.`);
@@ -8479,8 +8473,7 @@ function runRegistryInspection(horse) {
     breakdown: scored.breakdown
   };
   if (scored.result === 'Pass' && scored.branding) {
-    const placement = prompt(`Congratulations, ${horse.name} has received branding ${scored.branding}. Please choose its placing. (front/end)`, 'end');
-    horse.registryInspection.brandingPlacement = String(placement || 'end').toLowerCase() === 'front' ? 'front' : 'end';
+    csInlineInput(`${horse.name}: choose branding placement`, 'end', placement => { horse.registryInspection.brandingPlacement = placement === 'front' ? 'front' : 'end'; render(); saveGame(false); }, ['front','end']);
   }
   const titleText = scored.title ? ` ${scored.title} Champion title unlocked.` : '';
   pushReport(`${horse.name} inspection result: ${scored.result} (${scored.totalScore}).${titleText}`);
@@ -8998,17 +8991,11 @@ if (moneyLabel) {
   moneyLabel.style.cursor = 'pointer';
   moneyLabel.title = 'Click to set your money amount';
   moneyLabel.onclick = () => {
-    const entered = prompt('Set money amount:', `${Math.round(app.money)}`);
-    if (entered == null) return;
-    const normalized = entered.replace(/[$,\s]/g, '');
-    const value = Number(normalized);
-    if (!Number.isFinite(value) || value < 0) {
-      alert('Please enter a valid non-negative number.');
-      return;
-    }
-    app.money = Math.round(value);
-    render();
-    saveGame(false);
+    csInlineInput('Set money amount', String(Math.round(app.money)), entered => {
+      const value = Number(entered.replace(/[$,\s]/g, ''));
+      if (!Number.isFinite(value) || value < 0) return false;
+      app.money = Math.round(value); render(); saveGame(false);
+    });
   };
 }
 if (saveGameBtn) saveGameBtn.onclick = () => {
