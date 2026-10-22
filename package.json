@@ -1,0 +1,7 @@
+{
+  "name": "oxer-to-oxer-stable-manager",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/care-sales.test.cjs && node tests/integration.test.cjs && node tests/run-regressions.cjs"
+  }
+}
