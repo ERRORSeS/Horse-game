@@ -9,7 +9,7 @@
   function weighted(rows, value) { const total = rows.reduce((n, r) => n + r.weight, 0); let cursor = value * total; return rows.find(r => (cursor -= r.weight) < 0) || rows.at(-1); }
   const catalog = {};
   function condition(id, name, category, weight, days, signs, tests, options = {}) {
-    catalog[id] = { id, name, category, weight, days, signs: signs.split('|'), tests: tests.split('|'), severity: 'minor', residual: 0, restriction: 'demanding', ...options };
+    catalog[id] = { id, name, category, weight, days, signs: signs.split('|'), tests: tests.split('|'), severity: 'minor', residual: 0, restriction: 'demanding', configuredResidual: Object.hasOwn(options,'residual'), ...options };
   }
   condition('scratch', 'Superficial Scratch', 'skin', 45, [2,6], 'Small superficial mark on the coat', 'general|intake', { visible: true, contexts: ['rest','groom'], restriction: '', routine: true });
   condition('cut', 'Small Cut', 'skin', 25, [4,10], 'Visible small wound', 'general|intake', { visible: true, contexts: ['rest','groom'], residual: .01, routine: true });
@@ -54,22 +54,112 @@
   condition('weight-loss', 'Weight-Loss Investigation', 'general', 15, [21,60], 'Loss of body condition', 'general|blood|dental', { requires: 'weightLoss', contexts: ['rest'], severity: 'moderate' });
   condition('age-related', 'Age-Related Management Condition', 'general', 10, [30,90], 'Persistent changes in energy or condition', 'general|blood', { minAge: 20, contexts: ['rest'], chronic: true });
   condition('contusion','Pasture Contusion','muscle',1,[3,10],'Localized bruising|Movement discomfort','general|lameness',{requires:'trauma',contexts:['rest','walk','groom'],restriction:'all',routine:true});
+  const defaults = typeof module!=='undefined' ? require('./medical-catalog.js') : root.MedicalCatalogDefaults;
+  const probabilityAudit=[];
+  const aliases={abrasion:'rub','tendon-rupture':'tendon','stable-fracture':'orthopedic','unstable-fracture':'orthopedic',impaction:'colic','surgical-colic':'colic','critical-colic':'colic'};
+  // New subtypes are never added as another independent incidence opportunity.
+  for(const [id,base] of Object.entries(aliases)) if(!catalog[id]) catalog[id]={...copy(catalog[base]),id,name:defaults[id].name,weight:0,selectable:false,configuredResidual:false};
+  const recurrenceDefaults={scratch:[.01,60],cut:[.02,60],abrasion:[.02,60,.15],rub:[.03,60,.25],dermatitis:[.05,90,.20],'skin-infection':[.08,90,.20],laceration:[.02,90],'tender-hoof':[.10,60],abscess:[.08,90],bruise:[.05,60],imbalance:[.05,90,.30],thrush:[.06,90,.25],soreness:[.15,30],strain:[.08,360],tendon:[.12,720],'tendon-rupture':[.35,720],suspensory:[.15,720],synovitis:[.12,360],back:[.06,360,.25],respiratory:[.05,60],strangles:[.05,90],'airway-irritation':[.03,60,.35],'digestive-upset':[.10,60],colic:[.08,360],impaction:[.18,360],'surgical-colic':[.15,720],'critical-colic':[.20,720],ulcers:[.25,360],parasites:[.03,360,.15],'digestive-illness':[.10,360],eye:[.08,90],cornea:[.05,90],ear:[.12,90],oral:[.05,360],heat:[.10,90],'stable-fracture':[.08,720]};
+  for(const d of Object.values(catalog)){
+    const e=defaults[d.id];
+    d.legacyNames=[d.name];
+    if(d.id==='skin-infection')d.name='Skin Infection';if(d.id==='tendon')d.name='Partial Tendon Injury';if(d.id==='rub')d.name='Tack Rub';
+    d.conditionId=d.id;
+    d.eligibleSeverityLevels=Object.keys(e?.severityWeights||{[d.severity]:100});
+    d.severityWeights=e?.severityWeights||{[d.severity]:100};
+    d.recoveryDurationBySeverity=e?.recoveryDurationBySeverity||{[d.severity]:d.days};
+    d.causes=[e?.source.Cause||d.requires||'Recorded clinical history'];
+    d.triggerConditions=d.requires?[d.requires]:[];
+    d.contexts=[...new Set((d.contexts||['rest']).map(c=>c==='groom'?'stall':c))];
+    if(d.visible&&!d.contexts.includes('stall'))d.contexts.push('stall');
+    if(d.contexts.includes('rest'))d.contexts.push('stall','pasture');
+    d.observationLocations=[...new Set(d.contexts)];d.observableSigns=d.signs;
+    d.recommendedExaminations=d.tests;
+    d.diagnosticRequirements=['tendon','suspensory','tendon-rupture'].includes(d.id)?['ultrasound']:['orthopedic','stable-fracture','unstable-fracture'].includes(d.id)?['radiographs']:d.id==='ulcers'?['gastroscopy']:[];
+    d.validTreatments=[e?.source.Treatment||'Individual professional management and follow-up'];
+    d.requiredSupplies=d.category==='skin'?['Saline Rinse','Sterile Gauze']:[];
+    d.treatmentCost=d.requiredSupplies.length?21:0;
+    const recurrence=recurrenceDefaults[d.id]||[0,0];
+    d.recurrenceProbabilityBySeverity=d.id==='strain'?{minor:.08,moderate:.15}:d.id==='tendon'?{minor:.12,moderate:.25,major:.40}:d.id==='suspensory'?{minor:.15,moderate:.25,major:.40}:d.id==='synovitis'?{minor:.12,moderate:.25,major:.40}:d.id==='colic'?{minor:.08,moderate:.18}:{};
+    d.recurrenceProbability=d.recurrence??recurrence[0];d.recurrenceHorizon=recurrence[1];d.recurrenceIfCausePersists=recurrence[2]??d.recurrenceProbability;
+    d.requiresRecurrenceTrigger=['scratch','cut','tender-hoof','abscess','soreness','digestive-upset','eye','ear','heat'].includes(d.id);
+    d.outcomesBySeverity={};
+    for(const severity of d.eligibleSeverityLevels){
+      const a=[...(e?.outcomes[severity]||[1-d.residual,d.residual,0,0])];while(a.length<4)a.push(0);
+      // Surgical escalation is removed from the acute table and resolved through its own branch.
+      if(d.id==='impaction') {const total=a.reduce((n,v)=>n+v,0);for(let i=0;i<4;i++)a[i]/=total;d.surgicalEscalationProbability=.05;}
+      let residual=d.configuredResidual?d.residual:a[1];
+      if(d.id==='tendon')residual={minor:.15,moderate:.35,major:.6}[severity];
+      if(d.id==='suspensory')residual={minor:.2,moderate:.35,major:.55}[severity];
+      if(residual!==a[1]) probabilityAudit.push({conditionId:d.id,severity,field:'residual',preserved:residual,suggested:a[1]});
+      const remaining=1-residual,others=a[0]+a[2]+a[3];
+      d.outcomesBySeverity[severity]={full:others?a[0]/others*remaining:0,residual,persistent:others?a[2]/others*remaining:remaining,death:others?a[3]/others*remaining:0};
+    }
+    d.fullRecoveryProbability=Object.fromEntries(Object.entries(d.outcomesBySeverity).map(([k,v])=>[k,v.full]));
+    d.residualEffectProbability=Object.fromEntries(Object.entries(d.outcomesBySeverity).map(([k,v])=>[k,v.residual]));
+    d.fatalityProbability=Object.fromEntries(Object.entries(d.outcomesBySeverity).map(([k,v])=>[k,v.death]));
+    d.workRestrictions=d.restriction;d.progressionStages=['Active','Improving','Awaiting Follow-Up','Resolved','Resolved with Residual Effects','Chronic / Persistent','Deceased'];
+    d.historicalRecord=['horseId','id','diagnosis','onset','resolvedDay','severity','outcome','treatmentStarted'];
+    const quotes=e?.quotes||[d.signs[0],d.signs[1]||d.signs[0]+' remains noticeable.',e?.source.Treatment||'The observed concern remains under assessment.',d.id==='contusion'?'The bruised area is becoming less sensitive.':'The documented symptoms are more comfortable under the current plan.',d.id==='contusion'?'The bruising has resolved after appropriate rest.':'The clinical history remains available for continued management.'];
+    d.narrativeTemplates=quotes.map((text,i)=>({text,phase:['first','active','ongoing','improving','resolved'][i]||'prognosis',requiresDiagnosis:i>=3||/veterinar|farrier|examin|infection|dermatitis|fracture|colic|tendon|strain|dental|condition has resolved/i.test(text)}));
+    d.resolvedNarrativeTemplates=d.narrativeTemplates.filter(t=>t.phase==='resolved');
+  }
+  for(const id of ['tendon-rupture','unstable-fracture','surgical-colic','critical-colic']){
+    const d=catalog[id];d.emergency=true;d.restriction=d.workRestrictions='all';d.routine=false;d.requires='majorTrauma';d.contexts=d.observationLocations=['rest','stall','pasture','walk','legs'];d.requiredSupplies=[];d.treatmentCost=id==='tendon-rupture'?4000:id==='unstable-fracture'?6000:id==='critical-colic'?7000:4000;
+    d.narrativeTemplates.forEach((t,i)=>{t.phase=i===0?'first':i===1?'active':i===2?'ongoing':'prognosis';t.requiresDiagnosis=i>0;});
+  }
+  catalog['stable-fracture'].routine=false;catalog['stable-fracture'].restriction='all';catalog['stable-fracture'].requiredSupplies=[];
+  catalog['stable-fracture'].narrativeTemplates[3].phase='treatment';catalog['stable-fracture'].narrativeTemplates[4].phase='improving';
+  catalog['tendon-rupture'].narrativeTemplates[3].phase='diagnostic';
+  catalog['surgical-colic'].narrativeTemplates[4].phase='postoperative';catalog['surgical-colic'].narrativeTemplates[5].phase='improving';catalog['surgical-colic'].narrativeTemplates[6].phase='worsening';catalog['surgical-colic'].narrativeTemplates[7].phase='terminal';
+  catalog['critical-colic'].narrativeTemplates[4].phase='critical';catalog['critical-colic'].narrativeTemplates[5].phase='improving';catalog['critical-colic'].narrativeTemplates[6].phase='worsening';catalog['critical-colic'].narrativeTemplates[7].phase='death';
+  for(const id of ['tendon-rupture','unstable-fracture'])catalog[id].narrativeTemplates.push({phase:'improving',requiresDiagnosis:true,text:id==='tendon-rupture'?'The repaired tendon is progressing through rehabilitation, with sporting function still uncertain.':'The stabilized fracture is progressing through healing under specialist supervision.'});
+  for(const id of ['djd','asthma'])catalog[id].narrativeTemplates[4].phase='prognosis';
+  catalog.djd.functionalOutcomes={stable:.65,restricted:.30,severe:.05};catalog.asthma.functionalOutcomes={stable:.60,restricted:.30,severe:.10};
+  for(const id of ['fever','weight-loss'])catalog[id].investigation=true;
   const exams = {
     general: ['General Physical Exam',90], intake: ['Rescue Intake Exam',140], lameness: ['Lameness Evaluation',180], soundness: ['Detailed Soundness Exam',350], ultrasound: ['Ultrasound',180], radiographs: ['Radiographs',250], blood: ['Bloodwork',110], respiratory: ['Respiratory Assessment',135], dental: ['Dental Examination',120], gastroscopy: ['Gastroscopy',350], emergency: ['Emergency Consultation',300], followup: ['Follow-Up',65], eye: ['Eye Examination',90], ear: ['Ear Examination',90], parasite: ['Targeted Parasite Test',90], hoof: ['Hoof Assessment',35], joint: ['Farrier-Vet Joint Assessment',170]
   };
   const supplies = Object.fromEntries([['Sterile Gauze',12],['Non-Adherent Dressing',15],['Cohesive Bandage',10],['Cotton Padding',14],['Saline Rinse',9],['Digital Thermometer',20],['Disposable Gloves',8],['Clean Towels',7],['Hoof Pick',8],['Hoof Brush',9],['Routine Hoof Dressing',22],['Horse-Safe Shampoo',18],['Fly Mask',25],['Fly Sheet',70],['Cooling Wraps',45],['First-Aid Box',35],['Treatment Folder',12]].map(([name,price])=>[name,{name,price,kind:'supply'}]));
   const medicines = Object.fromEntries([['Phenylbutazone',45],['Flunixin',65],['Firocoxib',95],['Omeprazole',120],['Sucralfate',85],['Trimethoprim–Sulfadiazine',75],['Penicillin G veterinary package',110],['Ceftiofur',125],['Dexamethasone',50],['Ivermectin package',28],['Moxidectin',38],['Praziquantel',35],['Electrolytes',25],['Antiseptic',22]].map(([name,price])=>[name,{name,price,kind:'medicine'}]));
+  for(const [name,price] of [['Non-Sterile Examination Gloves',6],['Veterinary Antiseptic Product',22],['Equine Digital Thermometer Case',6],['Bandage Storage Set',18],['Fly Repellent (Equine)',20],['Soft Hoof-Care Cloth',7]])supplies[name] ||= {name,price,kind:'supply'};
+  medicines['Prescription Eye Medication Package']={name:'Prescription Eye Medication Package',price:70,kind:'medicine'};
+  catalog.cornea.medication='Prescription Eye Medication Package';
+  const services={hospital:['Hospital Admission',400],hospitalDay:['Hospital Daily Care',150],specialist:['Specialist Consultation',600],fluids:['Hospital Fluid Therapy Service',180],colic:['Emergency Colic Treatment Service',350],wound:['Routine Wound Treatment Service',80],dental:['Dental Treatment Package',100],tendon:['Tendon Surgery Package',4000],fracture:['Fracture Surgery Package',6000],surgery:['Surgical Colic Package',4000],critical:['Critical Colic Surgery Package',7000]};
   const farrierServices = { basic:['Basic Trim',45], routine:['Full Routine Trim',65], front:['Front Shoes',95], full:['Full Set',160], reset:['Reset',115], lost:['Lost Shoe Replacement',55], balance:['Hoof Balance Assessment',35], joint:['Farrier-Vet Joint Assessment',170], therapeutic:['Therapeutic Plan',240] };
   const arrays = ['medicalConditions','observableSigns','playerObservations','suspectedDiagnoses','confirmedDiagnoses','previousConditions','prescriptions','vaccinations','vetVisits','diagnosticTests','medicalRestrictions','rehabilitationPlans','conditionRiskFactors','medicalTimeline'];
   function ensure(h, day) {
-    if (h.medicalVersion === 1) return h;
+    if (h.medicalVersion === 1) {
+      arrays.forEach(key=>{if(!Array.isArray(h[key]))h[key]=[];});
+      if(h.medicalExpansionVersion!==2){
+        for(const c of h.medicalConditions){
+          c.careLog ||= [];
+          const rx=h.prescriptions.find(rx=>rx.conditionId===c.id&&rx.used>0);
+          if(c.medicationSupport&&rx&&!c.medicationCourse)c.medicationCourse={rxId:rx.id,remainingDays:Math.max(0,c.recoveryDays-c.recoveryProgress),started:rx.issued};
+        }
+        h.medicalExpansionVersion=2;
+      }
+      // Earlier service controls allowed an impossible 'surgery unavailable' decision after a paid operation.
+      for(const c of h.medicalConditions.filter(c=>c.specialistCare&&c.criticalDecision==='unavailable')){
+        if(c.outcome==='death'&&!c.criticalEvaluated&&h.deathRecord?.conditionId===c.id){
+          (h.correctedMedicalRecords ||= []).push({reason:'Invalid unavailable-surgery branch after completed operation',record:copy(h.deathRecord)});
+          h.deceased=false;delete h.deathDay;delete h.deathRecord;delete c.outcome;delete c.resolvedDay;c.resolved=false;c.stage='Post-operative Monitoring';
+          h.previousConditions=h.previousConditions.filter(r=>!(r.id===c.id&&r.outcome==='death'));
+          h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>{p.status='Active';p.scheduled=true;});
+        }
+        delete c.criticalDecision;delete c.decisionDay;
+        h.medicalTimeline.push({day,conditionId:c.id,kind:'Invalid treatment branch corrected',text:'Completed surgery retains post-operative care; the unavailable-surgery branch does not apply.'});
+      }
+      for(const c of h.medicalConditions.filter(c=>!c.resolved&&c.confirmed&&c.services?.length&&!h.rehabilitationPlans.some(p=>p.conditionId===c.id&&p.status==='Active')))if(!c.outcome)plan(h,c.id,day);
+      return h;
+    }
     arrays.forEach(key => { if (!Array.isArray(h[key])) h[key] = []; });
-    h.medicalVersion = 1; h.healthSeed = hash(h.id + '|medical'); h.healthProcessedDay = day;
+    h.medicalVersion = 1; h.medicalExpansionVersion=2; h.healthSeed = hash(h.id + '|medical'); h.healthProcessedDay = day;
     h.hoofHealth = h.hoofHealth || { condition: h.hoofCare ?? 65, balance: 70, growth: 0, shoes: 'barefoot', lostShoe: false, nextDue: day + 42, observations: [], findings: [], history: [], handling: 0 };
     // Legacy records remain byte-for-byte accessible; migration never manufactures disease.
     h.legacyMedicalRecords = copy(h.illnesses || []);
     for (const [i, old] of (h.illnesses || []).entries()) {
-      const def = Object.values(catalog).find(d => d.name.toLowerCase() === String(old.name).toLowerCase());
+      const def = Object.values(catalog).find(d => [d.name,...(d.legacyNames||[])].some(name=>name.toLowerCase() === String(old.name).toLowerCase()));
       const c = add(h, def?.id || 'legacy', day, { id: `${h.id}:legacy:${i}`, legacyName: old.name, known: !old.hidden, severity: old.severity === 'Easy' ? 'minor' : 'moderate', recoveryDays: Math.max(1, (old.remaining || 1) * 30), resolved: old.active === false, legacy: copy(old) });
       if (c.resolved) { c.stage = 'Resolved'; h.previousConditions.push(copy(c)); }
     }
@@ -81,7 +171,12 @@
     const def = catalog[diagnosis] || { ...catalog.strain, id:'legacy' };
     if (extra.id && h.medicalConditions.some(c=>c.id===extra.id)) return h.medicalConditions.find(c=>c.id===extra.id);
     const id = extra.id || `${h.id}:condition:${day}:${h.medicalConditions.length}`;
-    const c = { id, horseId:h.id, diagnosis, category:def.category, region:def.category === 'hoof' ? 'hoof' : def.category === 'muscle' ? 'limb / back' : def.category, onset:day, cause:extra.cause || 'existing physiological condition', severity:def.severity, stage:'Active', symptoms:[...def.signs], known:false, suspected:false, confirmed:false, resolved:false, residual:false, recoveryDays:def.days[0]+Math.floor(roll(h.healthSeed,id)* (def.days[1]-def.days[0]+1)), recoveryProgress:0, ...extra };
+    const severity=def.eligibleSeverityLevels.includes(extra.severity)?extra.severity:weighted(Object.entries(def.severityWeights).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`${id}:clinical-severity`)).id;
+    const duration=def.recoveryDurationBySeverity[severity]||def.days;
+    const c = { id, horseId:h.id, diagnosis, category:def.category, region:def.category === 'hoof' ? 'hoof' : def.category === 'muscle' ? 'limb / back' : def.category, onset:day, cause:extra.cause || 'existing physiological condition', severity, stage:'Active', symptoms:[...def.signs], known:false, suspected:false, confirmed:false, resolved:false, residual:false, recoveryDays:duration[0]+Math.floor(roll(h.healthSeed,id)* (duration[1]-duration[0]+1)), recoveryProgress:0, ...extra };
+    c.severity=def.eligibleSeverityLevels.includes(c.severity)?c.severity:severity;
+    c.careLog ||= [];
+    if(def.emergency)c.emergencyStatus='Attention Required';
     h.medicalConditions.push(c);if(diagnosis==='lost-shoe'&&!c.resolved)h.hoofHealth.lostShoe=true;
     if (c.known) { c.confirmed=true; h.confirmedDiagnoses.push({conditionId:id,name:definition(c).name,day,legacy:true}); }
     h.medicalTimeline.push({day,kind:c.known?'Legacy Medical Record':'internal',conditionId:id});
@@ -89,24 +184,43 @@
   }
   function current(h) { return h.medicalConditions.filter(c=>!c.resolved); }
   function allowed(h, activity, intensity=1) {
+    if(h.deceased)return 'This horse is deceased; its history is preserved.';
+    if(h.medicalConditions.some(c=>c.outcome==='persistent'&&c.functionalOutcome!=='stable'||c.sportRestriction==='non-sport')&&['jump','ridden','lunge','competition'].includes(activity))return 'A persistent condition requires an individually cleared workload.';
     if (['jump','ridden','lunge','competition'].includes(activity) && ['Very Underweight'].includes(h.weightStatus)) return 'The current body condition requires stabilization before this activity.';
     for (const c of current(h)) { const d=definition(c); if (d.restriction==='all' && (!c.resolved)) return 'A health concern requires professional assessment and rest before this activity.'; if ((d.restriction==='demanding' && intensity>=2||d.restriction==='high'&&intensity>=3)) return 'Demanding work is restricted pending veterinary review.'; }
     if (h.medicalConditions.some(c=>c.residual) && intensity>=3) return 'The documented residual limitation requires an adjusted workload.';
     return '';
   }
-  function observe(h, context, day, eventId) {
+  function narrative(h,c,phase){
+    const d=definition(c),templates=d.narrativeTemplates||[];
+    if(phase==='improving'&&['surgical-colic','critical-colic'].includes(c.diagnosis)&&!c.criticalSurvived)return c.symptoms[0]+' remains under intensive monitoring.';
+    let t=templates.find(t=>t.phase===phase&&(!t.requiresDiagnosis||c.confirmed));
+    // Diagnosis-sensitive scripted lines are never substituted into unconfirmed observations.
+    const text=t?.text||(phase==='improving'?c.symptoms[0]+' is less noticeable.':phase==='resolved'?c.residual?'The documented episode has ended with residual limitations.':'The documented episode has resolved.':c.symptoms[0]);
+    return text.replaceAll('[HORSE]',h.name||'The horse').replaceAll('[BODY REGION]',c.region||'affected area').replaceAll('[LIMB]',c.limb||'affected limb');
+  }
+  function recordObservation(h,c,context,day,phase){
+    c.observedPhases ||= [];
+    if(c.observedPhases.includes(phase))return null;
+    c.observedPhases.push(phase);
+    const record={day,context,text:'Important Observation: '+narrative(h,c,phase),conditionId:c.id,phase,strength:definition(c).emergency?'Emergency Veterinary Attention Required':'Important Observation'};
+    h.observableSigns.push(record);h.playerObservations.push(record);return record;
+  }
+  function observe(h, context, day, eventId, options={}) {
+    // Accept the historical context as a save/API alias, never as a required UI action.
+    if(context==='groom')context='stall';
     const key=`observe:${eventId}:${context}`;
     if ((h.healthEvents ||= {})[key]) return [];
     h.healthEvents[key]=true;
     const found=[];
-    for (const c of current(h)) {
-      const d=definition(c); if (!(d.contexts || ['trot','circle','post']).includes(context)) continue;
-      const previous=h.playerObservations.filter(o=>o.conditionId===c.id).length;
-      const chance=Math.min(.95,(d.visible?.9:['circle','jump'].includes(context)?.65:.35)+previous*.1);
-      if (roll(h.healthSeed,`${key}:${c.id}`)>=chance) continue;
-      const sign=d.signs[Math.floor(roll(h.healthSeed,`${key}:${c.id}:sign`)*d.signs.length)];
-      const record={day,context,text:sign,conditionId:c.id,strength:d.emergency?'Emergency sign':d.visible?'Obvious clinical sign':previous?'Repeated clue':'Weak clue'};
-      h.observableSigns.push(record);h.playerObservations.push(record);found.push(record);
+    for(const c of current(h)){
+      const d=definition(c);if(!d.contexts.includes(context))continue;
+      if(context==='pasture'&&options.close!==true&&!d.emergency)continue;
+      const phase=c.recoveryProgress>0?'improving':'first';
+      const chance=d.emergency?1:Math.min(.95,(d.visible?.9:['circle','jump'].includes(context)?.65:.35));
+      if(roll(h.healthSeed,`${key}:${c.id}`)>=chance)continue;
+      const r=recordObservation(h,c,context,day,phase);if(r)found.push(r);
+      if(r&&c.diagnosis==='scratch'&&!c.confirmed){c.known=c.confirmed=true;h.confirmedDiagnoses.push({conditionId:c.id,name:d.name,day,visual:true});}
     }
     return found;
   }
@@ -133,20 +247,29 @@
       if(!relevant)continue;
       const imaging=['ultrasound','radiographs','gastroscopy'].includes(type),chance=imaging?.9:['general','intake'].includes(type)?d.visible?.9:.4:.75;
       const value=roll(h.healthSeed,`exam:${eventId}:${c.id}`);
-      if(value<chance){c.known=true;c.confirmed=true;report.observed.push(...d.signs);report.diagnoses.push(d.name);if(!h.confirmedDiagnoses.some(r=>r.conditionId===c.id))h.confirmedDiagnoses.push({conditionId:c.id,name:d.name,day});}
+      const diagnosticsReady=!d.diagnosticRequirements.length||d.diagnosticRequirements.includes(type)||d.diagnosticRequirements.every(test=>h.diagnosticTests.some(r=>r.type===test));
+      if(value<chance&&diagnosticsReady){c.known=true;c.confirmed=true;report.observed.push(...d.signs);report.diagnoses.push(d.name);if(!h.confirmedDiagnoses.some(r=>r.conditionId===c.id))h.confirmedDiagnoses.push({conditionId:c.id,name:d.name,day});}
       else if(value<Math.min(.98,chance+.15)){c.suspected=true;report.possible.push('A relevant concern remains uncertain; further targeted assessment may help.');h.suspectedDiagnoses.push({day,conditionId:c.id,text:'Further targeted assessment recommended.'});}
-      if(type==='followup'&&c.confirmed&&c.recoveryProgress>=c.recoveryDays)finish(h,c,day);
+      if(type==='followup'&&c.confirmed&&c.recoveryProgress>=c.recoveryDays&&!d.investigation){c.medicalClearance=day;finish(h,c,day);}
+      if(type==='emergency'&&d.emergency){c.emergencyAssessed=day;c.emergencyStatus='Assessed — Treatment Required';}
+      if(['lameness','soundness','joint'].includes(type))report.lamenessGrade=Math.max(report.lamenessGrade||0,lamenessGrade(h));
       if(d.restriction&&c.confirmed&&!c.resolved)report.restrictions.push(d.restriction==='all'?'Rest and professional reassessment.':'Avoid demanding work; review a controlled return with the veterinarian.');
     }
     h.vetVisits.push(report);h.diagnosticTests.push({day,type,reportId:eventId});return {ok:true,report};
   }
   function plan(h, conditionId, day) {
     const c=current(h).find(c=>c.id===conditionId&&c.confirmed);if(!c)return {ok:false,message:'A confirmed relevant diagnosis is required.'};
-    let p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(p)return {ok:true,plan:p};
-    const d=definition(c);p={id:`plan:${c.id}`,conditionId:c.id,day,followup:day+Math.min(14,c.recoveryDays),status:'Active',restrictions:d.restriction,care:d.routine?'Routine care and monitoring':'Veterinary-directed care, monitoring and reassessment',supplies:d.category==='skin'?['Sterile Gauze','Saline Rinse']:[]};
-    c.treatmentStarted=day;h.rehabilitationPlans.push(p);h.medicalRestrictions.push({conditionId:c.id,activity:d.restriction,from:day});
-    if(d.medication)h.prescriptions.push({id:`rx:${c.id}`,horseId:h.id,conditionId:c.id,item:d.medication,quantity:1,dispensed:0,used:0,issued:day,expires:day+14,competitionHoldUntil:day+Math.max(7,c.recoveryDays),professionalOnly:/Penicillin|Ceftiofur|Flunixin|Dexamethasone/.test(d.medication)});
+    let p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(p){issuePrescription(h,c,day);return {ok:true,plan:p};}
+    const d=definition(c);p={id:`plan:${c.id}`,conditionId:c.id,day,followup:day+Math.min(14,c.recoveryDays),status:'Active',restrictions:d.restriction,care:d.routine?'Routine care and monitoring':'Veterinary-directed care, monitoring and reassessment',supplies:[...d.requiredSupplies],scheduled:true};
+    c.treatmentStarted=day;c.courseDaysRemaining=c.recoveryDays-c.recoveryProgress;h.rehabilitationPlans.push(p);h.medicalRestrictions.push({conditionId:c.id,activity:d.restriction,from:day});
+    issuePrescription(h,c,day);
     return {ok:true,plan:p};
+  }
+  function issuePrescription(h,c,day){
+    const d=definition(c);if(!d.medication||c.resolved||c.recoveryProgress>=c.recoveryDays||c.medicationCourse?.remainingDays>0)return;
+    if(h.prescriptions.some(rx=>rx.conditionId===c.id&&rx.item===d.medication&&rx.expires>=day&&rx.used<rx.quantity))return;
+    const prior=h.prescriptions.filter(rx=>rx.conditionId===c.id).length;
+    h.prescriptions.push({id:`rx:${c.id}${prior?':'+prior:''}`,horseId:h.id,conditionId:c.id,item:d.medication,quantity:1,dispensed:0,used:0,issued:day,expires:day+14,competitionHoldUntil:day+Math.max(7,c.recoveryDays-c.recoveryProgress),professionalOnly:/Penicillin|Ceftiofur|Flunixin|Dexamethasone/.test(d.medication)});
   }
   function purchase(state,h,item,quantity,day,eventId,rxId) {
     const store=state.careEconomy ||= {receipts:[],inventory:[],operations:{}};
@@ -165,40 +288,207 @@
     const c=current(h).find(c=>c.id===rx?.conditionId);
     if(!rx||!c||!item||rx.expires<day||rx.used>=rx.quantity)return {ok:false,message:'A current condition, valid prescription and dispensed package are required.'};
     // Packages represent a professional-authorized game course, never a dose.
-    item.quantity--;rx.used++;c.medicationSupport=true;store.operations[key]=true;
+    item.quantity--;rx.used++;c.medicationSupport=true;c.medicationCourse={rxId,remainingDays:Math.max(1,c.recoveryDays-c.recoveryProgress),started:day};store.operations[key]=true;
     h.medicalTimeline.push({day,kind:'Medication course recorded',conditionId:c.id,item:rx.item,professional:rx.professionalOnly});return {ok:true};
   }
   function finish(h,c,day) {
-    const d=definition(c);if(c.resolved)return;
-    if(d.chronic){c.stage='Chronic / Recurrent';return;}
-    const residualChance=c.diagnosis==='tendon'?({minor:.15,moderate:.35,major:.6}[c.severity]??d.residual):c.diagnosis==='suspensory'?({minor:.2,moderate:.35,major:.55}[c.severity]??d.residual):d.residual;c.resolved=true;c.residual=roll(h.healthSeed,`outcome:${c.id}`)<residualChance;c.stage=c.residual?'Resolved with Residual Effects':'Resolved';c.resolvedDay=day;
-    h.previousConditions.push(copy(c));h.medicalRestrictions=h.medicalRestrictions.filter(r=>r.conditionId!==c.id);h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>p.status='Completed');
+    const d=definition(c);if(c.resolved||c.outcome)return;
+    if(d.investigation)return;
+    if(d.chronic){
+      const outcomes=d.functionalOutcomes||{stable:1};
+      c.functionalOutcome=weighted(Object.entries(outcomes).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`functional:${c.id}`)).id;
+      c.stage=c.functionalOutcome==='stable'?'Stable / Managed':'Chronic / Persistent';c.outcome='persistent';c.sportRestriction=c.functionalOutcome==='stable'?'adjusted':'non-sport';h.previousConditions.push(copy(c));recordObservation(h,c,'health',day,'prognosis');h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>p.status='Ongoing Management');return;
+    }
+    let table=d.outcomesBySeverity[c.severity]||Object.values(d.outcomesBySeverity)[0];
+    if(d.emergency&&table.death>0&&!c.emergencyAssessed)return;
+    if(['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.specialistCare&&c.criticalDecision!=='unavailable')return;
+    if(c.criticalDecision==='unavailable')table={full:0,residual:.05,persistent:.05,death:.90};
+    const result=weighted(Object.entries(table).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`outcome:${c.id}`)).id;
+    c.outcome=result;c.resolvedDay=day;c.residual=result==='residual';c.resolved=result!=='persistent';
+    c.stage=result==='death'?'Deceased':result==='persistent'?'Chronic / Persistent':c.residual?'Resolved with Residual Effects':'Resolved';
+    if(result==='persistent'||['tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&result==='residual')c.sportRestriction='non-sport';
+    if(result==='death'){
+      h.deceased=true;h.deathDay=day;
+      h.deathRecord={horseId:h.id,name:h.registeredName||h.name,day,cause:c.confirmed?d.name:'Severe veterinary emergency',conditionId:c.id,outcome:'death',veterinaryRecord:copy(h.vetVisits),treatments:copy(h.rehabilitationPlans),ownershipHistory:copy(h.ownershipHistory||[]),competitionHistory:copy(h.showResults||[]),pedigree:copy(h.pedigree||{}),genetics:copy(h.genetics||{})};
+      recordObservation(h,c,'health',day,'death');
+      h.medicalTimeline.push({day,conditionId:c.id,kind:'Death',text:`${h.name} has died following a severe medical emergency. The medical record has been updated.`});
+    }else{
+      recordObservation(h,c,'health',day,result==='persistent'?'prognosis':'resolved');
+      if(result!=='persistent'&&d.recurrenceHorizon){c.recurrenceDue=day+1+Math.floor(roll(h.healthSeed,`recurrence-date:${c.id}`)*d.recurrenceHorizon);c.recurrenceUntil=day+d.recurrenceHorizon;}
+    }
+    h.previousConditions.push(copy(c));h.medicalRestrictions=h.medicalRestrictions.filter(r=>r.conditionId!==c.id);
+    h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>p.status=result==='persistent'?'Ongoing Management':'Completed');
+  }
+  function lamenessGrade(h){return Math.max(0,...current(h).filter(c=>definition(c).category==='muscle'||definition(c).category==='hoof').map(c=>['tendon-rupture','unstable-fracture'].includes(c.diagnosis)?5:c.severity==='major'?4:c.severity==='moderate'?3:1));}
+  function careDay(state,h,c,day,context={}){
+    const d=definition(c),p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');
+    c.careLog ||= [];const old=c.careLog.find(r=>r.day===day);if(old)return old;
+    if(!p)return {day,ok:false,reason:'No active authorized care plan'};
+    const missing=[];
+    if(d.correction&&!context[d.correction])missing.push('Contributing cause requires correction');
+    if(d.farrier&&!c.farrierCare)missing.push('Farrier care is required');
+    if(d.emergency&&!c.emergencyAssessed)missing.push('Emergency veterinary assessment is required');
+    if(d.medication&&!(c.medicationCourse?.remainingDays>0))missing.push('Authorized medication course is not prepared');
+    if(['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.specialistCare)missing.push('Specialist treatment decision is required');
+    const inventory=state?.careEconomy?.inventory||[],stock=p.supplies.map(item=>inventory.find(i=>i.item===item&&i.kind==='supply'&&i.quantity>0));
+    if(stock.some(i=>!i))missing.push('Required treatment supplies are missing');
+    if(d.category==='mouth'&&['dental','oral'].includes(d.id)&&!c.services?.some(r=>r.service==='dental'))missing.push('Professional dental treatment is required');
+    if(c.hospitalized&&!missing.length&&!ledger(state,`hospital-daily:${h.id}:${day}`,services.hospitalDay[1],day,h,[{name:services.hospitalDay[0],quantity:1,unitPrice:services.hospitalDay[1]}]))missing.push('Hospital daily care could not be paid');
+    const r={day,ok:!missing.length,reason:missing.join('; ')};c.careLog.push(r);
+    if(r.ok){stock.forEach(i=>i.quantity--);if(c.medicationCourse)c.medicationCourse.remainingDays--;c.courseDaysRemaining=Math.max(0,(c.courseDaysRemaining??c.recoveryDays)-1);}
+    h.medicalTimeline.push({day,conditionId:c.id,planId:p.id,kind:r.ok?'Scheduled care completed':'Missed treatment task',reason:r.reason});return r;
+  }
+  function serviceOptions(h,c){
+    if(c.resolved||c.recoveryProgress>=c.recoveryDays)return [];
+    const d=definition(c),completed=id=>c.services?.some(r=>r.service===id);
+    const surgical={ 'tendon-rupture':'tendon','stable-fracture':'fracture','unstable-fracture':'fracture','surgical-colic':'surgery','critical-colic':'critical' }[c.diagnosis];
+    const ids=[];
+    if(d.emergency||c.severity!=='minor'){
+      if(!c.hospitalized&&!c.criticalSurvived&&!completed('hospital'))ids.push('hospital');
+      if(c.hospitalized)ids.push('hospitalDay');
+      if(!completed('specialist'))ids.push('specialist');
+    }
+    if((d.category==='digestive'||['dehydration','heat'].includes(c.diagnosis))&&!completed('fluids'))ids.push('fluids');
+    if(['colic','impaction'].includes(c.diagnosis)&&!completed('colic'))ids.push('colic');
+    if(d.category==='skin'&&!completed('wound'))ids.push('wound');
+    if(['dental','oral'].includes(c.diagnosis)&&!completed('dental'))ids.push('dental');
+    if(surgical&&!completed(surgical))ids.push(surgical);
+    return ids.map(id=>({id,name:services[id][0],price:services[id][1],blocked:d.emergency&&!c.emergencyAssessed?'Call the emergency veterinarian first.':['tendon','fracture','surgery','critical'].includes(id)&&!c.specialistAssessed?'Specialist assessment is required first.':''}));
+  }
+  function clinicalService(state,h,conditionId,service,day,eventId){
+    const c=current(h).find(c=>c.id===conditionId),d=c&&definition(c);
+    if(!c||(!c.confirmed&&!(['hospital','specialist','hospitalDay'].includes(service)&&c.emergencyAssessed))||!services[service]||h.deceased)return {ok:false,message:'A confirmed current condition and relevant veterinary service are required.'};
+    const previous=c.services?.find(r=>r.service===service&&(service!=='hospitalDay'||r.day===day));
+    if(previous)return {ok:true,message:services[service][0]+' is already completed for this episode. No additional charge was made.',serviceRecord:previous};
+    const option=serviceOptions(h,c).find(r=>r.id===service);
+    if(!option)return {ok:false,message:'This service is not indicated for the diagnosed condition. Choose one of the listed relevant services.'};
+    if(option.blocked)return {ok:false,message:option.blocked};
+    const key=service==='hospitalDay'?`hospital-daily:${h.id}:${day}`:`service:${h.id}:${c.id}:${service}`;
+    const receipt=ledger(state,key,services[service][1],day,h,[{name:services[service][0],quantity:1,unitPrice:services[service][1]}]);
+    if(!receipt)return {ok:false,message:'Insufficient funds for this service.'};
+    c.services ||= [];
+    const record={service,day,receipt:receipt.number,findings:[],nextSteps:[]};c.services.push(record);
+    if(service==='specialist'){
+      c.specialistAssessed=day;
+      record.findings.push(c.confirmed?d.name+' has been reviewed by the specialist.':'The specialist has assessed the urgent signs; the exact diagnosis still needs targeted testing.');
+      record.nextSteps.push(...d.diagnosticRequirements.filter(type=>!h.diagnosticTests.some(r=>r.type===type)).map(type=>'Authorize '+exams[type][0]+'.'));
+      const surgery=serviceOptions(h,c).find(r=>['tendon','fracture','surgery','critical'].includes(r.id));
+      if(surgery)record.nextSteps.push('Review and authorize '+surgery.name+' if treatment is feasible.');
+      else record.nextSteps.push('Begin the condition-specific care plan and attend the scheduled follow-up.');
+    }
+    if(['tendon','fracture','surgery','critical'].includes(service)){
+      c.specialistCare=true;c.hospitalized=true;c.operationDay=day;c.emergencyStatus='Post-operative Monitoring';
+      record.findings.push('The operation has been completed. The horse remains hospitalized during the critical phase.');
+      record.nextSteps.push('Scheduled hospital care and restricted rehabilitation are now active. The critical response will be reviewed after five completed care days.');
+    }
+    if(service==='hospital'){
+      c.hospitalized=true;c.emergencyStatus='Hospitalized — Assessment / Treatment';
+      record.findings.push('Hospital admission is complete. The horse is under professional monitoring.');
+      record.nextSteps.push('Complete the indicated assessment and treatment. Hospital daily care costs $150 on each eligible care day.');
+    }
+    if(service==='hospitalDay'){
+      record.findings.push('Hospital nursing and monitoring for this day have been paid.');
+      record.nextSteps.push('The daily treatment clock will not charge this same hospital day twice.');
+    }
+    if(service==='colic'){
+      c.emergencyTreatment=true;c.emergencyStatus='Medical Monitoring';
+      record.findings.push('Veterinary medical treatment for the abdominal episode has started.');
+      record.nextSteps.push('Continue the scheduled monitoring; an unresolved episode may require referral.');
+    }
+    if(service==='fluids'){
+      c.fluidTherapy={day,provider:'Veterinary team'};
+      record.findings.push('The veterinary team has provided the indicated fluid therapy.');
+      record.nextSteps.push('Continue the cause-specific plan; fluid support does not replace indicated surgery or other treatment.');
+    }
+    if(service==='wound'){
+      c.woundCare={day,provider:'Veterinary team'};
+      record.findings.push('The wound has been professionally assessed and treated.');
+      record.nextSteps.push('Daily wound care is scheduled. Keep the required dressing and cleansing supplies available.');
+    }
+    if(service==='dental'){
+      c.dentalCare={day,provider:'Veterinary team'};
+      record.findings.push('The diagnosed oral problem has received professional dental treatment.');
+      record.nextSteps.push('Monitor eating comfort through the recovery period and attend the follow-up.');
+    }
+    // Authorizing actual treatment also starts its scheduled plan; a paid operation must never remain inert.
+    let carePlan;
+    if(c.confirmed){carePlan=plan(h,c.id,day).plan;if(carePlan){carePlan.scheduled=true;record.planId=carePlan.id;}}
+    h.medicalTimeline.push({day,conditionId:c.id,kind:'Veterinary service completed',service,receipt:receipt.number,text:record.findings.join(' '),nextSteps:record.nextSteps});
+    return {ok:true,message:record.findings.join(' ')+' '+record.nextSteps.join(' '),serviceRecord:record,plan:carePlan,receipt};
+  }
+  function emergencyResponse(state,h,conditionId,action,day,eventId){
+    const c=current(h).find(c=>c.id===conditionId),d=c&&definition(c);
+    if(!c||!d.emergency||h.deceased)return {ok:false,message:'No current emergency episode is available.'};
+    if(action==='call'){if(c.emergencyAssessed)return {ok:true,message:'The emergency consultation is already recorded. Continue with the indicated treatment or hospital referral.'};return examine(state,h,'emergency',day,eventId);}
+    if(action==='referral'){
+      if(!c.emergencyAssessed)return {ok:false,message:'Call the emergency veterinarian for assessment first.'};
+      const result=clinicalService(state,h,c.id,'hospital',day,eventId);if(result.ok)c.referralRequested=day;return result;
+    }
+    if(action==='unavailable'){
+      if(c.specialistCare)return {ok:false,message:'The operation has already been completed. Continue post-operative monitoring and rehabilitation.'};
+      if(!c.specialistAssessed||!['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis))return {ok:false,message:'Specialist assessment and a treatment prognosis must be recorded first.'};
+      c.criticalDecision='unavailable';c.decisionDay=day;c.emergencyStatus='Critical Veterinary Monitoring';
+      h.medicalTimeline.push({day,conditionId:c.id,kind:'Specialist treatment unavailable',text:'The veterinarian reports a critical prognosis without the indicated specialist treatment.'});return {ok:true,message:'The critical prognosis and veterinary monitoring decision have been recorded.'};
+    }
+    return {ok:false,message:'Choose an available emergency response.'};
+  }
+  function linkUnderlying(h,conditionId,underlyingId,day){
+    const c=current(h).find(c=>c.id===conditionId),cause=current(h).find(c=>c.id===underlyingId);
+    if(!c||!cause||!definition(c).investigation||!cause.confirmed||definition(cause).investigation)return {ok:false,message:'Select a confirmed underlying diagnosis for this investigation.'};
+    c.underlyingId=cause.id;c.stage='Underlying Cause Identified';h.medicalTimeline.push({day,kind:'Investigation linked',conditionId:c.id,underlyingId:cause.id});return {ok:true};
   }
   function injuryOutcome(seed,key){const value=roll(seed,key)*114;return value<80?'none':value<94?'minor':value<107?'moderate':'major';}
   function incident(h,day,context={}) {
     if(h.deceased||current(h).length)return;
     const chance=1-Math.pow(.96,1/30),r=roll(h.healthSeed,`incident:${day}`);if(r>=chance)return;
     const severity=injuryOutcome(h.healthSeed,`severity:${day}`);(h.healthOpportunities ||= []).push({day,outcome:severity});if(severity==='none')return;
-    const eligible=Object.values(catalog).filter(d=>d.severity===severity&&(!d.minAge||h.age>=d.minAge)&&(!d.requires||context[d.requires]));
+    const eligible=Object.values(catalog).filter(d=>d.selectable!==false&&d.severity===severity&&(!d.minAge||h.age>=d.minAge)&&(!d.requires||context[d.requires]));
     const groups=[['skin',25],['hoof',20],['muscle',20],['airway',10],['digestive',10],['mouth',7],['general',8]].map(([id,weight])=>({id,weight,definitions:eligible.filter(d=>d.category===id)})).filter(g=>g.definitions.length);
     if(!groups.length)return;const group=weighted(groups,roll(h.healthSeed,`category:${day}`));
     const defs=group.definitions.map(d=>({...d,weight:d.weight*(d.vaccine&&h.vaccinations.some(v=>v.vaccine===d.vaccine&&v.nextDue>=day&&v.courseStatus==='Complete')?({influenza:.4,ehv:.65,strangles:.7}[d.id]??.75):1)}));
-    const d=weighted(defs,roll(h.healthSeed,`diagnosis:${day}`));add(h,d.id,day,{cause:d.requires||'ordinary environmental exposure'});
+    const d=weighted(defs,roll(h.healthSeed,`diagnosis:${day}`));add(h,d.id,day,{cause:d.requires||'ordinary environmental exposure',severity});
   }
-  function advance(h,targetDay,context={}) {
+  function advance(h,targetDay,context={},state) {
     ensure(h,targetDay);
     for(let day=h.healthProcessedDay+1;day<=targetDay;day++){
+      if(h.deceased){h.healthProcessedDay=day;continue;}
       for(const c of current(h)){
-        const d=definition(c),p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');
-        if((d.routine||p)&&(!d.correction||context[d.correction])&&(!d.farrier||c.farrierCare)&&(!d.medication||c.medicationSupport)){
-          c.recoveryProgress++;if(c.recoveryProgress>0)c.stage='Improving';
+        const d=definition(c);if(c.outcome==='persistent')continue;
+        if(d.investigation){const cause=h.medicalConditions.find(r=>r.id===c.underlyingId);if(cause?.resolved){c.resolved=true;c.resolvedDay=day;c.stage='Underlying Cause Managed';h.previousConditions.push(copy(c));}continue;}
+        if(c.recoveryProgress>=c.recoveryDays){c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';continue;}
+        if(c.criticalDecision==='unavailable'&&day>c.decisionDay){finish(h,c,day);if(h.deceased)break;continue;}
+        const care=careDay(state,h,c,day,context);
+        if(care.ok){
+          c.recoveryProgress++;c.stage='Improving';
+          if(c.specialistCare&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.criticalEvaluated&&c.recoveryProgress>=5){
+            c.criticalEvaluated=true;
+            const table=d.outcomesBySeverity[c.severity]||Object.values(d.outcomesBySeverity)[0];
+            const result=weighted(Object.entries(table).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`outcome:${c.id}`)).id;
+            if(result==='death'){finish(h,c,day);break;}
+            c.criticalSurvived=true;c.hospitalized=false;c.emergencyStatus='Restricted Rehabilitation';h.medicalTimeline.push({day,conditionId:c.id,kind:'Critical phase survived',text:'The critical phase has passed, although longer-term rehabilitation is still required.'});
+          }
+          if(c.observedPhases?.length)recordObservation(h,c,'health',day,'improving');
+          if((d.surgicalEscalationProbability||c.diagnosis==='colic'&&c.severity==='moderate')&&c.recoveryProgress>=c.recoveryDays&&!c.escalationChecked){
+            c.escalationChecked=true;
+            if(roll(h.healthSeed,`escalation:${c.id}`)<(d.surgicalEscalationProbability||.02)){
+              c.resolved=true;c.stage='Referred for Surgery';c.outcome='escalated';c.resolvedDay=day;h.previousConditions.push(copy(c));
+              const next=add(h,c.diagnosis==='colic'?'impaction':'surgical-colic',day,{cause:'Escalation of persistent abdominal emergency',parentEpisodeId:c.id,known:c.confirmed,confirmed:c.confirmed});
+              c.escalatedTo=next.id;h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>p.status='Referred');continue;
+            }
+          }
           if(c.recoveryProgress>=c.recoveryDays){if(d.routine)finish(h,c,day);else c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';}
         }
       }
+      for(const c of h.medicalConditions.filter(c=>c.resolved&&c.recurrenceDue&&day>=c.recurrenceDue&&!c.recurrenceChecked)){
+        const d=definition(c),eligible=(!d.requiresRecurrenceTrigger||context[d.requires]||d.correction&&!context[d.correction])&&(!['tendon','suspensory','tendon-rupture','stable-fracture'].includes(c.diagnosis)||c.returnedToWork);
+        if(!eligible){if(day>=c.recurrenceUntil)c.recurrenceChecked=true;continue;}
+        c.recurrenceChecked=true;
+        const probability=d.correction&&!context[d.correction]?d.recurrenceIfCausePersists:d.recurrence??d.recurrenceProbabilityBySeverity[c.severity]??d.recurrenceProbability;
+        if(roll(h.healthSeed,`recurrence:${c.id}`)<probability&&!current(h).some(r=>r.diagnosis===c.diagnosis))add(h,c.diagnosis,day,{cause:'Linked recurrence of previous episode',parentEpisodeId:c.id,severity:c.severity});
+      }
       h.hoofHealth.growth+=.15;
       if(day>h.hoofHealth.nextDue+14&&roll(h.healthSeed,`hoof:${day}`)<.02)h.hoofHealth.condition=bounded(h.hoofHealth.condition-1,0,100);
-      incident(h,day,{...context,shod:h.hoofHealth.shoes!=='barefoot',overdueHooves:day>h.hoofHealth.nextDue+21});
-      h.healthProcessedDay=day;
+      incident(h,day,{...context,shod:h.hoofHealth.shoes!=='barefoot',overdueHooves:day>h.hoofHealth.nextDue+21});h.healthProcessedDay=day;
     }
   }
   function cooperation(h,farrier=false,tension=0) {
@@ -255,6 +545,6 @@
     const c=add(h,id,day,{cause:id==='rub'?'Pre-sale tack discomfort':'Persistent pre-sale health history',severity});
     h.preSaleHealthProfile.conditionId=c.id;return h.preSaleHealthProfile;
   }
-  root.HorseHealth={seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
+  root.HorseHealth={serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
   if(typeof module!=='undefined')module.exports=root.HorseHealth;
 })(globalThis);
