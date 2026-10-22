@@ -123,3 +123,11 @@ Normal training skills display whole numbers and each genuinely earned normal sk
 ### Ridden exercise availability restoration
 
 Ridden catalogs remain visible when an exercise is temporarily locked by equipment, health, fatigue or education. Locks show their reasons instead of emptying the list. If lunging equipment is still equipped, use Remove Lunging Equipment for Riding. Groundwork/Lunging retain their combined pool; ridden disciplines, Polework and Mixed have ridden choices. Existing progression and no-monthly-cap behavior are preserved. See `RIDDEN-EXERCISE-RESTORATION.md`.
+
+### Auto-Training repair
+
+Scheduled Auto entries run at 09:00 when time advances. Weekly Training Schedule → Auto-Training Reports shows actual gains, stamina consumed and reasons for postponed/skipped work. Auto and manual training share each horse's existing daily session allowance and recovery; no monthly skill cap applies. See `AUTO-TRAINING-FIX.md` for the audited limits and validation.
+
+### Current training horse selection
+
+Training always resolves the selected horse against the current owned roster. Stale saved selections are repaired, and temporary health/stamina restrictions show reasons instead of hiding owned horses. Optional current-barn lesson horses are labeled separately. The combined download retains the shared-stamina Auto-Training fix and no monthly progression cap. See `TRAINING-ROSTER-AUTO-VALIDATION.md`.

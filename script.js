@@ -5551,6 +5551,8 @@ function createHorseCard(horse) {
       }
       if (action === 'save-auto-focus') {
         horse.autoTrainingFocus = node.querySelector('.auto-focus')?.value || '';
+        if(horse.training2){horse.training2.scheduleEdited=false;delete horse.training2.importedAutoFocus;}
+        if(typeof t2importLegacySchedule==='function')t2importLegacySchedule(horse);
       }
       if (action === 'toggle-auto-stall') horse.autoStallCleaning = !horse.autoStallCleaning;
       if (action === 'toggle-auto-groom') horse.autoGrooming = !horse.autoGrooming;
@@ -7622,7 +7624,7 @@ function renderTraining() {
   }
 
   const trainingScope = ['private', 'lesson', 'both'].includes(app.trainingHorseScope) ? app.trainingHorseScope : 'both';
-  const privateTrainingHorses = app.horses.filter((h) => !h.retiredForever);
+  const privateTrainingHorses = app.horses.filter((h) => !h.deceased && !h.sold && !h.rehomed);
   const lessonTrainingHorses = currentBarnLessonHorses();
   const trainingPool = trainingScope === 'private'
     ? privateTrainingHorses
@@ -7639,7 +7641,6 @@ function renderTraining() {
       <select id='train-horse-scope'>
         <option value='both' ${trainingScope === 'both' ? 'selected' : ''}>Both private + lesson horses</option>
         <option value='private' ${trainingScope === 'private' ? 'selected' : ''}>Private horses only</option>
-        <option value='lesson' ${trainingScope === 'lesson' ? 'selected' : ''}>Lesson horses only</option>
       </select>
       <p class='small'>Choose whether training includes your stable horses, lesson horses, or both.</p>
     </div>
