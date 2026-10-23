@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 function game() {
   const dummy = new Proxy(function(){},{get(t,k){if(['style','classList','dataset'].includes(k))return dummy;if(k==='value')return '';if(k==='querySelectorAll')return ()=>[];return ()=>{};}});
-  const context=vm.createContext({console, document:{readyState:'loading',addEventListener(){},getElementById(){return dummy},querySelectorAll(){return []}},localStorage:{getItem(){return null},setItem(){}},window:{addEventListener(){}},alert(m){throw Error(m)},setTimeout(){},clearTimeout(){}});
+  const context=vm.createContext({console, document:{createElement(){return dummy},readyState:'loading',addEventListener(){},getElementById(){return dummy},querySelectorAll(){return []}},localStorage:{data:{},getItem(k){return this.data[k]??null},setItem(k,v){this.data[k]=String(v)},removeItem(k){delete this.data[k]}},window:{addEventListener(){}},alert(m){throw Error(m)},setTimeout(){},clearTimeout(){}});
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
   for(const match of html.matchAll(/<script src="([^?]+)\?/g))vm.runInContext(fs.readFileSync(path.join(root,match[1]),'utf8'),context,{filename:match[1]});
   return context;
@@ -60,12 +60,12 @@ test('friends reduce and enemies increase one combined fight hazard; personality
  r.score=0;a.personality='Hot-Blooded';const risk=pastureFightRisk(a,b,r,p,2);check(Math.abs(1-Math.pow(1-risk,8)-.06)<1e-10,'personality not six percent');
  a.gender=b.gender='Stallion';const stallion=pastureFightRisk(a,b,r,p,2);check(stallion>risk,'stallion fighting removed');check(PASTURE_PERSONALITY_FIGHT_RISK===.06,'wrong modifier');
 `);
-test('at most one serious fight per pair/day; reciprocal logs, injury and stall rest',fixture+`
+test('at most one serious fight per pair/day; reciprocal logs and persistent undiagnosed injury',fixture+`
  const {a,b,state,p,start}=setup(30,'Hot-Blooded','Stallion');const r=getPasturePair(a,b,p,start+8);const c={a,b,rel:r,p,hour:start+8,group:[a,b]};
  const savedRandom=pastureRandom;pastureRandom=()=>.01;HorseHealth.injuryOutcome=()=> 'minor';const e=applyPastureEvent(PASTURE_EVENT_LIBRARY[45],c,{serious:true});
  check(Boolean(e),'fight not generated');check(applyPastureEvent(PASTURE_EVENT_LIBRARY[45],c,{serious:true})===null,'duplicate daily fight');
- check(a.pastureImportantIds.includes(e.id)&&b.pastureImportantIds.includes(e.id),'not linked');check(a.vetNotes.length&&a.illnesses.some(i=>i.active),'no veterinary injury');check(!pastureMedicalEligible(a),'injured horse still eligible');
- a.illnesses.forEach(i=>i.active=false);b.illnesses.forEach(i=>i.active=false);c.hour+=24;applyPastureEvent(PASTURE_EVENT_LIBRARY[45],c,{serious:true});
+ check(a.pastureImportantIds.includes(e.id)&&b.pastureImportantIds.includes(e.id),'not linked');check(a.vetNotes.length&&HorseHealth.current(a).length>0,'no veterinary injury');check(HorseHealth.current(a).every(c=>!c.confirmed),'fight invented a diagnosis');
+ a.medicalConditions.forEach(c=>c.resolved=true);b.medicalConditions.forEach(c=>c.resolved=true);csSync(a);csSync(b);c.hour+=24;applyPastureEvent(PASTURE_EVENT_LIBRARY[45],c,{serious:true});
  trainerNotesForHorse(a);check(a.trainerNotes.some(n=>n.includes('serious fights')&&n.includes('Consider separating')),'repeated fight warning');pastureRandom=savedRandom;
 `);
 test('retired, breeding-retired, elderly and unrideable horses still turn out',fixture+`

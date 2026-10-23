@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 function game() {
   const dummy = new Proxy(function(){},{get(t,k){if(['style','classList','dataset'].includes(k))return dummy;if(k==='value')return '';if(k==='querySelectorAll')return ()=>[];return ()=>{};}});
-  const context=vm.createContext({console, document:{readyState:'loading',addEventListener(){},getElementById(){return dummy},querySelectorAll(){return []}},localStorage:{getItem(){return null},setItem(){}},window:{addEventListener(){}},alert(m){throw Error(m)},setTimeout(){},clearTimeout(){}});
+  const context=vm.createContext({console, document:{createElement(){return dummy},readyState:'loading',addEventListener(){},getElementById(){return dummy},querySelectorAll(){return []}},localStorage:{data:{},getItem(k){return this.data[k]??null},setItem(k,v){this.data[k]=String(v)},removeItem(k){delete this.data[k]}},window:{addEventListener(){}},alert(m){throw Error(m)},setTimeout(){},clearTimeout(){}});
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
   for(const match of html.matchAll(/<script src="([^?]+)\?/g))vm.runInContext(fs.readFileSync(path.join(root,match[1]),'utf8'),context,{filename:match[1]});
   return context;

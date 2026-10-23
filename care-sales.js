@@ -6,12 +6,12 @@ function csDay(){return Math.floor((typeof careSimulationHour==='number'?careSim
 function csId(prefix){app.careSequence=(app.careSequence||0)+1;return `${prefix}:${app.careSequence}`;}
 function csEscape(value){return mgEscape(String(value??''));}
 function csOptions(values,current){return values.map(v=>`<option value="${csEscape(v)}" ${v===current?'selected':''}>${csEscape(v)}</option>`).join('');}
-function csHorses(){return [...new Map([...(app.saleBarn||[]),...(app.npcSales||[]),...(app.sales2?.listings||[]).filter(l=>!['Complete','Cancelled','Sold Elsewhere'].includes(l.status)).map(l=>l.horse),...app.horses].filter(Boolean).map(h=>[h.id,h])).values()];}
+function csHorses(){return [...new Map([...(app.saleBarn||[]),...(app.npcSales||[]),...(app.sales2?.listings||[]).filter(l=>!['Complete','Cancelled','Sold Elsewhere','Sold','Withdrawn'].includes(l.status)).map(l=>l.horse),...app.horses].filter(Boolean).map(h=>[h.id,h])).values()];}
 function csEnsure(h,day=csDay()){HorseHealth.ensure(h,day);return h;}
 function csSync(h){
   csEnsure(h);
   // Only severe restrictions project into old global blockers. Hidden diagnosis names never do.
-  h.illnesses=h.medicalConditions.filter(c=>c.confirmed||!c.resolved&&HorseHealth.definition(c).restriction==='all').map(c=>({medicalId:c.id,name:c.confirmed?HorseHealth.definition(c).name:'Health concern requiring veterinary assessment',active:!c.resolved&&HorseHealth.definition(c).restriction==='all',hidden:!c.confirmed,severity:c.severity,remaining:0,impact:c.resolved?0:c.severity==='major'?8:3}));
+  h.illnesses=h.medicalConditions.filter(c=>c.confirmed).map(c=>({medicalId:c.id,name:c.confirmed?HorseHealth.definition(c).name:'Health concern requiring veterinary assessment',active:!c.resolved&&HorseHealth.definition(c).restriction==='all',hidden:!c.confirmed,severity:c.severity,remaining:0,impact:c.resolved?0:c.severity==='major'?8:3}));
   h.due ||= {};h.due.farrier=csDay()>h.hoofHealth.nextDue;h.hoofCare=h.hoofHealth.condition;
 }
 function csMigrate(data){
@@ -60,7 +60,7 @@ monthlyProgress=function(...args){const result=CS_MONTH(...args);csHorses().forE
 const CS_ELIGIBILITY=t2eligibility;
 t2eligibility=function(h,e,setup={},session){if(h&&e){csEnsure(h);const error=HorseHealth.allowed(h,e.category==='Jumping'?'jump':e.id.startsWith('lunge-')?'lunge':e.category==='Groundwork'?'handling':'ridden',e.intensity);if(error)return error;if((session||t2state().session)?.saleTrial&&e.category==='Jumping'&&Number(setup.height??.5)>(session||t2state().session).saleTrial.maxHeight)return 'The seller limits the trial to the agreed safe schooling height.';}return CS_ELIGIBILITY(h,e,setup,session);};
 const CS_ATTEMPT=t2attempt;
-t2attempt=function(h,s){const result=CS_ATTEMPT(h,s);if(!result.blocked){const e=t2exercise(s.exerciseId),context=e.category==='Jumping'?'jump':e.id==='hoof'?'hooves':/circle|serpentine/.test(e.id)?'circle':e.category==='Groundwork'?'walk':'trot';for(const o of HorseHealth.observe(csEnsure(h),context,csDay(),`${s.id}:${s.attempts}`))s.log.push({kind:'Observation',text:o.text,elapsed:s.elapsed});}return result;};
+t2attempt=function(h,s){const result=CS_ATTEMPT(h,s);if(!result.blocked){const e=t2exercise(s.exerciseId);HorseHealth.workExposure(csEnsure(h),e.category==='Groundwork'?'handling':e.category==='Jumping'?'jump':e.id.startsWith('lunge-')?'lunge':'ridden',e.intensity,csDay(),`${s.id}:${s.attempts}`);const context=e.category==='Jumping'?'jump':e.id==='hoof'?'hooves':/circle|serpentine/.test(e.id)?'circle':e.category==='Groundwork'?'walk':'trot';for(const o of HorseHealth.observe(csEnsure(h),context,csDay(),`${s.id}:${s.attempts}`))s.log.push({kind:'Observation',text:o.text,elapsed:s.elapsed});}return result;};
 const CS_FINISH=t2finish;
 t2finish=function(h,s){const result=CS_FINISH(h,s);if(!s.carePostChecked){s.carePostChecked=true;const observations=HorseHealth.observe(csEnsure(h),'post',csDay(),s.id);result.notes.push(...observations.map(o=>o.text));if(s.saleTrial){const tx=HorseSales.state(app).transactions.find(t=>t.id===s.saleTrial.transactionId);if(tx){tx.trial=true;tx.status='Trial Completed';tx.trialNotes=result.exercises.map(e=>({name:e.name,result:e.result,text:e.text}));}}}return result;};
 const CS_FIND_HORSE=t2findHorse;
