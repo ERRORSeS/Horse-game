@@ -3810,7 +3810,7 @@ function requiredBehaviorForRiding(horse) {
 }
 
 function canRideUnderSaddle(horse) {
-  if (!horse || horse.unridable) return false;
+  if (!horse || horse.deceased) return false;
   const required = requiredBehaviorForRiding(horse);
   return (horse.behavior || 0) >= required;
 }
@@ -3999,7 +3999,7 @@ function canCompeteUnderSaddle(horse) {
   if (horse?.isLessonHorse && !horse?.barnAvailable) return false;
   const pregnancy = pregnancyStage(horse);
   const hasActiveIllness = (horse?.illnesses || []).some((i) => i.active);
-  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete && !hasActiveIllness;
+  return horse.age >= 3 && canRideUnderSaddle(horse) && !horse.retiredToBreeding && !horse.retiredForever && pregnancy.canCompete;
 }
 
 function horseLifeStage(horse) {

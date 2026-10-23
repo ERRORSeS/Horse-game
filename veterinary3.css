@@ -1,0 +1,19 @@
+#vet .v3-clinic{background:linear-gradient(140deg,#203b40,#142b30);border:1px solid #416065;border-radius:20px;padding:clamp(18px,3vw,28px);box-shadow:0 10px 28px #07191c33;margin-block:18px}
+#vet .v3-clinic h3{font-size:1.35rem;margin:4px 0 20px;letter-spacing:-.025em}
+#vet .v3-clinic .shop-eyebrow{color:#9dc6b5;letter-spacing:.14em;font-size:.7rem;font-weight:700;margin:0 0 8px}
+#vet .v3-clinic select{width:100%;min-height:48px;border-radius:12px;background:#10262b;border:1px solid #567a7c;color:#edf7f4;padding:12px;box-sizing:border-box}
+#vet .v3-clinic label{font-weight:600;color:#c6dad5}
+#vet .v3-answer{background:#11282d;border:1px solid #38565b;border-radius:14px;padding:18px;margin:16px 0;line-height:1.6}
+#vet .v3-answer[hidden]{display:none}
+#vet .v3-condition,#vet .v3-services details{background:#11282d66;border:1px solid #38565b;border-radius:12px;padding:14px 16px;margin:14px 0 0}
+#vet .v3-clinic summary{cursor:pointer;font-weight:650;line-height:1.5;min-height:24px}
+#vet .v3-clinic button{min-height:44px;border-radius:11px;border:1px solid #628a80;background:#31594f;padding:10px 16px}
+#vet .v3-clinic :is(select,button,summary,input):focus-visible{outline:3px solid #b2dfca;outline-offset:3px}
+#vet .v3-workload{margin:0}
+#vet .v3-workload>div{display:grid;grid-template-columns:minmax(130px,1fr) 2fr;gap:14px;padding:12px 0;border-bottom:1px solid #365258}
+#vet .v3-workload dt{font-weight:650}
+#vet .v3-workload dd{margin:0}
+#vet .v3-workload dd strong{display:block;color:#b5d8c7}
+#vet .v3-workload dd span{display:block;font-size:.85rem;color:#b8cbc8;margin-top:4px}
+#vet .v3-services h4{margin:20px 0 12px}
+@media(max-width:600px){#vet .v3-workload>div{grid-template-columns:1fr;gap:4px}#vet .v3-clinic{border-radius:15px;padding:18px}#vet .v3-clinic h3{font-size:1.2rem}}

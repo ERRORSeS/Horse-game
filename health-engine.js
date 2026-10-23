@@ -123,7 +123,7 @@
   };
   const supplies = Object.fromEntries([['Sterile Gauze',12],['Non-Adherent Dressing',15],['Cohesive Bandage',10],['Cotton Padding',14],['Saline Rinse',9],['Digital Thermometer',20],['Disposable Gloves',8],['Clean Towels',7],['Hoof Pick',8],['Hoof Brush',9],['Routine Hoof Dressing',22],['Horse-Safe Shampoo',18],['Fly Mask',25],['Fly Sheet',70],['Cooling Wraps',45],['First-Aid Box',35],['Treatment Folder',12]].map(([name,price])=>[name,{name,price,kind:'supply'}]));
   const medicines = Object.fromEntries([['Phenylbutazone',45],['Flunixin',65],['Firocoxib',95],['Omeprazole',120],['Sucralfate',85],['Trimethoprim–Sulfadiazine',75],['Penicillin G veterinary package',110],['Ceftiofur',125],['Dexamethasone',50],['Ivermectin package',28],['Moxidectin',38],['Praziquantel',35],['Electrolytes',25],['Antiseptic',22]].map(([name,price])=>[name,{name,price,kind:'medicine'}]));
-  for(const [name,price] of [['Non-Sterile Examination Gloves',6],['Veterinary Antiseptic Product',22],['Equine Digital Thermometer Case',6],['Bandage Storage Set',18],['Fly Repellent (Equine)',20],['Soft Hoof-Care Cloth',7]])supplies[name] ||= {name,price,kind:'supply'};
+  for(const [name,price] of [['Thermometer',20],['Cotton Padding Roll',14],['Oral Electrolyte Product',25],['Non-Sterile Examination Gloves',6],['Veterinary Antiseptic Product',22],['Equine Digital Thermometer Case',6],['Bandage Storage Set',18],['Fly Repellent (Equine)',20],['Soft Hoof-Care Cloth',7]])supplies[name] ||= {name,price,kind:'supply'};
   medicines['Prescription Eye Medication Package']={name:'Prescription Eye Medication Package',price:70,kind:'medicine'};
   catalog.cornea.medication='Prescription Eye Medication Package';
   const services={hospital:['Hospital Admission',400],hospitalDay:['Hospital Daily Care',150],specialist:['Specialist Consultation',600],fluids:['Hospital Fluid Therapy Service',180],colic:['Emergency Colic Treatment Service',350],wound:['Routine Wound Treatment Service',80],dental:['Dental Treatment Package',100],tendon:['Tendon Surgery Package',4000],fracture:['Fracture Surgery Package',6000],surgery:['Surgical Colic Package',4000],critical:['Critical Colic Surgery Package',7000]};
@@ -187,33 +187,58 @@
   function allowed(h, activity, intensity=1) {
     ensure(h);
     if(h.deceased)return 'This horse is deceased; its history is preserved.';
-    if(h.medicalConditions.some(c=>c.confirmed&&(c.outcome==='persistent'&&c.functionalOutcome!=='stable'||c.sportRestriction==='non-sport'))&&['jump','ridden','lunge','competition'].includes(activity))return 'A persistent condition requires an individually cleared workload.';
-    if (['jump','ridden','lunge','competition'].includes(activity) && ['Very Underweight'].includes(h.weightStatus)) return 'The current body condition requires stabilization before this activity.';
-    if(['jump','ridden','lunge','competition'].includes(activity)&&current(h).some(c=>c.confirmed&&['muscle','hoof'].includes(definition(c).category)))return 'Movement discomfort requires veterinary assessment and clearance before ridden work, jumping or lunging.';
-    if(activity==='handling')return '';
-    for (const c of current(h).filter(c=>c.confirmed)) { const d=definition(c); if (d.restriction==='all' && (!c.resolved)) return 'A health concern requires professional assessment and rest before this activity.'; if ((d.restriction==='demanding' && intensity>=2||d.restriction==='high'&&intensity>=3)) return 'Demanding work is restricted pending veterinary review.'; }
-    if (h.medicalConditions.some(c=>c.confirmed&&c.residual) && intensity>=3) return 'The documented residual limitation requires an adjusted workload.';
     return '';
   }
-  function workExposure(h,activity,intensity,day,eventId) {
-    ensure(h);if(allowed(h,activity,intensity))return {ok:false,blocked:true};
-    if(!['jump','ridden','lunge','competition'].includes(activity))return {ok:true,affected:[]};
-    const affected=[];
-    for(const c of current(h)){
-      const d=definition(c);if(!d.restriction&&!d.correction)continue;
-      c.workEvents ||= [];if(c.workEvents.includes(eventId))continue;c.workEvents.push(eventId);
-      c.workAggravation=(c.workAggravation||0)+Math.max(1,Number(intensity)||1);
-      c.workRecoveryBaseline ||= c.recoveryDays;
-      if(c.workAggravation>=6*(1+(c.workEscalations||0))){
-        const next={minor:'moderate',moderate:'major'}[c.severity];
-        if(next&&d.eligibleSeverityLevels.includes(next)){c.severity=next;c.workEscalations=(c.workEscalations||0)+1;c.recoveryDays=Math.max(c.recoveryDays,(d.recoveryDurationBySeverity[next]||d.days)[0]);c.workRecoveryBaseline=c.recoveryDays;}
+  function workloadAdvice(h,activity,intensity=1) {
+    ensure(h);
+    return current(h).map(c=>{
+      const d=definition(c),load=Math.max(0,Number(intensity)||0);
+      let level=0;
+      if(load>0){
+        if(activity==='handling')level=d.emergency?3:['muscle','hoof'].includes(d.category)?1:0;
+        else if(d.category==='skin')level=d.correction&&activity==='ridden'?2:d.id==='scratch'?0:load>=3?1:0;
+        else if(d.restriction==='all')level=3;
+        else if(['muscle','hoof'].includes(d.category))level=activity==='jump'?3:activity==='lunge'?2:load>=2?2:1;
+        else level=load>=3?3:load>=2?2:0;
       }
-      c.recoveryProgress=Math.max(0,c.recoveryProgress-1);
-      c.recoveryDays=Math.min(Math.ceil(c.workRecoveryBaseline*1.5),c.recoveryDays+1);
-      c.stage='Active';affected.push(c.id);
-      h.medicalTimeline.push({day,kind:'Work aggravated an existing concern',conditionId:c.id,eventId});
+      if(c.stage==='Awaiting Follow-Up'&&!d.emergency)level=Math.max(0,level-1);
+      const status=['Recommended','Acceptable with Caution','Not Recommended','Strongly Advised Against'][level];
+      return {conditionId:c.id,level,status,reason:c.confirmed?`${d.name}: ${d.validTreatments.join(' ')}`:'Recent observations raise a possible health concern.'};
+    });
+  }
+  function workExposure(h,activity,intensity,day,eventId) {
+    ensure(h);if(h.deceased)return {ok:false,blocked:true};
+    const affected=[],events=[];
+    for(const advice of workloadAdvice(h,activity,intensity)){
+      const c=current(h).find(c=>c.id===advice.conditionId);
+      c.workEvents ||= [];if(c.workEvents.includes(eventId))continue;c.workEvents.push(eventId);
+      c.workloadHistory ||= [];c.workloadHistory.push({day,eventId,activity,intensity,status:advice.status});
+      if(!advice.level)continue;
+      const recent=c.workloadHistory.filter(r=>r.day>=day-7&&r.status!=='Recommended').length;
+      const base=[0,.02,.08,.20][advice.level];
+      const risk=Math.min([0,.03,.12,.30][advice.level],base*(c.severity==='major'?1.3:c.severity==='moderate'?1.1:1)*(1+Math.min(5,recent-1)*.08));
+      if(roll(h.healthSeed,`work:${c.id}:${eventId}`)>=risk)continue;
+      const outcome=roll(h.healthSeed,`work-outcome:${c.id}:${eventId}`),delay=outcome<(advice.level<3?.65:.40)?0:outcome<.90?1+Math.floor(roll(h.healthSeed,`delay:${eventId}`)*3):4+Math.floor(roll(h.healthSeed,`delay:${eventId}`)*11);
+      c.discomfort=(c.discomfort||0)+1;
+      const severePathway={'unstable-fracture':'Fracture instability','tendon-rupture':'Loss of tendon support','critical-colic':'Critical abdominal deterioration','surgical-colic':'Post-operative abdominal complication',heat:'Exertional heat deterioration'}[c.diagnosis];
+      if(severePathway&&advice.level===3&&intensity>=3&&outcome>=.70){
+        c.complications ||= [];c.complications.push({day,eventId,kind:severePathway,requiresEmergencyAssessment:true});
+        c.emergencyStatus='Urgent Reassessment Required';c.recoveryProgress=Math.max(0,c.recoveryProgress-7);
+        events.push(c.confirmed?`${definition(c).name}: ${severePathway}. Urgent veterinary reassessment is required.`:'The horse shows serious deterioration. Urgent veterinary assessment is required.');
+        // Terminal outcomes remain owned by the existing diagnosis-specific emergency engine.
+      }
+
+      if(outcome>=.90&&advice.level>=2){
+        const d=definition(c),next={minor:'moderate',moderate:'major'}[c.severity];
+        if(next&&d.eligibleSeverityLevels.includes(next)){c.severity=next;c.reinjuries ||= [];c.reinjuries.push({day,eventId,activity});c.recoveryDays=Math.max(c.recoveryDays,(d.recoveryDurationBySeverity[next]||d.days)[0]);}
+        if(outcome>=.95&&['tendon','suspensory','tendon-rupture','stable-fracture','unstable-fracture'].includes(d.id)){c.complications ||= [];c.complications.push({day,eventId,kind:'Reinjury requires veterinary reassessment'});if((c.reinjuries?.length||0)>=3)c.residual=true;}
+      }
+      if(delay){const p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(p){p.forecastHistory ||= [];p.forecastHistory.push({day,previous:p.estimatedRecovery,reason:'Workload setback'});p.estimatedRecovery=(p.estimatedRecovery||[c.recoveryDays,c.recoveryDays]).map(n=>n+delay);}c.recoveryDays+=delay;c.setbacks ||= [];c.setbacks.push({day,eventId,delay});c.stage='Active';}
+      const activePlan=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(activePlan){activePlan.adviceHistory ||= [];activePlan.adviceHistory.push({day,eventId,activity,previous:advice.status,current:workloadAdvice(h,activity,intensity).find(a=>a.conditionId===c.id)?.status,reason:'Actual workload response'});}
+      const text=delay?'The recovery estimate has been extended after the recent setback.':`${h.name} appears more uncomfortable following the demanding exercise.`;
+      affected.push(c.id);events.push(text);h.medicalTimeline.push({day,kind:'Medical workload response',conditionId:c.id,eventId,text,delay});
     }
-    return {ok:true,affected};
+    return {ok:true,affected,events};
   }
   function narrative(h,c,phase){
     const d=definition(c),templates=d.narrativeTemplates||[];
@@ -299,7 +324,7 @@
   function plan(h, conditionId, day) {
     const c=current(h).find(c=>c.id===conditionId&&c.confirmed);if(!c)return {ok:false,message:'A confirmed relevant diagnosis is required.'};
     let p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(p){issuePrescription(h,c,day);return {ok:true,plan:p};}
-    const d=definition(c);p={id:`plan:${c.id}`,conditionId:c.id,day,followup:day+Math.min(14,c.recoveryDays),status:'Active',restrictions:d.restriction,care:d.routine?'Routine care and monitoring':'Veterinary-directed care, monitoring and reassessment',supplies:[...d.requiredSupplies],scheduled:true};
+    const d=definition(c);p={horseId:h.id,severity:c.severity,assignedVeterinarian:'Stable veterinarian',estimatedRecovery:[Math.max(1,Math.floor(c.recoveryDays*.8)),Math.ceil(c.recoveryDays*1.3)],adviceHistory:[],forecastHistory:[],id:`plan:${c.id}`,conditionId:c.id,day,followup:day+Math.min(14,c.recoveryDays),status:'Active',restrictions:d.restriction,care:d.routine?'Routine care and monitoring':'Veterinary-directed care, monitoring and reassessment',supplies:[...d.requiredSupplies],scheduled:true};
     c.treatmentStarted=day;c.courseDaysRemaining=c.recoveryDays-c.recoveryProgress;h.rehabilitationPlans.push(p);h.medicalRestrictions.push({conditionId:c.id,activity:d.restriction,from:day});
     issuePrescription(h,c,day);
     return {ok:true,plan:p};
@@ -308,7 +333,7 @@
     const d=definition(c);if(!d.medication||c.resolved||c.recoveryProgress>=c.recoveryDays||c.medicationCourse?.remainingDays>0)return;
     if(h.prescriptions.some(rx=>rx.conditionId===c.id&&rx.item===d.medication&&rx.expires>=day&&rx.used<rx.quantity))return;
     const prior=h.prescriptions.filter(rx=>rx.conditionId===c.id).length;
-    h.prescriptions.push({id:`rx:${c.id}${prior?':'+prior:''}`,horseId:h.id,conditionId:c.id,item:d.medication,quantity:1,dispensed:0,used:0,issued:day,expires:day+14,competitionHoldUntil:day+Math.max(7,c.recoveryDays-c.recoveryProgress),professionalOnly:/Penicillin|Ceftiofur|Flunixin|Dexamethasone/.test(d.medication)});
+    h.prescriptions.push({id:`rx:${c.id}${prior?':'+prior:''}`,horseId:h.id,conditionId:c.id,medicationId:d.medication,indication:d.name,courseState:'Issued',nextReview:day+7,authorizedTreatmentUnits:Math.max(1,c.recoveryDays-c.recoveryProgress),item:d.medication,quantity:1,dispensed:0,used:0,issued:day,expires:day+14,competitionHoldUntil:day+Math.max(7,c.recoveryDays-c.recoveryProgress),professionalOnly:/Penicillin|Ceftiofur|Flunixin|Dexamethasone/.test(d.medication)});
   }
   function purchase(state,h,item,quantity,day,eventId,rxId) {
     const store=state.careEconomy ||= {receipts:[],inventory:[],operations:{}};
@@ -317,7 +342,7 @@
     const rx=h?.prescriptions.find(r=>r.id===rxId);
     if(product.kind==='medicine'&&(!rx||rx.horseId!==h.id||rx.item!==item||rx.expires<day||quantity>rx.quantity-rx.dispensed||!current(h).some(c=>c.id===rx.conditionId)))return {ok:false,message:'A valid matching prescription for this horse and quantity is required.'};
     const receipt=ledger(state,`shop:${eventId}`,product.price*quantity,day,h,[{name:item,quantity,unitPrice:product.price}],{prescription:rxId||null});if(!receipt)return {ok:false,message:'Insufficient funds.'};
-    store.inventory.push({id:`stock:${receipt.number}`,item,kind:product.kind,quantity,horseId:product.kind==='medicine'?h.id:null,prescription:rxId||null});if(rx)rx.dispensed+=quantity;
+    store.inventory.push({id:`stock:${receipt.number}`,item,kind:product.kind,quantity,horseId:product.kind==='medicine'?h.id:null,prescription:rxId||null});if(rx){rx.dispensed+=quantity;rx.courseState='Dispensed';}
     return {ok:true,receipt};
   }
   function administer(state,h,rxId,day,eventId) {
@@ -325,9 +350,12 @@
     const store=state.careEconomy ||= {receipts:[],inventory:[],operations:{}};if(store.operations[key])return {ok:true};
     const item=store.inventory.find(i=>i.prescription===rxId&&i.horseId===h.id&&i.quantity>0);
     const c=current(h).find(c=>c.id===rx?.conditionId);
+    if(rx&&rx.horseId!==h.id)return {ok:false,message:'This prescription was issued for a different horse.'};
+    if(!rx)return {ok:false,message:'This medication requires an active veterinary prescription.'};
     if(!rx||!c||!item||rx.expires<day||rx.used>=rx.quantity)return {ok:false,message:'A current condition, valid prescription and dispensed package are required.'};
+    const nsaids=['Phenylbutazone','Flunixin Meglumine','Firocoxib'];if(nsaids.includes(rx.item)&&current(h).some(other=>other.id!==c.id&&other.medicationCourse?.remainingDays>0&&h.prescriptions.some(r=>r.id===other.medicationCourse.rxId&&nsaids.includes(r.item))))return {ok:false,message:'An active NSAID course requires veterinary review before another NSAID can be prepared.'};
     // Packages represent a professional-authorized game course, never a dose.
-    item.quantity--;rx.used++;c.medicationSupport=true;c.medicationCourse={rxId,remainingDays:Math.max(1,c.recoveryDays-c.recoveryProgress),started:day};store.operations[key]=true;
+    item.quantity--;rx.used++;rx.courseState='Prepared';c.medicationSupport=true;c.medicationCourse={rxId,remainingDays:Math.max(1,c.recoveryDays-c.recoveryProgress),started:day};store.operations[key]=true;
     h.medicalTimeline.push({day,kind:'Medication course recorded',conditionId:c.id,item:rx.item,professional:rx.professionalOnly});return {ok:true};
   }
   function finish(h,c,day) {
@@ -359,10 +387,21 @@
     h.rehabilitationPlans.filter(p=>p.conditionId===c.id).forEach(p=>p.status=result==='persistent'?'Ongoing Management':'Completed');
   }
   function lamenessGrade(h){return Math.max(0,...current(h).filter(c=>definition(c).category==='muscle'||definition(c).category==='hoof').map(c=>['tendon-rupture','unstable-fracture'].includes(c.diagnosis)?5:c.severity==='major'?4:c.severity==='moderate'?3:1));}
+  function completeCare(state,h,conditionId,day,selected=[],context={}){
+    ensure(h);const c=current(h).find(c=>c.id===conditionId&&c.confirmed),p=h.rehabilitationPlans.find(p=>p.conditionId===conditionId&&p.status==='Active');
+    if(!c||!p)return {ok:false,message:'A confirmed relevant diagnosis and active treatment plan are required.'};
+    if(c.careLog?.some(r=>r.day===day&&r.ok))return {ok:false,message:"Today's scheduled care has already been completed."};
+    if(selected.some(item=>!p.supplies.includes(item)))return {ok:false,message:'This item is not appropriate for the current treatment plan.'};
+    if(p.supplies.some(item=>!selected.includes(item)))return {ok:false,message:'Required supplies are missing. Purchase the prescribed items before completing this treatment.'};
+    const result=careDay(state,h,c,day,{...context,playerCompleted:true});return {...result,message:result.ok?'Scheduled care completed.':result.reason.includes('supplies')?'Required supplies are missing. Purchase the prescribed items before completing this treatment.':result.reason};
+  }
   function careDay(state,h,c,day,context={}){
     const d=definition(c),p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');
-    c.careLog ||= [];const old=c.careLog.find(r=>r.day===day);if(old)return old;
+    c.careLog ||= [];const old=c.careLog.find(r=>r.day===day&&r.ok);if(old)return old;
+    if(context.playerCompleted)c.careLog=c.careLog.filter(r=>r.day!==day);
     if(!p)return {day,ok:false,reason:'No active authorized care plan'};
+    if(!context.playerCompleted&&c.hospitalized&&c.specialistCare)context={...context,playerCompleted:true};
+    if(!context.playerCompleted){const existing=c.careLog.find(r=>r.day===day);if(existing)return existing;const r={day,ok:false,reason:'Scheduled care was not completed by the player'};c.careLog.push(r);h.medicalTimeline.push({day,conditionId:c.id,planId:p.id,kind:'Missed treatment task',reason:r.reason});return r;}
     const missing=[];
     if(d.correction&&!context[d.correction])missing.push('Contributing cause requires correction');
     if(d.farrier&&!c.farrierCare)missing.push('Farrier care is required');
@@ -374,7 +413,7 @@
     if(d.category==='mouth'&&['dental','oral'].includes(d.id)&&!c.services?.some(r=>r.service==='dental'))missing.push('Professional dental treatment is required');
     if(c.hospitalized&&!missing.length&&!ledger(state,`hospital-daily:${h.id}:${day}`,services.hospitalDay[1],day,h,[{name:services.hospitalDay[0],quantity:1,unitPrice:services.hospitalDay[1]}]))missing.push('Hospital daily care could not be paid');
     const r={day,ok:!missing.length,reason:missing.join('; ')};c.careLog.push(r);
-    if(r.ok){stock.forEach(i=>i.quantity--);if(c.medicationCourse)c.medicationCourse.remainingDays--;c.courseDaysRemaining=Math.max(0,(c.courseDaysRemaining??c.recoveryDays)-1);}
+    if(r.ok){stock.forEach(i=>{if(!['Digital Thermometer','Hoof Pick','Hoof Brush','Fly Mask','Fly Sheet','First-Aid Box','Treatment Folder','Cooling Wraps'].includes(i.item))i.quantity--;});if(c.medicationCourse)c.medicationCourse.remainingDays--;c.courseDaysRemaining=Math.max(0,(c.courseDaysRemaining??c.recoveryDays)-1);}
     h.medicalTimeline.push({day,conditionId:c.id,planId:p.id,kind:r.ok?'Scheduled care completed':'Missed treatment task',reason:r.reason});return r;
   }
   function serviceOptions(h,c){
@@ -497,7 +536,7 @@
         if(d.investigation){const cause=h.medicalConditions.find(r=>r.id===c.underlyingId);if(cause?.resolved){c.resolved=true;c.resolvedDay=day;c.stage='Underlying Cause Managed';h.previousConditions.push(copy(c));}continue;}
         if(c.recoveryProgress>=c.recoveryDays){c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';continue;}
         if(c.criticalDecision==='unavailable'&&day>c.decisionDay){finish(h,c,day);if(h.deceased)break;continue;}
-        const care=careDay(state,h,c,day,context);
+        const care=careDay(state,h,c,c.hospitalized?day:day-1,context);
         if(care.ok){
           c.recoveryProgress++;c.stage='Improving';
           if(c.specialistCare&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.criticalEvaluated&&c.recoveryProgress>=5){
@@ -626,6 +665,6 @@
     }
     return h.rehabilitationProfile;
   }
-  root.HorseHealth={workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
+  root.HorseHealth={completeCare,workloadAdvice,workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
   if(typeof module!=='undefined')module.exports=root.HorseHealth;
 })(globalThis);

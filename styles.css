@@ -247,9 +247,9 @@ button, input, select, textarea, summary { scroll-margin-top:var(--ui-obstructio
 /* Shared stable palette: the Tack Shop's quiet greens and layered surfaces. */
 :root { --bg:#101c22; --surface:#1b2b31; --surface-alt:#22383e; --accent:#9ccabd; --text:#edf4f1; --muted:#a9bdbd; --good:#9bd4ad; --warn:#e4bf83; }
 body { background:radial-gradient(ellipse at top left,#24413f55,transparent 55%),#101c22; line-height:1.5; }
-.topbar { background:#101d23f5; border-color:#344e50; padding:1.15rem 1.5rem; }
+.topbar { background:#101d23; border-color:#344e50; padding:1.15rem 1.5rem; }
 .topbar h1 { letter-spacing:-.035em; font-weight:650; }
-.tabs { background:#15272cf5; border-color:#344e50; gap:.4rem; }
+.tabs { background:#15272c; border-color:#344e50; gap:.4rem; }
 button { background:#263f42; border-color:#466360; padding:.55rem .85rem; border-radius:10px; font-weight:550; transition:background .15s,border-color .15s; }
 button:hover { background:#34554f; border-color:#7fa99b; }
 button:disabled { opacity:.48; cursor:not-allowed; }

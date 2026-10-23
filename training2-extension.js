@@ -235,8 +235,8 @@ function t2xAidStatus(h,e,s){
  const setup=eqSetup(h),gear=equipmentModifiers(h,'groundwork'),aid=setup.trainingAid;
  const approved=aid==='Side Reins',surcingle=aid==='Lunging Surcingle';
  const suitable=['Bomb-Proof','Easy-Going','Unfocused'].includes(mgPersonality(h));
- const ok=(approved&&suitable||surcingle)&&gear.comfort>=85&&!h.stallRest&&!h.unridable&&!(h.illnesses||[]).some(x=>x.active)&&t2educationScore(h)>=e.education;
- return {ok,bonus:ok&&approved,aid,message:ok?'':T2X_TEXT.A4};
+ const ok=(approved&&suitable||surcingle)&&gear.comfort>=85&&t2educationScore(h)>=e.education;
+ return {ok,bonus:ok&&approved&&!h.stallRest&&!h.unridable&&!(h.illnesses||[]).some(x=>x.active),aid,message:ok?'':T2X_TEXT.A4};
 }
 function t2xAward(h,s,name,requested,changes){
  if(name==='Sensitivity to Aids'||!Number.isFinite(requested)||requested<=0)return 0;
