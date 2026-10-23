@@ -141,3 +141,7 @@ See `MEDICAL-REALISM-VALIDATION.md` for preserved incidence settings, residual-r
 ## Save/load checkpoints
 
 Save Game creates or explicitly replaces the named checkpoint. Normal actions autosave the current session separately, so they cannot overwrite a checkpoint you intend to reload. Load Game restores the selected checkpoint; reopening the game resumes the latest session. The Save/Load panel reports success and storage errors directly. Existing save slots remain supported. See `SAVE-LOAD-VALIDATION.md`.
+
+## Critical fixes and balance update
+
+Verified saves, scoped quarterly backup recovery, owned-horse buyer workflows, condition-based veterinary/PPE findings, updated new-market/rescue distributions, and cumulative work aggravation are documented in [CRITICAL-UPDATE-REPORT.md](CRITICAL-UPDATE-REPORT.md). Undiagnosed horses remain workable; diagnosed conditions enforce veterinary restrictions. Run `npm test` for the unit, integration and original-system regression checks.
