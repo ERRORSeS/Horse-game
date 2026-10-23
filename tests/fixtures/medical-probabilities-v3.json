@@ -1,0 +1,1186 @@
+{
+  "scratch": [
+    45,
+    {
+      "minor": 100
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0.01
+  ],
+  "cut": [
+    25,
+    {
+      "minor": 85,
+      "moderate": 15
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9684782608695652,
+        "residual": 0.01,
+        "persistent": 0.021521739130434783,
+        "death": 0
+      }
+    },
+    0.02
+  ],
+  "rub": [
+    15,
+    {
+      "minor": 85,
+      "moderate": 15
+    },
+    {
+      "minor": {
+        "full": 0.97,
+        "residual": 0,
+        "persistent": 0.03,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.97,
+        "residual": 0,
+        "persistent": 0.03,
+        "death": 0
+      }
+    },
+    0.03
+  ],
+  "dermatitis": [
+    7,
+    {
+      "minor": 70,
+      "moderate": 30
+    },
+    {
+      "minor": {
+        "full": 0.969375,
+        "residual": 0.01,
+        "persistent": 0.020625,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.969375,
+        "residual": 0.01,
+        "persistent": 0.020625,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "skin-infection": [
+    5,
+    {
+      "minor": 55,
+      "moderate": 40,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.97,
+        "residual": 0.03,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.938021978021978,
+        "residual": 0.03,
+        "persistent": 0.03197802197802198,
+        "death": 0
+      },
+      "major": {
+        "full": 0.84875,
+        "residual": 0.03,
+        "persistent": 0.12125000000000002,
+        "death": 0
+      }
+    },
+    0.08
+  ],
+  "laceration": [
+    3,
+    {
+      "moderate": 65,
+      "major": 35
+    },
+    {
+      "moderate": {
+        "full": 0.8292682926829268,
+        "residual": 0.15,
+        "persistent": 0.02073170731707317,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7083333333333334,
+        "residual": 0.15,
+        "persistent": 0.1416666666666667,
+        "death": 0
+      }
+    },
+    0.02
+  ],
+  "tender-hoof": [
+    30,
+    {
+      "minor": 75,
+      "moderate": 25
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9199999999999999,
+        "residual": 0.06,
+        "persistent": 0.019999999999999997,
+        "death": 0
+      }
+    },
+    0.1
+  ],
+  "lost-shoe": [
+    20,
+    {
+      "minor": 90,
+      "moderate": 10
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "abscess": [
+    18,
+    {
+      "minor": 35,
+      "moderate": 55,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.94,
+        "residual": 0.05,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "major": {
+        "full": 0.85,
+        "residual": 0.1,
+        "persistent": 0.05,
+        "death": 0
+      }
+    },
+    0.08
+  ],
+  "bruise": [
+    15,
+    {
+      "minor": 70,
+      "moderate": 28,
+      "major": 2
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9199999999999999,
+        "residual": 0.07,
+        "persistent": 0.009999999999999998,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7999999999999999,
+        "residual": 0.15,
+        "persistent": 0.049999999999999996,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "imbalance": [
+    12,
+    {
+      "minor": 60,
+      "moderate": 35,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9299999999999999,
+        "residual": 0.06,
+        "persistent": 0.009999999999999998,
+        "death": 0
+      },
+      "major": {
+        "full": 0.75,
+        "residual": 0.2,
+        "persistent": 0.05,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "thrush": [
+    5,
+    {
+      "minor": 65,
+      "moderate": 30,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9,
+        "residual": 0.08,
+        "persistent": 0.02,
+        "death": 0
+      },
+      "major": {
+        "full": 0.75,
+        "residual": 0.2,
+        "persistent": 0.05,
+        "death": 0
+      }
+    },
+    0.06
+  ],
+  "soreness": [
+    30,
+    {
+      "minor": 85,
+      "moderate": 15
+    },
+    {
+      "minor": {
+        "full": 0.995,
+        "residual": 0.005,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.96515,
+        "residual": 0.005,
+        "persistent": 0.029849999999999998,
+        "death": 0
+      }
+    },
+    0.15
+  ],
+  "strain": [
+    25,
+    {
+      "minor": 65,
+      "moderate": 35
+    },
+    {
+      "minor": {
+        "full": 0.95,
+        "residual": 0.05,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9176136363636362,
+        "residual": 0.05,
+        "persistent": 0.03238636363636363,
+        "death": 0
+      }
+    },
+    0.08
+  ],
+  "tendon": [
+    12,
+    {
+      "minor": 45,
+      "moderate": 45,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.8292682926829268,
+        "residual": 0.15,
+        "persistent": 0.02073170731707317,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.573529411764706,
+        "residual": 0.35,
+        "persistent": 0.07647058823529412,
+        "death": 0
+      },
+      "major": {
+        "full": 0.2545454545454545,
+        "residual": 0.6,
+        "persistent": 0.14545454545454548,
+        "death": 0
+      }
+    },
+    0.12
+  ],
+  "suspensory": [
+    10,
+    {
+      "minor": 35,
+      "moderate": 45,
+      "major": 20
+    },
+    {
+      "minor": {
+        "full": 0.7804878048780488,
+        "residual": 0.2,
+        "persistent": 0.01951219512195122,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.55,
+        "residual": 0.35,
+        "persistent": 0.1,
+        "death": 0
+      },
+      "major": {
+        "full": 0.24545454545454543,
+        "residual": 0.55,
+        "persistent": 0.20454545454545453,
+        "death": 0
+      }
+    },
+    0.15
+  ],
+  "synovitis": [
+    10,
+    {
+      "minor": 55,
+      "moderate": 35,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.7914893617021277,
+        "residual": 0.2,
+        "persistent": 0.00851063829787234,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.7609756097560976,
+        "residual": 0.2,
+        "persistent": 0.03902439024390244,
+        "death": 0
+      },
+      "major": {
+        "full": 0.6285714285714286,
+        "residual": 0.2,
+        "persistent": 0.1714285714285714,
+        "death": 0
+      }
+    },
+    0.12
+  ],
+  "back": [
+    8,
+    {
+      "minor": 55,
+      "moderate": 35,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.95,
+        "residual": 0.04,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.82,
+        "residual": 0.15,
+        "persistent": 0.03,
+        "death": 0
+      },
+      "major": {
+        "full": 0.5499999999999999,
+        "residual": 0.3,
+        "persistent": 0.14999999999999997,
+        "death": 0
+      }
+    },
+    0.06
+  ],
+  "djd": [
+    3,
+    {
+      "minor": 45,
+      "moderate": 40,
+      "major": 15
+    },
+    {
+      "minor": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "major": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "orthopedic": [
+    2,
+    {
+      "major": 100
+    },
+    {
+      "major": {
+        "full": 0.4,
+        "residual": 0.6,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "respiratory": [
+    35,
+    {
+      "minor": 70,
+      "moderate": 30
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.95,
+        "residual": 0.04,
+        "persistent": 0.01,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "influenza": [
+    15,
+    {
+      "minor": 35,
+      "moderate": 55,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.95,
+        "residual": 0.04,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7999999999999999,
+        "residual": 0.15,
+        "persistent": 0.049999999999999996,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "ehv": [
+    10,
+    {
+      "minor": 35,
+      "moderate": 55,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.95,
+        "residual": 0.04,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "major": {
+        "full": 0.85,
+        "residual": 0.12,
+        "persistent": 0.03,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "strangles": [
+    8,
+    {
+      "minor": 20,
+      "moderate": 60,
+      "major": 20
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9199999999999999,
+        "residual": 0.06,
+        "persistent": 0.019999999999999997,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7000000000000001,
+        "residual": 0.2,
+        "persistent": 0.10000000000000003,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "asthma": [
+    15,
+    {
+      "minor": 45,
+      "moderate": 40,
+      "major": 15
+    },
+    {
+      "minor": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "major": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "airway-irritation": [
+    17,
+    {
+      "minor": 80,
+      "moderate": 20
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.98,
+        "residual": 0,
+        "persistent": 0.02,
+        "death": 0
+      }
+    },
+    0.03
+  ],
+  "digestive-upset": [
+    35,
+    {
+      "minor": 85,
+      "moderate": 15
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.98,
+        "residual": 0,
+        "persistent": 0.02,
+        "death": 0
+      }
+    },
+    0.1
+  ],
+  "colic": [
+    20,
+    {
+      "minor": 65,
+      "moderate": 35
+    },
+    {
+      "minor": {
+        "full": 0.97,
+        "residual": 0.03,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.88,
+        "residual": 0.1,
+        "persistent": 0.02,
+        "death": 0
+      }
+    },
+    0.08
+  ],
+  "ulcers": [
+    20,
+    {
+      "minor": 35,
+      "moderate": 50,
+      "major": 15
+    },
+    {
+      "minor": {
+        "full": 0.95,
+        "residual": 0.05,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9299999999999999,
+        "residual": 0.05,
+        "persistent": 0.019999999999999997,
+        "death": 0
+      },
+      "major": {
+        "full": 0.8852272727272728,
+        "residual": 0.05,
+        "persistent": 0.06477272727272727,
+        "death": 0
+      }
+    },
+    0.25
+  ],
+  "parasites": [
+    15,
+    {
+      "minor": 60,
+      "moderate": 35,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.94,
+        "residual": 0.05,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7999999999999999,
+        "residual": 0.15,
+        "persistent": 0.049999999999999996,
+        "death": 0
+      }
+    },
+    0.03
+  ],
+  "digestive-illness": [
+    10,
+    {
+      "moderate": 70,
+      "major": 30
+    },
+    {
+      "moderate": {
+        "full": 0.85,
+        "residual": 0.12,
+        "persistent": 0.03,
+        "death": 0
+      },
+      "major": {
+        "full": 0.6,
+        "residual": 0.25,
+        "persistent": 0.15,
+        "death": 0
+      }
+    },
+    0.1
+  ],
+  "dental": [
+    40,
+    {
+      "minor": 60,
+      "moderate": 35,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.95,
+        "residual": 0.04,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "major": {
+        "full": 0.85,
+        "residual": 0.12,
+        "persistent": 0.03,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "eye": [
+    25,
+    {
+      "minor": 75,
+      "moderate": 25
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9199999999999999,
+        "residual": 0.07,
+        "persistent": 0.009999999999999998,
+        "death": 0
+      }
+    },
+    0.08
+  ],
+  "cornea": [
+    10,
+    {
+      "minor": 40,
+      "moderate": 45,
+      "major": 15
+    },
+    {
+      "minor": {
+        "full": 0.94,
+        "residual": 0.05,
+        "persistent": 0.01,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.7999999999999999,
+        "residual": 0.15,
+        "persistent": 0.049999999999999996,
+        "death": 0
+      },
+      "major": {
+        "full": 0.5,
+        "residual": 0.35,
+        "persistent": 0.15,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "ear": [
+    15,
+    {
+      "minor": 75,
+      "moderate": 25
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9299999999999999,
+        "residual": 0.06,
+        "persistent": 0.009999999999999998,
+        "death": 0
+      }
+    },
+    0.12
+  ],
+  "oral": [
+    10,
+    {
+      "minor": 40,
+      "moderate": 45,
+      "major": 15
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9,
+        "residual": 0.08,
+        "persistent": 0.02,
+        "death": 0
+      },
+      "major": {
+        "full": 0.7000000000000001,
+        "residual": 0.2,
+        "persistent": 0.10000000000000003,
+        "death": 0
+      }
+    },
+    0.05
+  ],
+  "dehydration": [
+    25,
+    {
+      "minor": 75,
+      "moderate": 25
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.99,
+        "residual": 0,
+        "persistent": 0.01,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "heat": [
+    10,
+    {
+      "minor": 60,
+      "moderate": 35,
+      "major": 5
+    },
+    {
+      "minor": {
+        "full": 0.99,
+        "residual": 0.01,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.9199999999999999,
+        "residual": 0.07,
+        "persistent": 0.009999999999999998,
+        "death": 0
+      },
+      "major": {
+        "full": 0.65,
+        "residual": 0.25,
+        "persistent": 0.1,
+        "death": 0
+      }
+    },
+    0.1
+  ],
+  "fatigue": [
+    25,
+    {
+      "minor": 85,
+      "moderate": 15
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.98,
+        "residual": 0,
+        "persistent": 0.02,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "fever": [
+    15,
+    {
+      "moderate": 85,
+      "major": 15
+    },
+    {
+      "moderate": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "major": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "weight-loss": [
+    15,
+    {
+      "minor": 45,
+      "moderate": 45,
+      "major": 10
+    },
+    {
+      "minor": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      },
+      "major": {
+        "full": 0,
+        "residual": 0,
+        "persistent": 1,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "age-related": [
+    10,
+    {
+      "minor": 100
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "contusion": [
+    1,
+    {
+      "minor": 100
+    },
+    {
+      "minor": {
+        "full": 1,
+        "residual": 0,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0
+  ],
+  "abrasion": [
+    0,
+    {
+      "minor": 90,
+      "moderate": 10
+    },
+    {
+      "minor": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      },
+      "moderate": {
+        "full": 0.98,
+        "residual": 0.02,
+        "persistent": 0,
+        "death": 0
+      }
+    },
+    0.02
+  ],
+  "tendon-rupture": [
+    0,
+    {
+      "major": 100
+    },
+    {
+      "major": {
+        "full": 0.1,
+        "residual": 0.45,
+        "persistent": 0.3,
+        "death": 0.15
+      }
+    },
+    0.35
+  ],
+  "stable-fracture": [
+    0,
+    {
+      "moderate": 65,
+      "major": 35
+    },
+    {
+      "moderate": {
+        "full": 0.6499999999999999,
+        "residual": 0.3,
+        "persistent": 0.049999999999999996,
+        "death": 0
+      },
+      "major": {
+        "full": 0.35,
+        "residual": 0.45,
+        "persistent": 0.15,
+        "death": 0.05
+      }
+    },
+    0.08
+  ],
+  "unstable-fracture": [
+    0,
+    {
+      "major": 100
+    },
+    {
+      "major": {
+        "full": 0.1,
+        "residual": 0.2,
+        "persistent": 0.2,
+        "death": 0.5
+      }
+    },
+    0
+  ],
+  "impaction": [
+    0,
+    {
+      "moderate": 100
+    },
+    {
+      "moderate": {
+        "full": 0.8631578947368421,
+        "residual": 0.12631578947368421,
+        "persistent": 0,
+        "death": 0.010526315789473686
+      }
+    },
+    0.18
+  ],
+  "surgical-colic": [
+    0,
+    {
+      "major": 100
+    },
+    {
+      "major": {
+        "full": 0.58,
+        "residual": 0.22,
+        "persistent": 0,
+        "death": 0.20000000000000004
+      }
+    },
+    0.15
+  ],
+  "critical-colic": [
+    0,
+    {
+      "major": 100
+    },
+    {
+      "major": {
+        "full": 0.35,
+        "residual": 0.25,
+        "persistent": 0,
+        "death": 0.4
+      }
+    },
+    0.2
+  ]
+}

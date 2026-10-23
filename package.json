@@ -2,6 +2,7 @@
   "name": "oxer-to-oxer-stable-manager",
   "private": true,
   "scripts": {
-    "test": "node --test tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs && node tests/integration.test.cjs && node tests/run-regressions.cjs"
+    "test": "node --test tests/recovery-rebuild.test.cjs tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs && node tests/integration.test.cjs && node tests/run-regressions.cjs",
+    "test:recovery-population": "node tests/simulate-recovery.cjs"
   }
 }

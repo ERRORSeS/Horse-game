@@ -7,6 +7,7 @@
   // Independent, reproducible opportunities. Opening a menu cannot advance this stream.
   const roll = (seed, key) => { let n = hash(`${seed}|${key}`); n ^= n << 13; n ^= n >>> 17; n ^= n << 5; return (n >>> 0) / 4294967296; };
   function weighted(rows, value) { const total = rows.reduce((n, r) => n + r.weight, 0); let cursor = value * total; return rows.find(r => (cursor -= r.weight) < 0) || rows.at(-1); }
+  const recoveryDefinitions=(typeof module!=='undefined'?require('./medical-recovery.js'):root.MedicalRecovery).definitions;
   const catalog = {};
   function condition(id, name, category, weight, days, signs, tests, options = {}) {
     catalog[id] = { id, name, category, weight, days, signs: signs.split('|'), tests: tests.split('|'), severity: 'minor', residual: 0, restriction: 'demanding', configuredResidual: Object.hasOwn(options,'residual'), ...options };
@@ -152,7 +153,7 @@
         h.medicalTimeline.push({day,conditionId:c.id,kind:'Invalid treatment branch corrected',text:'Completed surgery retains post-operative care; the unavailable-surgery branch does not apply.'});
       }
       for(const c of h.medicalConditions.filter(c=>!c.resolved&&c.confirmed&&c.services?.length&&!h.rehabilitationPlans.some(p=>p.conditionId===c.id&&p.status==='Active')))if(!c.outcome)plan(h,c.id,day);
-      for(const c of h.medicalConditions)if(c.hospitalized||c.hospitalEpisode)hospitalRecord(h,c,day);
+      for(const c of h.medicalConditions)if(c.hospitalized||c.hospitalEpisode)hospitalRecord(h,c,h.healthProcessedDay??day??0);
       return h;
     }
     arrays.forEach(key => { if (!Array.isArray(h[key])) h[key] = []; });
@@ -166,7 +167,7 @@
       if (c.resolved) { c.stage = 'Resolved'; h.previousConditions.push(copy(c)); }
     }
     for (const [i, old] of (h.hiddenIllnesses || []).entries()) add(h, 'legacy', day, { id: `${h.id}:hidden:${i}`, legacyName: old.name, legacy: copy(old) });
-    for(const c of h.medicalConditions)if(c.hospitalized||c.hospitalEpisode)hospitalRecord(h,c,day);
+    for(const c of h.medicalConditions)if(c.hospitalized||c.hospitalEpisode)hospitalRecord(h,c,h.healthProcessedDay??day??0);
     return h;
   }
   function definition(c) { return catalog[c.diagnosis] || { ...catalog.strain, name: c.legacyName || 'Legacy Medical Record', tests:['general','soundness'], residual:0 }; }
@@ -243,7 +244,8 @@
     return {ok:true,affected,events};
   }
   function narrative(h,c,phase){
-    const d=definition(c),templates=d.narrativeTemplates||[];
+    const d=definition(c),templates=d.narrativeTemplates||[],course=recoveryDefinitions[c.diagnosis],quoteIndex={first:0,active:1,improving:2,worsening:3,resolved:4}[phase];
+    if(course&&c.confirmed&&quoteIndex!=null&&!(phase==='resolved'&&(c.residual||c.outcome==='persistent'))){return course.quotes[quoteIndex].replaceAll('[HORSE]',h.name).replaceAll('[BODY REGION]',c.bodyRegion||'affected area').replaceAll('[LIMB]',c.limb||'affected limb').replaceAll('[NO VISIBLE MARK / A SMALL RESIDUAL SCAR]',c.residual?'a small residual scar':'no visible mark').replaceAll('[RESOLVED / CHRONIC MANAGEMENT]',c.outcome==='persistent'?'chronic management':'resolved').replaceAll('[REMAINING EFFECTS]',c.residual?'documented residual effects':'no meaningful remaining effects').replace(/\[[A-Z][^\]]*\]/g,()=>c.outcome==='death'?'terminal outcome':c.outcome==='persistent'?'long-term management':c.escalatedTo?'surgical referral':c.residual?'documented residual effects':'full recovery');}
     if(phase==='improving'&&['surgical-colic','critical-colic'].includes(c.diagnosis)&&!c.criticalSurvived)return c.symptoms[0]+' remains under intensive monitoring.';
     let t=templates.find(t=>t.phase===phase&&(!t.requiresDiagnosis||c.confirmed));
     // Diagnosis-sensitive scripted lines are never substituted into unconfirmed observations.
@@ -290,7 +292,7 @@
   function examine(state,h,type,day,eventId) {
     if (!exams[type]) return {ok:false,message:'Unknown examination.'};
     const prior=h.vetVisits.find(v=>v.id===eventId);if(prior)return {ok:true,report:prior};
-    const clinicalSignature=JSON.stringify(h.medicalConditions.map(c=>[c.id,c.resolved,c.residual,c.severity,c.recoveryProgress]));
+    const clinicalSignature=JSON.stringify(h.medicalConditions.map(c=>[c.id,c.resolved,c.residual,c.severity,c.recoveryProgress,c.symptomIntensity,c.discomfort,c.complications?.length,c.hospitalEpisode?.status]));
     const sameDay=h.vetVisits.find(v=>v.day===day&&v.type===type&&v.clinicalSignature===clinicalSignature);if(sameDay)return {ok:true,report:sameDay,reused:true};
     const receipt=ledger(state,`exam:${h.id}:${eventId}`,exams[type][1],day,h,[{name:exams[type][0],quantity:1,unitPrice:exams[type][1]}]);
     if (!receipt)return {ok:false,message:'Insufficient funds.'};
@@ -300,7 +302,7 @@
       if(!relevant)continue;
       const imaging=['ultrasound','radiographs','gastroscopy'].includes(type),chance=imaging?.9:['general','intake'].includes(type)?d.visible?.9:.4:.75;
       const value=type==='followup'&&c.confirmed?0:roll(h.healthSeed,`exam:${eventId}:${c.id}`);
-      if(type==='followup'&&c.confirmed){const previous=c.lastFollowupProgress??0;if((c.setbacks?.length||0)<=(c.lastFollowupSetbacks||0))report.messages.push(c.recoveryProgress>previous?'The follow-up examination shows improvement since the previous visit.':'The condition remains stable, and the existing plan will continue.');const worse=(c.setbacks?.length||0)>(c.lastFollowupSetbacks||0);if(worse)report.messages.push('The condition has worsened since the previous assessment.');if(!worse&&c.recoveryProgress>previous){c.rehabStage=Math.max(1,Math.min(4,Math.floor(c.recoveryProgress/Math.max(1,c.recoveryDays)*5)));c.stage=['Acute','Early Recovery','Controlled Rehabilitation','Progressive Work','Return to Training'][c.rehabStage];}c.lastFollowupSetbacks=c.setbacks?.length||0;c.followupResults ||= [];c.followupResults.push({day,previousProgress:previous,progress:c.recoveryProgress,stage:c.stage,severity:c.severity,workloadCount:c.workloadHistory?.length||0,careDays:c.careLog?.filter(r=>r.ok).length||0,outcome:worse?'Worse':c.recoveryProgress>previous?'Improving':'Stable'});c.lastFollowupProgress=c.recoveryProgress;c.lastFollowupDay=day;const plan=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(plan){plan.followup=day+7;delete plan.followupNotified;}}
+      if(type==='followup'&&c.confirmed){const previous=c.lastFollowupProgress??0;if(c.recoveryProgress>=previous&&(c.symptomIntensity??0)<=(c.lastFollowupSymptoms??100))report.messages.push(c.recoveryProgress>previous?'The follow-up examination shows improvement since the previous visit.':'The condition remains stable, and the existing plan will continue.');const worse=c.recoveryProgress<previous||(c.symptomIntensity??0)>(c.lastFollowupSymptoms??100);c.lastFollowupSymptoms=c.symptomIntensity??100;if(worse)report.messages.push('The condition has worsened since the previous assessment.');if(!worse&&c.recoveryProgress>previous){c.rehabStage=Math.max(1,Math.min(4,Math.floor(c.recoveryProgress/Math.max(1,c.recoveryDays)*5)));c.rehabStage=c.recoveryStage??c.rehabStage;c.stage=['Acute','Stabilizing','Improving','Recovering','Final Recovery','Awaiting Follow-Up'][c.rehabStage];}c.lastFollowupSetbacks=c.setbacks?.length||0;c.followupResults ||= [];c.followupResults.push({day,previousProgress:previous,progress:c.recoveryProgress,stage:c.stage,severity:c.severity,workloadCount:c.workloadHistory?.length||0,careDays:c.careLog?.filter(r=>r.ok).length||0,outcome:worse?'Worse':c.recoveryProgress>previous?'Improving':'Stable'});c.lastFollowupProgress=c.recoveryProgress;c.lastFollowupDay=day;if(c.hospitalEpisode?.reconciliationRequired){c.hospitalEpisode.reconciliationRequired=false;c.hospitalEpisode.latestAssessment={day,progress:c.healingProgress??c.recoveryProgress/c.recoveryDays*100,outcome:worse?'Worse':c.recoveryProgress>previous?'Improving':'Stable'};c.hospitalEpisode.status=c.hospitalized?'Awaiting Review':'Transferred to Rehabilitation';c.currentPrognosis='Historical treatment reviewed. Continue the current clinical care and reassessment plan.';}const plan=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(plan){plan.followup=day+7;delete plan.followupNotified;}}
       const diagnosticsReady=!d.diagnosticRequirements.length||d.diagnosticRequirements.includes(type)||d.diagnosticRequirements.every(test=>h.diagnosticTests.some(r=>r.type===test));
       // A relevant exam records present signs even when a definitive diagnosis needs targeted testing.
       if(!c.resolved||value<chance){
@@ -311,7 +313,7 @@
       if(value<chance&&diagnosticsReady){c.known=true;c.confirmed=true;if(c.resolved){report.historyFindings.push(d.name);const old=h.previousConditions.find(r=>r.id===c.id);if(old){old.known=true;old.confirmed=true;}}else report.diagnoses.push(d.name);if(!h.confirmedDiagnoses.some(r=>r.conditionId===c.id))h.confirmedDiagnoses.push({conditionId:c.id,name:d.name,day});}
       else if(value<Math.min(.98,chance+.15)){c.suspected=true;report.possible.push('A relevant concern remains uncertain; further targeted assessment may help.');h.suspectedDiagnoses.push({day,conditionId:c.id,text:'Further targeted assessment recommended.'});}
       if(type==='followup'&&c.confirmed&&c.recoveryProgress<c.recoveryDays){const p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');if(p){p.followup=day+Math.min(14,c.recoveryDays-c.recoveryProgress);delete p.followupNotified;}}
-      if(type==='followup'&&c.confirmed&&c.recoveryProgress>=c.recoveryDays&&!d.investigation){c.medicalClearance=day;finish(h,c,day);const finding=c.followupResults?.at(-1);if(finding){finding.stage=c.stage;finding.outcome=c.outcome||finding.outcome;}if(c.outcome==='full')report.messages.push('The condition has resolved without meaningful remaining effects.');else if(c.residual)report.messages.push('Recovery is incomplete, and some residual limitations remain.');else if(c.outcome==='persistent')report.messages.push('The horse requires a revised long-term management plan.');}
+      if(type==='followup'&&c.confirmed&&c.recoveryProgress>=c.recoveryDays&&!d.investigation){finish(h,c,day);if(c.outcome||c.resolved)c.medicalClearance=day;const finding=c.followupResults?.at(-1);if(finding){finding.stage=c.stage;finding.outcome=c.outcome||finding.outcome;}if(c.outcome==='full')report.messages.push('The condition has resolved without meaningful remaining effects.');else if(c.residual)report.messages.push('Recovery is incomplete, and some residual limitations remain.');else if(c.outcome==='persistent')report.messages.push('The horse requires a revised long-term management plan.');}
       if(type==='emergency'&&d.emergency){c.emergencyAssessed=day;c.emergencyStatus='Assessed — Treatment Required';}
       if(['lameness','soundness','joint'].includes(type))report.lamenessGrade=Math.max(report.lamenessGrade||0,lamenessGrade(h));
       if(d.restriction&&!c.resolved)report.restrictions.push(d.restriction==='all'?'Rest and professional reassessment.':'Avoid demanding work; review a controlled return with the veterinarian.');
@@ -323,6 +325,7 @@
     if(!report.diagnoses.length&&report.possible.length&&!report.messages.includes('The findings do not currently support a definitive diagnosis.'))report.messages.push('The findings do not currently support a definitive diagnosis.');
     if(!report.observed.length&&!report.diagnoses.length&&!report.possible.length)report.messages.push('No significant abnormality was identified during the examinations performed.');
     if(report.restrictions.length)report.messages.push("The horse's current condition is not suitable for the proposed workload.");
+    if(type==='followup'){const checks=h.rehabilitationPlans.filter(p=>p.status==='Active'&&p.followup>day).map(p=>p.followup);if(checks.length)report.followup=Math.min(...checks);}
     h.vetVisits.push(report);h.diagnosticTests.push({day,type,reportId:eventId});return {ok:true,report};
   }
   function plan(h, conditionId, day) {
@@ -365,6 +368,7 @@
   function finish(h,c,day) {
     const d=definition(c);if(c.resolved||c.outcome)return;
     if(d.investigation)return;
+    if(c.specialistCare&&!c.criticalEvaluated&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis))return;
     if(d.chronic){
       const outcomes=d.functionalOutcomes||{stable:1};
       c.functionalOutcome=weighted(Object.entries(outcomes).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`functional:${c.id}`)).id;
@@ -405,22 +409,27 @@
     const p=h.rehabilitationPlans.find(p=>p.conditionId===c.id&&p.status==='Active');
     if(!c.hospitalEpisode&&c.hospitalized){const admitted=c.operationDay??c.services?.find(r=>r.service==='hospital')?.day??p?.day??day;c.hospitalEpisode={id:'hospital:'+c.id,horseId:h.id,conditionId:c.id,admittedDay:admitted,careProvider:'HOSPITAL'};}
     const e=c.hospitalEpisode;if(!e)return null;
+    if(!Number.isFinite(e.admittedDay)){e.admittedDay=c.operationDay??c.services?.find(r=>r.service==='hospital')?.day??p?.day??c.treatmentStarted??h.healthProcessedDay??day;e.timestampReconstructed=true;e.reconciliationRequired=true;}
+    e.horseId ||= h.id;e.conditionId ||= c.id;e.historicalRecordedCareDays=Math.max(e.historicalRecordedCareDays||0,e.completedDays||0);
     e.expectedDays ??= Math.max(1,Math.min(14,c.recoveryDays));e.coveredUntil ??= e.admittedDay+e.expectedDays;e.status ??= c.hospitalized?'Active':'Discharged';
     e.elapsedDays=Math.max(0,(e.dischargeDay??day)-e.admittedDay);
     if(c.hospitalized&&day>=e.coveredUntil&&e.status==='Active')e.status='Review Due';
     for(const r of c.careLog||[])if(r.ok&&!r.careProvider&&r.day>=e.admittedDay&&r.day<=(e.dischargeDay??e.coveredUntil)){r.careProvider='HOSPITAL';r.status='Completed by Hospital';r.treatmentEpisodeId=e.id;}
-    e.completedDays=(c.careLog||[]).filter(r=>r.ok&&r.careProvider==='HOSPITAL').length;
+    e.completedDays=(c.careLog||[]).filter(r=>r.ok&&r.careProvider==='HOSPITAL').length;e.validCompletedDays=Math.min(e.expectedDays,new Set((c.careLog||[]).filter(r=>r.ok&&r.careProvider==='HOSPITAL'&&r.day>e.admittedDay&&r.day<=e.coveredUntil).map(r=>r.day)).size);
+    if(c.hospitalized&&h.healthProcessedDay>e.coveredUntil&&!e.reviewedThrough){if(c.recoveryStage==null){c.healingProgress=bounded(c.recoveryProgress/Math.max(1,c.recoveryDays)*100,0,100);c.recoveryStage=c.healingProgress>=100?5:c.healingProgress>=85?4:c.healingProgress>=60?3:c.healingProgress>=35?2:c.healingProgress>=15?1:0;if(!c.outcome&&!c.resolved)c.stage=['Acute','Stabilizing','Improving','Recovering','Final Recovery','Awaiting Follow-Up'][c.recoveryStage];}e.reconciledAtDay=h.healthProcessedDay;e.historicalElapsedDays=e.elapsedDays;e.historicalCompletedDays=e.completedDays;e.reviewedThrough=e.coveredUntil;e.status='Awaiting Review';e.reconciliationRequired=true;e.treatmentEndedDay=e.coveredUntil;c.hospitalized=false;c.homeCareStartsDay=h.healthProcessedDay;c.reviewRecommended=true;e.nextReview=h.healthProcessedDay;if(p)p.followup=Math.min(p.followup??h.healthProcessedDay,h.healthProcessedDay);c.currentPrognosis='Historical treatment needs veterinary reconciliation; no unrecorded care or charges have been inferred.';}
     for(const r of c.careLog||[])if(r.ok&&r.recoveryAppliedDay==null&&(r.careProvider==='HOSPITAL'?r.day<=h.healthProcessedDay:r.day<h.healthProcessedDay))r.recoveryAppliedDay=r.day;
     for(const r of c.careLog||[])if(!r.ok&&r.reason==='Scheduled care was not completed by the player'&&r.day>=e.admittedDay&&r.day<(e.dischargeDay??e.coveredUntil)){
       r.previousStatus=copy(r);r.status='Superseded by Professional Care';r.careProvider='HOSPITAL';r.reason='Transferred to hospital responsibility';r.missedReason=null;
     }
     for(const r of h.medicalTimeline)if(r.conditionId===c.id&&r.kind==='Missed treatment task'&&r.reason==='Scheduled care was not completed by the player'&&r.day>=e.admittedDay&&r.day<(e.dischargeDay??e.coveredUntil)){r.previousKind=r.kind;r.kind='Home task superseded by professional care';}
+    if(e.reconciliationRequired&&e.reconciledAtDay&&!e.dischargeDay){for(const r of c.careLog||[])if(!r.ok&&r.day>e.coveredUntil&&r.day<e.reconciledAtDay&&(r.status==='Missed'||r.reason==='Scheduled care was not completed by the player')){r.previousStatus=copy(r);r.status='Historical Responsibility Uncertain';r.careProvider='UNASSIGNED';r.missedReason=null;r.reason='Uncertain historical period requires veterinary reconciliation';}}
+    e.recordedProfessionalDays=(c.careLog||[]).filter(r=>r.ok&&r.careProvider==='HOSPITAL').length;e.completedDays=e.validCompletedDays;e.historicalRecordedCareDays=Math.max(e.historicalRecordedCareDays||0,e.recordedProfessionalDays);e.billStatus='Daily fees recorded in care ledger';
     return e;
   }
   function hospitalDecision(h,conditionId,action,day){
     ensure(h,day);const c=current(h).find(c=>c.id===conditionId);if(!c)return {ok:false,message:'Select an active condition.'};const e=hospitalRecord(h,c,day);if(!e)return {ok:false,message:'No hospital episode is recorded.'};
     if(action==='discharge'){if(e.status==='Discharged')return {ok:true,message:'Discharge is already recorded.'};c.hospitalized=false;e.status='Discharged';e.dischargeDay=day;c.homeCareStartsDay=day;c.stage='Home Rehabilitation';h.medicalTimeline.push({day,conditionId:c.id,kind:'Hospital discharge',episodeId:e.id});return {ok:true,message:'Discharged to the existing home rehabilitation plan. Home tasks begin today.'};}
-    if(action==='extend'&&c.hospitalized&&e.status==='Review Due'&&c.lastFollowupDay>=e.coveredUntil){e.extensions ||= [];e.extensions.push({authorizedDay:day,previousEnd:e.coveredUntil});e.coveredUntil=day+Math.max(1,Math.min(14,c.recoveryDays-c.recoveryProgress));e.expectedDays=e.coveredUntil-e.admittedDay;e.status='Active';return {ok:true,message:'Continued hospital care authorized. Daily fees apply only to provided care.'};}
+    if(action==='extend'&&c.hospitalized&&['Review Due','Extension Recommended','Awaiting Review'].includes(e.status)&&(c.lastFollowupDay>=e.coveredUntil||e.latestAssessment?.day>=e.coveredUntil)){e.extensions ||= [];e.extensions.push({authorizedDay:day,previousEnd:e.coveredUntil});e.coveredUntil=day+Math.max(1,Math.min(14,c.recoveryDays-c.recoveryProgress));e.expectedDays=e.coveredUntil-e.admittedDay;e.status='Active';return {ok:true,message:'Continued hospital care authorized. Daily fees apply only to provided care.'};}
     return {ok:false,message:'A follow-up examination is required before authorizing continued hospital care.'};
   }
   function careDay(state,h,c,day,context={}){
@@ -561,6 +570,46 @@
     const defs=group.definitions.map(d=>({...d,weight:d.weight*(d.vaccine&&h.vaccinations.some(v=>v.vaccine===d.vaccine&&v.nextDue>=day&&v.courseStatus==='Complete')?({influenza:.4,ehv:.65,strangles:.7}[d.id]??.75):1)}));
     const d=weighted(defs,roll(h.healthSeed,`diagnosis:${day}`));add(h,d.id,day,{cause:d.requires||'ordinary environmental exposure',severity});
   }
+  function clinicalDay(h,c,care,day){
+    if(c.lastClinicalDay>=day)return;
+    const d=definition(c),config=recoveryDefinitions[c.diagnosis]||recoveryDefinitions.strain;
+    c.lastClinicalDay=day;c.clinicalHistory ||= [];c.daysWithEffectiveCare ||= 0;c.daysWithMissedCare ||= 0;
+    if(care.ok)c.daysWithEffectiveCare++;else if(care.status==='Missed')c.daysWithMissedCare++;
+    c.baselineRecoveryDays ||= c.recoveryDays;
+    let weights=[...(d.dailyOutcomes||config.daily)];
+    const essential=d.investigation||(d.farrier&&!c.farrierCare)||(d.medication&&!care.ok)||(d.emergency&&!c.emergencyAssessed)||(['tendon-rupture','unstable-fracture','surgical-colic','critical-colic'].includes(c.diagnosis)&&!c.specialistCare)||(['dental','oral'].includes(c.diagnosis)&&!c.dentalCare)||(d.correction&&!care.ok);
+    if(essential&&config.beforeTreatment)weights=[...config.beforeTreatment];if(essential&&!config.beforeTreatment){weights[1]+=weights[0];weights[0]=0;}
+    if(!care.ok){const shift=Math.min(10,weights[0]);weights[0]-=shift;weights[1]+=shift*.6;weights[2]+=shift*.3;weights[3]+=shift*.1;}
+    const professional=care.ok&&['HOSPITAL','VETERINARIAN'].includes(care.careProvider);
+    const trainingSetback=c.setbacks?.some(r=>r.day===day&&r.eventId);
+    if(trainingSetback){weights[1]+=weights[2]+weights[3];weights[2]=weights[3]=0;}
+    const outcome=weighted(weights.map((weight,i)=>({id:i,weight})),roll(h.healthSeed,`clinical:${c.id}:${day}`)).id;
+    const before=c.recoveryProgress;
+    const multiplier=professional?1.15:care.ok?care.careProvider==='PASSIVE'?.9:1:.35;
+    const cap=Math.max(1,c.baselineRecoveryDays*.05),expectedLoss=(config.daily[2]*Math.min(2,cap)+config.daily[3]*Math.min(7,cap))/100,improvementScale=(1+expectedLoss)/Math.max(.01,config.daily[0]/100);
+    let delta=outcome===0&&!essential?multiplier*improvementScale*(.8+.4*roll(h.healthSeed,`clinical-size:${c.id}:${day}`)):0;
+    if(outcome>=2){const loss=outcome===2?1+Math.floor(roll(h.healthSeed,`clinical-loss:${c.id}:${day}`)*3):4+Math.floor(roll(h.healthSeed,`clinical-loss:${c.id}:${day}`)*7);delta=-Math.min(loss,Math.max(1,c.baselineRecoveryDays*.05));c.setbacks ||= [];c.setbacks.push({day,kind:outcome===2?'Mild setback':'Significant worsening',effectiveDays:-delta,source:'daily-clinical'});if(outcome===3){c.complications ||= [];c.complications.push({day,kind:d.category==='skin'?'Delayed skin healing':d.category==='muscle'?'Orthopedic recovery deterioration':d.category==='airway'?'Respiratory symptom exacerbation':'Clinical deterioration requiring reassessment',confirmedDiagnosis:false});c.reviewRecommended=true;}}
+    c.recoveryProgress=bounded(c.recoveryProgress+delta,0,c.recoveryDays);
+    c.healingProgress=bounded(c.recoveryProgress/Math.max(1,c.recoveryDays)*100,0,100);
+    c.recoveryStage=c.healingProgress>=100?5:c.healingProgress>=85?4:c.healingProgress>=60?3:c.healingProgress>=35?2:c.healingProgress>=15?1:0;
+    c.stage=['Acute','Stabilizing','Improving','Recovering','Final Recovery','Awaiting Follow-Up'][c.recoveryStage];
+    c.estimatedRemainingRecovery=[Math.max(0,Math.floor((c.recoveryDays-c.recoveryProgress)*.8)),Math.max(0,Math.ceil((c.recoveryDays-c.recoveryProgress)*1.6))];
+    c.healthState=['Improved','Stable','Mild setback','Significant worsening'][outcome];c.careQuality=essential?'Essential treatment outstanding':professional?'Professional':care.ok?'Appropriate':'Incomplete';
+    c.symptomIntensity=essential?bounded((c.symptomIntensity??100)+(outcome===0?-5:outcome>=2?10:0),0,100):bounded(100-c.healingProgress+(outcome>=2?10:0),0,100);c.currentSymptoms=c.symptomIntensity<15?['Minimal remaining signs; reassessment required']:c.symptomIntensity<60?d.signs.map(sign=>'Reduced '+sign.toLowerCase()):[...d.signs];
+    c.daysSinceOnset=Math.max(0,day-(c.onsetDay??c.onset??c.day??c.createdDay??day));c.daysSinceDiagnosis=c.confirmed?Math.max(0,day-(h.confirmedDiagnoses.find(r=>r.conditionId===c.id)?.day??c.onset??day)):null;c.daysSinceTreatmentStart=Math.max(0,day-(c.treatmentStarted??day));
+    const quote=config.quotes[outcome>=2?3:outcome===0&&!essential?2:1].replaceAll('[HORSE]',h.name).replaceAll('[BODY REGION]',c.bodyRegion||'affected area').replaceAll('[LIMB]',c.limb||'affected limb');
+    c.clinicalHistory.push({day,outcome:c.healthState,change:c.recoveryProgress-before,progress:c.healingProgress,careProvider:care.careProvider||'NONE',effectiveCare:care.ok&&!essential,quote});
+    if(delta>0){c.lastImprovementDay=day;if(c.currentPrognosis?.startsWith('Recovery Not Progressing'))c.currentPrognosis='Clinical improvement has resumed; review the existing follow-up recommendation.';}
+    if(day-(c.lastImprovementDay??c.treatmentStarted??day)>=Math.min(28,Math.max(7,c.baselineRecoveryDays*.25))){c.reviewRecommended=true;c.currentPrognosis='Recovery Not Progressing — Veterinary Review Recommended.';}
+  }
+  function reviewHospital(h,c,day){
+    const e=c.hospitalEpisode;if(!c.hospitalized||!e||day<e.coveredUntil||e.reviewedThrough===e.coveredUntil)return;
+    e.reviewedThrough=e.coveredUntil;e.latestAssessment={day,severity:c.severity,symptoms:copy(c.currentSymptoms||c.symptoms),careQuality:c.careQuality,outcome:c.healthState==='Significant worsening'?'Worse':c.healingProgress>0?'Improving':'Stable',progress:c.healingProgress??c.recoveryProgress/c.recoveryDays*100,completedCare:e.completedDays,reason:'Authorized treatment interval completed'};e.nextReview=day+7;
+    const critical=['tendon-rupture','unstable-fracture','surgical-colic','critical-colic'].includes(c.diagnosis)&&!c.criticalSurvived;
+    if(critical||c.healthState==='Significant worsening'){e.status='Extension Recommended';e.continuedStayReason=critical?'Specialist decision required':'Recent clinical deterioration requires a treatment decision';c.reviewRecommended=true;}
+    else{e.status='Transferred to Rehabilitation';e.dischargeDay=e.coveredUntil;c.hospitalized=false;c.homeCareStartsDay=e.coveredUntil;c.stage='Home Rehabilitation';}
+    h.medicalTimeline.push({day,conditionId:c.id,kind:'Hospital course assessed',episodeId:e.id,status:e.status,findings:copy(e.latestAssessment)});
+  }
   function advance(h,targetDay,context={},state) {
     ensure(h,targetDay);
     for(let day=h.healthProcessedDay+1;day<=targetDay;day++){
@@ -569,20 +618,20 @@
       for(const c of current(h)){
         hospitalRecord(h,c,day);
         const d=definition(c);if(c.outcome==='persistent')continue;
-        if(d.investigation){const cause=h.medicalConditions.find(r=>r.id===c.underlyingId);if(cause?.resolved){c.resolved=true;c.resolvedDay=day;c.stage='Underlying Cause Managed';h.previousConditions.push(copy(c));}continue;}
-        if(c.recoveryProgress>=c.recoveryDays){c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';continue;}
+        if(d.investigation){clinicalDay(h,c,{ok:false,reason:'Underlying cause requires investigation'},day);const cause=h.medicalConditions.find(r=>r.id===c.underlyingId);if(cause&&(cause.resolved||cause.outcome==='persistent')){c.resolved=true;c.resolvedDay=day;c.stage='Underlying Cause Managed';h.previousConditions.push(copy(c));}continue;}
+        if(c.recoveryProgress>=c.recoveryDays&&!(c.specialistCare&&!c.criticalEvaluated&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis))){c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';continue;}
         if(c.criticalDecision==='unavailable'&&day>c.decisionDay){finish(h,c,day);if(h.deceased)break;continue;}
         const care=careDay(state,h,c,c.hospitalized?day:day-1,context);
-        if(care.ok&&care.recoveryAppliedDay==null){
-          care.recoveryAppliedDay=day;c.recoveryProgress++;c.stage='Improving';
-          if(c.specialistCare&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.criticalEvaluated&&c.recoveryProgress>=5){
+        if(care.recoveryAppliedDay==null){
+          care.recoveryAppliedDay=day;clinicalDay(h,c,care,day);
+          if(c.specialistCare&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.criticalEvaluated&&c.daysWithEffectiveCare>=5){
             c.criticalEvaluated=true;
             const table=d.outcomesBySeverity[c.severity]||Object.values(d.outcomesBySeverity)[0];
             const result=weighted(Object.entries(table).map(([id,weight])=>({id,weight})),roll(h.healthSeed,`outcome:${c.id}`)).id;
             if(result==='death'){finish(h,c,day);break;}
             c.criticalSurvived=true;if(c.hospitalEpisode){c.hospitalEpisode.dischargeDay=day;c.hospitalEpisode.status='Discharged';}c.homeCareStartsDay=day;c.hospitalized=false;c.emergencyStatus='Restricted Rehabilitation';h.medicalTimeline.push({day,conditionId:c.id,kind:'Critical phase survived',text:'The critical phase has passed, although longer-term rehabilitation is still required.'});
           }
-          if(c.observedPhases?.length)recordObservation(h,c,'health',day,'improving');
+          if(c.healthState==='Improved'&&c.observedPhases?.length)recordObservation(h,c,'health',day,'improving');
           if((d.surgicalEscalationProbability||c.diagnosis==='colic'&&c.severity==='moderate')&&c.recoveryProgress>=c.recoveryDays&&!c.escalationChecked){
             c.escalationChecked=true;
             if(roll(h.healthSeed,`escalation:${c.id}`)<(d.surgicalEscalationProbability||.02)){
@@ -603,7 +652,7 @@
       }
       h.hoofHealth.growth+=.15;
       if(day>h.hoofHealth.nextDue+14&&roll(h.healthSeed,`hoof:${day}`)<.02)h.hoofHealth.condition=bounded(h.hoofHealth.condition-1,0,100);
-      for(const c of h.medicalConditions)if(c.hospitalEpisode)hospitalRecord(h,c,day);
+      for(const c of h.medicalConditions)if(c.hospitalEpisode){hospitalRecord(h,c,day);reviewHospital(h,c,day);}
       incident(h,day,{...context,shod:h.hoofHealth.shoes!=='barefoot',overdueHooves:day>h.hoofHealth.nextDue+21});h.healthProcessedDay=day;
     }
   }
@@ -702,6 +751,6 @@
     }
     return h.rehabilitationProfile;
   }
-  root.HorseHealth={hospitalRecord,hospitalDecision,completeCare,workloadAdvice,workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
+  root.HorseHealth={clinicalDay,reviewHospital,recoveryDefinitions,hospitalRecord,hospitalDecision,completeCare,workloadAdvice,workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
   if(typeof module!=='undefined')module.exports=root.HorseHealth;
 })(globalThis);
