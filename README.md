@@ -145,3 +145,7 @@ Save Game creates or explicitly replaces the named checkpoint. Normal actions au
 ## Critical fixes and balance update
 
 Verified saves, scoped quarterly backup recovery, owned-horse buyer workflows, condition-based veterinary/PPE findings, updated new-market/rescue distributions, and cumulative work aggravation are documented in [CRITICAL-UPDATE-REPORT.md](CRITICAL-UPDATE-REPORT.md). Undiagnosed horses remain workable; diagnosed conditions enforce veterinary restrictions. Run `npm test` for the unit, integration and original-system regression checks.
+
+## Performance update
+
+Visible-panel redraws, faster compatible save compression and scoped UI-state scans reduce work during normal play. See [PERFORMANCE-VALIDATION.md](PERFORMANCE-VALIDATION.md) for measurements and compatibility checks. Run `npm test` for all feature checks and `npm run test:benchmark` for the informational save benchmark.
