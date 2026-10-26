@@ -2812,7 +2812,7 @@ function trainerNotesForHorse(horse) {
     notes.push(`${subject} has too much energy, you should train ${object} bit more!`);
   }
   if (!horse.retiredForever && !horse.retiredToBreeding && horse.soundnessYears <= 0) {
-    notes.push(`${subject} looks tired and burnt-out maybe it’s time for retirement.`);
+    notes.push(`${subject} has reached the sporting longevity estimate; a veterinarian can advise suitable continued activity.`);
   }
   if (horse.gender === 'Stallion' && horse.lastTrainingIssue === 'low' && !horse.retiredForever && !horse.retiredToBreeding) {
     notes.push('He looks overly energetic, consider gelding.');
@@ -4080,7 +4080,7 @@ function updateBondMonthly(horse) {
   const feedOk = feedTotal >= feedMin && feedTotal <= feedMax;
   if (trainingOk && turnoutOk && feedOk) nextBond += 2;
   if (horse.farrierThisMonth) nextBond += 3;
-  if (horse.soundnessYears <= 0 && !horse.retiredToBreeding && !horse.retiredForever && (horse.lastTrainingSessions > 0 || (horse.lastShowEntries || 0) > 0)) {
+  if ((horse.medicalConditions || []).some(c => !c.resolved && (c.discomfort || 0) > 0) && !horse.retiredToBreeding && !horse.retiredForever && (horse.lastTrainingSessions > 0 || (horse.lastShowEntries || 0) > 0)) {
     nextBond -= 5;
   }
   const minBond = horse.isRescue ? -50 : 0;
@@ -5324,7 +5324,7 @@ function createHorseCard(horse, options = {}) {
   const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
   horse.focusToleranceMonths = focusTolerance;
   const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${Math.round(horse.behavior || 0)} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${horse.soundnessYears.toFixed(1)} years est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${Math.round(horse.behavior || 0)} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${HorseSoundness.format(horse)} years.months est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${canCompeteUnderSaddle(horse) ? 'Under saddle eligible' : 'In-hand/registry only until age 3'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${Number(v).toFixed(0)}</li>`; });
@@ -5651,7 +5651,7 @@ function npcSalesAdMarkup(horse) {
   const experience = conformationExperienceTier(horse);
   const showRecord = showRecordSummaryForCurrentLevels(horse);
   const stamina = horse.trainingPreference || 'Medium';
-  const soundness = Number.isFinite(horse.soundnessYears) ? `${horse.soundnessYears.toFixed(1)} years` : 'Unknown';
+  const soundness = Number.isFinite(horse.soundnessYears) ? `${HorseSoundness.format(horse)} years.months` : 'Unknown';
   return `
     <h3>${horseDisplayName(horse)}</h3>
     <p>${horse.gender} • ${horse.age} • ${horse.breed} •</p>
@@ -6108,7 +6108,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   let tackPenaltyBias = 0;
   let tackRefusalBias = 0;
   if (discipline === 'jumping') {
-    rails = Array.from({ length: jumpCount }, () => Math.random() < showjumpingPoleChance(horse, level)).filter(Boolean).length;
+    rails = rpgRoundStats ? (rpgRoundStats.rails || 0) : showjumpingRoundPlan(horse, level, interaction?.poleRoundKey, jumpCount).rails;
     const refusalChance = clamp(clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60) + equipmentModifiers(horse,discipline).refusal, 0, 100);
     refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = Math.random()*100 < Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8))*(1-equipmentModifiers(horse,discipline).fallReduction/100);
@@ -6644,7 +6644,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     const phaseText = String(step.phase || '').toLowerCase();
 
     if (session.discipline === 'jumping') {
-      const poleDown = Math.random() < showjumpingPoleChance(horse, session.level);
+      const poleDown = showjumpingSessionPole(session, horse, outcome);
       if (outcome !== 'fail' && !poleDown) {
         rs.clearJumps += 1;
         displayOutcome = 'Clear Jump';
@@ -8128,7 +8128,7 @@ function monthlyProgress(fromDayRollover = false) {
       h.injuryCountYear = 0;
       h.healthTrackingYear = app.year;
       if (!h.retiredForever && !h.retiredToBreeding) {
-        h.soundnessYears = Math.max(0, (h.soundnessYears ?? 0) - 1);
+        // Soundness aging is handled once by the elapsed-time longevity clock.
       }
     });
   }
