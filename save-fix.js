@@ -3,19 +3,26 @@
   const target=typeof Storage!=='undefined'&&localStorage instanceof Storage?Storage.prototype:localStorage;
   const read=target.getItem,write=target.setItem,prefix='OXERLZ1:',cache=new Map();
   function pack(text){
-    const input=unescape(encodeURIComponent(text)),dict=new Map(),out=[];let next=256,word='';
-    for(const ch of input){const combined=word+ch;if(combined.length===1||dict.has(combined)){word=combined;continue;}out.push(word.length===1?word.charCodeAt(0):dict.get(word));if(next<65000)dict.set(combined,next++);word=ch;}
-    if(word)out.push(word.length===1?word.charCodeAt(0):dict.get(word));
-    return prefix+out.map(c=>String.fromCharCode(c+1)).join('');
+    const input=unescape(encodeURIComponent(text)),dict=new Map(),out=[];let next=256,word=input.charCodeAt(0);
+    if(!input.length)return prefix;
+    for(let i=1;i<input.length;i++){
+      const ch=input.charCodeAt(i),key=word*256+ch,combined=dict.get(key);
+      if(combined!==undefined){word=combined;continue;}
+      out.push(String.fromCharCode(word+1));if(next<65000)dict.set(key,next++);word=ch;
+    }
+    out.push(String.fromCharCode(word+1));return prefix+out.join('');
   }
   function unpack(text){
     if(!text?.startsWith(prefix))return text;
-    const codes=text.slice(prefix.length).split('').map(c=>c.charCodeAt(0)-1),dict=[];let next=256,word=String.fromCharCode(codes.shift()),out=[word];
-    for(const code of codes){const entry=code<256?String.fromCharCode(code):dict[code]||(code===next?word+word[0]:null);if(entry===null)throw Error('Compressed save is corrupt.');out.push(entry);if(next<65000)dict[next++]=word+entry[0];word=entry;}
+    const dict=[],start=prefix.length;let next=256,word=String.fromCharCode(text.charCodeAt(start)-1);const out=[word];
+    for(let i=start+1;i<text.length;i++){
+      const code=text.charCodeAt(i)-1,entry=code<256?String.fromCharCode(code):dict[code]||(code===next?word+word[0]:null);
+      if(entry===null)throw Error('Compressed save is corrupt.');out.push(entry);if(next<65000)dict[next++]=word+entry[0];word=entry;
+    }
     return decodeURIComponent(escape(out.join('')));
   }
   target.getItem=function(key){const stored=read.call(this,key),old=cache.get(key);if(old&&old.stored===stored)return old.raw;const raw=unpack(stored);cache.set(key,{stored,raw});return raw;};
-  target.setItem=function(key,value){const raw=String(value),packed=String(key).startsWith('horse_game')&&raw.length>512?pack(raw):raw;const stored=packed.length<raw.length?packed:raw;write.call(this,key,stored);cache.set(key,{stored,raw});};
+  target.setItem=function(key,value){const raw=String(value),old=cache.get(key);if(old?.raw===raw&&read.call(this,key)===old.stored)return;const packed=String(key).startsWith('horse_game')&&raw.length>512?pack(raw):raw;const stored=packed.length<raw.length?packed:raw;write.call(this,key,stored);cache.set(key,{stored,raw});};
   if(typeof localStorage.key==='function'){const keys=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));for(const key of keys)if(key?.startsWith('horse_game'))try{const raw=read.call(localStorage,key);if(raw&&!raw.startsWith(prefix)&&raw.length>512){const packed=pack(raw);if(packed.length<raw.length)write.call(localStorage,key,packed);}}catch(error){console.warn('Existing save compaction deferred',error);}}
 })();
 /* Manual slots are snapshots. Autosave belongs to the separate session key. */
@@ -106,7 +113,7 @@ const VERIFIED_SAVE=saveGame;
 saveGame=function(manual=true,name=''){
   const priorScope=app.saveScope,priorSchedule=app.autosaveSchedule;
   try{
-    validatePersistentState(JSON.parse(serializeAppState()));
+    validatePersistentState(app);
     if(manual){const selected=(name||resolveSelectedSaveName()).trim()||DEFAULT_SAVE_SLOT;app.saveScope='slot:'+selected;}
     ensureSaveSchedule();
     const ok=VERIFIED_SAVE(manual,name);
