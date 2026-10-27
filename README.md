@@ -149,3 +149,7 @@ Verified saves, scoped quarterly backup recovery, owned-horse buyer workflows, c
 ## Performance update
 
 Visible-panel redraws, faster compatible save compression and scoped UI-state scans reduce work during normal play. See [PERFORMANCE-VALIDATION.md](PERFORMANCE-VALIDATION.md) for measurements and compatibility checks. Run `npm test` for all feature checks and `npm run test:benchmark` for the informational save benchmark.
+
+## Soundness longevity, therapy and round pole faults
+
+Soundness now uses an integer-month clock and years.months display. Veterinary therapy is an interactive fourteen-day course; routine history/receipt controls preserve authoritative clinical and financial records. Showjumping uses one height-based pole-event chance per whole round. See [SOUNDNESS-THERAPY-VALIDATION.md](SOUNDNESS-THERAPY-VALIDATION.md) for effective rules, migration details and all validation results.
