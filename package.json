@@ -2,8 +2,10 @@
   "name": "oxer-to-oxer-stable-manager",
   "private": true,
   "scripts": {
-    "test": "node --test tests/recovery-rebuild.test.cjs tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs tests/performance.test.cjs tests/longevity.test.cjs && node tests/integration.test.cjs && node tests/longevity-integration.cjs && node tests/run-regressions.cjs",
+    "test": "node --test tests/recovery-rebuild.test.cjs tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs tests/performance.test.cjs tests/longevity.test.cjs && node tests/expansion.test.cjs && node tests/integration.test.cjs && node tests/longevity-integration.cjs && node tests/run-regressions.cjs",
     "test:recovery-population": "node tests/simulate-recovery.cjs",
-    "test:benchmark": "node tests/benchmark-save.cjs"
+    "test:benchmark": "node tests/benchmark-save.cjs",
+    "test:expansion": "node tests/expansion.test.cjs",
+    "test:benchmark-expansion": "node tests/benchmark-expansion.cjs"
   }
 }
