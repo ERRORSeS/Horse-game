@@ -1,0 +1,30 @@
+{
+  "script.js": {
+    "unchanged": true,
+    "sha256": "e0d66d9ab3914bbc96c63e8f4d1e85a182f59579058d0620d5d6fd2201b34df9"
+  },
+  "care-fixes.js": {
+    "unchanged": true,
+    "sha256": "d217517c1ca5e62c35f1488b7781e8d837cb6caf1d178ee6b5fcef51f0048379"
+  },
+  "care-sales.js": {
+    "unchanged": true,
+    "sha256": "2c2d9621cef32125d6a8d79dd8a43ede41b9d1a3614e4b5d6081802b01c99823"
+  },
+  "behavior.js": {
+    "unchanged": true,
+    "sha256": "50a5d3862f78e887977c4bcc829be59b989b21380187ba4a5dfa09ff774ef607"
+  },
+  "tack.js": {
+    "unchanged": true,
+    "sha256": "95383d886ef24094d56f2116af58def2255b1a5ba4c615ae659c7108ea24bad6"
+  },
+  "management.js": {
+    "unchanged": true,
+    "sha256": "83bcd967d60f7950ad011f0e4a44c150d3705cafeb0390b1297d1f09f04b4107"
+  },
+  "pasture.js": {
+    "unchanged": true,
+    "sha256": "0bceff6cfec9cf6e0ef16ff5f4351ee2b6ca9dc91499403789679edb3c671cdc"
+  }
+}

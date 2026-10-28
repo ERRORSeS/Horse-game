@@ -95,10 +95,14 @@ render=function(...args){const result=SAVE_FEEDBACK_RENDER(...args);saveFeedback
 
 // Verified persistence and quarterly backups, isolated by the active save scope.
 const QUARTERLY_SAVE_KEY=SAVE_KEY+'_quarterly_v1';
-function commitSaveValue(key,value){localStorage.setItem(key,value);if(localStorage.getItem(key)!==value)throw new Error('Browser storage did not confirm the saved data.');}
+function commitSaveValue(key,value){
+  const previous=localStorage.getItem(key);
+  try{localStorage.setItem(key,value);if(localStorage.getItem(key)!==value)throw new Error('Browser storage did not confirm the saved data.');}
+  catch(error){try{if(localStorage.getItem(key)!==previous){if(previous===null)localStorage.removeItem(key);else localStorage.setItem(key,previous);}}catch(restoreError){console.error('Save rollback failed',restoreError);}throw error;}
+}
 writeSaveSlotsStore=function(store){commitSaveValue(SAVE_SLOTS_KEY,JSON.stringify({version:1,activeSlot:store.activeSlot||'',slots:store.slots||{}}));};
 function validatePersistentState(data){
-  if(!data||!Array.isArray(data.horses)||!Number.isFinite(data.money)||data.money<0)throw new Error('The current stable or currency data is invalid.');
+  if(!data||!Array.isArray(data.horses)||!Number.isFinite(data.money))throw new Error('The current stable or currency data is invalid.');
   if(!Number.isInteger(data.year)||data.year<1||!Number.isInteger(data.month)||data.month<1||data.month>12||!Number.isInteger(data.day)||data.day<1||data.day>30)throw new Error('The current calendar is invalid.');
   const ids=new Set();for(const h of data.horses){if(!h||!h.id||typeof h.name!=='string'||ids.has(h.id))throw new Error('A horse has missing or duplicate identity data.');ids.add(h.id);}
   return data;
@@ -111,15 +115,15 @@ function ensureSaveSchedule(){
 }
 const VERIFIED_SAVE=saveGame;
 saveGame=function(manual=true,name=''){
-  const priorScope=app.saveScope,priorSchedule=app.autosaveSchedule;
+  const priorScope=app.saveScope,priorSchedule=app.autosaveSchedule,priorSavedAt=app.lastSuccessfulSave;
   try{
     validatePersistentState(app);
     if(manual){const selected=(name||resolveSelectedSaveName()).trim()||DEFAULT_SAVE_SLOT;app.saveScope='slot:'+selected;}
     ensureSaveSchedule();
-    const ok=VERIFIED_SAVE(manual,name);
-    if(manual){if(!ok){app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;}saveFeedback(ok?'Game saved successfully.':'Save failed. Your progress has not been confirmed as saved.',!ok);}
+    app.lastSuccessfulSave=new Date().toISOString();const ok=VERIFIED_SAVE(manual,name);if(!ok)app.lastSuccessfulSave=priorSavedAt;
+    if(manual){if(!ok){app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;}saveFeedback(ok?'Game saved successfully.':'Save failed. Your previous valid save has been preserved.',!ok);}
     return ok;
-  }catch(error){app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;saveFeedback('Save failed. Your progress has not been confirmed as saved.',true);console.error('Save validation or persistence failed',error);return false;}
+  }catch(error){app.lastSuccessfulSave=priorSavedAt;app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;saveFeedback('Save failed. Your previous valid save has been preserved.',true);console.error('Save validation or persistence failed',error);return false;}
 };
 const SCHEDULE_HYDRATE=hydrateFromSave;
 hydrateFromSave=function(data){const result=SCHEDULE_HYDRATE(data);app.saveScope=data.saveScope||null;app.autosaveSchedule=data.autosaveSchedule?HorseHealth.copy(data.autosaveSchedule):null;ensureSaveSchedule();return result;};
@@ -147,3 +151,32 @@ const SCHEDULE_RESET=resetGame;
 resetGame=function(...args){app.saveScope=null;app.autosaveSchedule=null;const result=SCHEDULE_RESET(...args);ensureSaveSchedule();return result;};
 const SCHEDULE_FEEDBACK=saveFeedback;
 saveFeedback=function(message,error=false){SCHEDULE_FEEDBACK(message,error);const panel=document.getElementById('savePanel');if(!panel||typeof document.createElement!=='function')return;let controls=panel.querySelector?.('[data-quarterly-controls]');if(!controls){controls=document.createElement('div');controls.setAttribute('data-quarterly-controls','');controls.innerHTML='<p data-quarterly-dates></p><button type="button" data-load-backup>Load Autosave</button><button type="button" data-load-previous>Load Previous Autosave</button>';panel.appendChild(controls);controls.querySelector('[data-load-backup]').onclick=()=>{if(loadQuarterlyBackup())render();};controls.querySelector('[data-load-previous]').onclick=()=>{if(loadQuarterlyBackup(true))render();};}const s=ensureSaveSchedule(),fmt=n=>`Year ${Math.floor(n/12)+1}, Month ${n%12+1}`;controls.querySelector('[data-quarterly-dates]').textContent=`Last autosave: ${s.commits.length?fmt(s.lastBoundary):'None yet'}. Next autosave: ${fmt(s.nextBoundary)}.`;};
+
+// Portable files use the same authoritative snapshot and validation as named saves.
+function exportStableSave(){return JSON.stringify({format:'oxer-to-oxer',version:1,exportedAt:new Date().toISOString(),state:JSON.parse(serializeAppState())},null,2);}
+function validateImportedSave(text){
+  const file=JSON.parse(text);
+  if(file.format&&file.format!=='oxer-to-oxer')throw new Error('This file is not an Oxer to Oxer save.');
+  if(file.format&&file.version!==1)throw new Error('Unsupported save version.');
+  return validatePersistentState(file.format?file.state:file);
+}
+function importStableSave(text){
+  const data=validateImportedSave(text),before=serializeAppState();
+  try{hydrateFromSave(data);if(!saveGame(false))throw new Error('Imported progress could not be stored.');return true;}
+  catch(error){hydrateFromSave(JSON.parse(before));throw error;}
+}
+const PORTABLE_HYDRATE=hydrateFromSave;
+hydrateFromSave=function(data){const result=PORTABLE_HYDRATE(data);app.lastSuccessfulSave=data.lastSuccessfulSave||null;return result;};
+const PORTABLE_FEEDBACK=saveFeedback;
+saveFeedback=function(message,error=false){
+  PORTABLE_FEEDBACK(message,error);const panel=document.getElementById('savePanel');if(!panel||typeof Blob==='undefined')return;
+  let controls=panel.querySelector('[data-portable-save]');
+  if(!controls){controls=document.createElement('div');controls.setAttribute('data-portable-save','');controls.innerHTML='<p data-save-time></p><button type="button" data-export-save>Export Save</button><label>Import Save<input type="file" accept=".json,application/json" data-import-file></label><button type="button" data-validate-save>Validate Import</button><button type="button" data-import-save>Import Validated Save</button><p data-import-status role="status"></p>';panel.appendChild(controls);
+    let pending=null;
+    controls.querySelector('[data-import-file]').onchange=()=>{pending=null;controls.querySelector('[data-import-status]').textContent='Validate the selected file before importing.';};
+    controls.querySelector('[data-export-save]').onclick=()=>{const url=URL.createObjectURL(new Blob([exportStableSave()],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='oxer-to-oxer-save.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+    controls.querySelector('[data-validate-save]').onclick=async()=>{try{const file=controls.querySelector('[data-import-file]').files[0];if(!file)throw new Error('Select a save file first.');const text=await file.text(),data=validateImportedSave(text);pending={text,file};controls.querySelector('[data-import-status]').textContent=`Valid save: ${data.horses.length} horses, year ${data.year}, month ${data.month}. Import will replace the current session; named saves remain available.`;}catch(error){pending=null;controls.querySelector('[data-import-status]').textContent=error.message;}};
+    controls.querySelector('[data-import-save]').onclick=()=>{try{if(!pending||controls.querySelector('[data-import-file]').files[0]!==pending.file)throw new Error('Validate the selected file first.');importStableSave(pending.text);pending=null;render();saveFeedback('Save imported successfully.');}catch(error){controls.querySelector('[data-import-status]').textContent=error.message;}};
+  }
+  controls.querySelector('[data-save-time]').textContent='Last successful save: '+(app.lastSuccessfulSave?new Date(app.lastSuccessfulSave).toLocaleString():'None yet');
+};

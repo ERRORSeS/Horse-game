@@ -298,6 +298,7 @@
     if (!receipt)return {ok:false,message:'Insufficient funds.'};
     const report={id:eventId,day,type,clinicalSignature,horseId:h.id,observed:[],possible:[],diagnoses:[],recommendedTests:[],historyFindings:[],messages:[],tests:[exams[type][0]],restrictions:[],followup:day+7,uncertainty:'An examination cannot guarantee future soundness or exclude every subtle condition.',receipt:receipt.number};
     for (const c of h.medicalConditions.filter(c=>!c.resolved||c.residual)) {
+      if(c.diagnosis==='fever'&&['general','blood','respiratory','followup','intake'].includes(type)){investigateFever(state,h,c,type,day,report);continue;}
       const d=definition(c),movement=['muscle','hoof'].includes(d.category),relevant=(movement&&['soundness','lameness','joint'].includes(type))||d.tests.includes(type)||(type==='followup'&&c.confirmed)||(type==='intake'&&d.tests.includes('general'));
       if(!relevant)continue;
       const imaging=['ultrasound','radiographs','gastroscopy'].includes(type),chance=imaging?.9:['general','intake'].includes(type)?d.visible?.9:.4:.75;
@@ -610,6 +611,54 @@
     else{e.status='Transferred to Rehabilitation';e.dischargeDay=e.coveredUntil;c.hospitalized=false;c.homeCareStartsDay=e.coveredUntil;c.stage='Home Rehabilitation';}
     h.medicalTimeline.push({day,conditionId:c.id,kind:'Hospital course assessed',episodeId:e.id,status:e.status,findings:copy(e.latestAssessment)});
   }
+  // A fever is an observation with a saved diagnostic path, not a permanent diagnosis gate.
+  function feverEpisode(h,c){
+    if(c.feverInvestigation)return c.feverInvestigation;
+    const compatible=current(h).find(x=>x.id!==c.id&&x.confirmed&&['respiratory','strangles','skin-infection','digestive-illness'].includes(x.diagnosis));
+    const r=roll(h.healthSeed,'fever-path:'+c.id),branch=compatible?'existing':r<.30?'mild':r<.55?'respiratory':r<.70?'infectious':r<.80?'inflammatory':r<.95?'unexplained':'significant';
+    const cause=compatible|| (branch==='inflammatory'?current(h).find(x=>x.id!==c.id&&!definition(x).investigation):null);
+    if(cause)c.underlyingId=cause.id;
+    c.feverInvestigation={version:1,branch,evaluatedDay:null,observations:[],tests:[]};
+    c.recoveryProgress=Math.max(0,Math.min(c.recoveryDays,c.recoveryProgress||0));
+    return c.feverInvestigation;
+  }
+  function investigateFever(state,h,c,type,day,report){
+    const f=feverEpisode(h,c);f.evaluatedDay=day;if(!f.tests.includes(type))f.tests.push(type);
+    report.observed.push('Elevated temperature');if(f.branch==='respiratory'&&['general','intake'].includes(type)){report.observed.push('Occasional cough accompanying the fever');if(!c.symptoms.includes('Occasional cough'))c.symptoms.push('Occasional cough');}
+    report.messages.push(`The thermometer confirms that ${h.name}'s temperature is elevated.`);
+    if(!c.underlyingId&&(['blood','respiratory'].includes(type))){
+      const diagnosis={respiratory:'respiratory',infectious:'skin-infection',significant:'digestive-illness'}[f.branch];
+      if(diagnosis&&(type==='blood'||diagnosis==='respiratory')){
+        const cause=current(h).find(x=>x.diagnosis===diagnosis)||add(h,diagnosis,day,{cause:'Investigated fever episode',parentEpisodeId:c.id});
+        cause.known=cause.confirmed=true;c.underlyingId=cause.id;
+        if(!h.confirmedDiagnoses.some(x=>x.conditionId===cause.id))h.confirmedDiagnoses.push({conditionId:cause.id,name:definition(cause).name,day});
+        report.diagnoses.push(definition(cause).name);plan(h,cause.id,day);
+        report.messages.push('The veterinarian identifies an underlying condition requiring specific care.');
+      }
+    }
+    if(!c.underlyingId){report.messages.push('The veterinarian cannot yet identify a definite cause for the fever.');report.recommendedTests.push(...(f.branch==='respiratory'?['respiratory','blood']:['blood']).filter(t=>!f.tests.includes(t)));}
+    report.recommendedTests.push('followup');
+  }
+  function feverDay(h,c,day){
+    const before=c.recoveryProgress,f=feverEpisode(h,c),cause=h.medicalConditions.find(x=>x.id===c.underlyingId);c.lastClinicalDay=day;
+    if(cause){c.recoveryProgress=cause.resolved?c.recoveryDays:Math.min(c.recoveryDays,(cause.recoveryProgress/Math.max(1,cause.recoveryDays))*c.recoveryDays);}
+    else{
+      const r=roll(h.healthSeed,`fever-day:${c.id}:${day}`),evaluated=f.evaluatedDay!==null;
+      const outcome=r<.65?'Improving':r<.90?'Stable':r<.98?'Mild worsening':'Significant worsening';
+      const delta=outcome==='Improving'?(evaluated?1:.5):outcome==='Stable'?0:-.25;
+      c.recoveryProgress=bounded(c.recoveryProgress+delta,0,c.recoveryDays);c.healthState=outcome;
+      if(outcome==='Significant worsening')c.reviewRecommended=true;
+      f.observations.push({day,outcome,progress:c.recoveryProgress,temperature:Math.round((39.5-1.5*c.recoveryProgress/c.recoveryDays)*10)/10});
+    }
+    c.healingProgress=c.recoveryProgress/Math.max(1,c.recoveryDays)*100;
+    (c.clinicalHistory ||= []).push({day,outcome:c.healthState||'Underlying cause monitored',change:c.recoveryProgress-before,progress:c.healingProgress,careProvider:'MONITORING',quote:c.recoveryProgress>before?'The fever is beginning to settle.':"The horse's clinical signs have not changed significantly."});
+    if(c.recoveryProgress>=c.recoveryDays||(cause&&(cause.resolved||cause.outcome==='persistent'))){
+      c.resolved=true;c.resolvedDay=day;c.outcome='full';c.stage='Resolved';
+      h.previousConditions.push(copy(c));h.medicalRestrictions=h.medicalRestrictions.filter(x=>x.conditionId!==c.id);
+      h.rehabilitationPlans.filter(x=>x.conditionId===c.id).forEach(x=>x.status='Complete');
+      h.medicalTimeline.push({day,conditionId:c.id,kind:'Fever resolved',text:cause?'The fever observation has resolved following management of the underlying cause.':'The fever has resolved without an exact cause being confirmed.'});
+    }
+  }
   function advance(h,targetDay,context={},state) {
     ensure(h,targetDay);
     for(let day=h.healthProcessedDay+1;day<=targetDay;day++){
@@ -618,6 +667,7 @@
       for(const c of current(h)){
         hospitalRecord(h,c,day);
         const d=definition(c);if(c.outcome==='persistent')continue;
+        if(c.diagnosis==='fever'){feverDay(h,c,day);continue;}
         if(d.investigation){clinicalDay(h,c,{ok:false,reason:'Underlying cause requires investigation'},day);const cause=h.medicalConditions.find(r=>r.id===c.underlyingId);if(cause&&(cause.resolved||cause.outcome==='persistent')){c.resolved=true;c.resolvedDay=day;c.stage='Underlying Cause Managed';h.previousConditions.push(copy(c));}continue;}
         if(c.recoveryProgress>=c.recoveryDays&&!(c.specialistCare&&!c.criticalEvaluated&&['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis))){c.stage=d.chronic?'Stable / Managed':'Awaiting Follow-Up';continue;}
         if(c.criticalDecision==='unavailable'&&day>c.decisionDay){finish(h,c,day);if(h.deceased)break;continue;}

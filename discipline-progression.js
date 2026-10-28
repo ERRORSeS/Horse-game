@@ -31,3 +31,28 @@ const ORIGINAL_SKILL_FINISH=t2finish;
 t2finish=function(h,s){const r=ORIGINAL_SKILL_FINISH(h,s);if(r.disciplineFocus!==undefined)return r;r.disciplineFocus=s.disciplineSkill||'';const [group,skill]=r.disciplineFocus.split(':');if(skill){const key=group==='education'?(skill==='Confidence'?'Flatwork Confidence (education)':'Manners'):(group==='jumping'?'Jumping ':'Dressage ')+skill;const earned=r.progress[key]||0;r.notes.push(earned>0?`The work contributed directly to ${skill}, the selected discipline skill.`:`The selected skill received only limited training during this lesson.`);}return r;};
 const ORIGINAL_SKILL_REPORT=t2reportMarkup;
 t2reportMarkup=function(r){const html=ORIGINAL_SKILL_REPORT(r),entries=Object.entries(r.progress||{}).filter(([k,v])=>/^(Jumping |Dressage )/.test(k)&&v>0);return html.replace('<h4>Progress</h4>',`<h4>Progress</h4>${entries.length?'<p>Fractional original-skill progress is stored at full precision, even when the whole-number display has not yet changed.</p>':''}`);};
+
+// Completion rewards top up work already earned; viewing a report cannot grant rewards.
+function completedFocusReward(h,s){
+  if(s.completionReward||s.finished)return;
+  const [group,skill]=String(s.disciplineSkill||'').split(':'),work=s.log.filter(x=>x.exerciseId&&Number.isFinite(x.resultIndex));
+  if(!['jumping','dressage'].includes(group)||!Object.hasOwn(h.stats?.[group]||{},skill)||work.length<3||work.filter(x=>x.resultIndex<=3).length<2||work.reduce((n,x)=>n+(t2exercise(x.exerciseId)?.duration||0),0)<8)return;
+  const relevant=work.filter(x=>{const map=originalSkillMapping(t2exercise(x.exerciseId),s);return map.group===group&&(map.primary===skill||map.secondary===skill);});
+  if(relevant.length<2)return;
+  const t=t2horse(h);t.completedRewardIds ||= [];if(t.completedRewardIds.includes(s.id))return;
+  const roll=HorseHealth.roll(HorseHealth.hash(h.id+'|'+s.id),'completion-skill'),base=roll<.15?1:roll<.40?2:roll<.70?3:roll<.90?4:5;
+  const key=(group==='jumping'?'Jumping ':'Dressage ')+skill,earned=s.progress[key]||0,discipline=['eventing','hunter'].includes(s.discipline)?s.discipline:group,cap=Math.min(100,h.potential?.[discipline]??100);
+  const modifier=s.difficulty<-1?.75:t.traits.includes('Slow Learner')?.85:1,target=Math.max(1,Math.min(5,Math.round(base*modifier))),gain=Math.max(0,Math.min(target-earned,cap-h.stats[group][skill]));
+  h.stats[group][skill]+=gain;s.progress[key]=earned+gain;s.skillGain+=gain;h.handTrainingSkillGainsThisMonth=(h.handTrainingSkillGainsThisMonth||0)+gain;
+  const map=t2xMapping(t2exercise(relevant.at(-1).exerciseId),s),attribute=map.filter((x,i)=>i%2===0&&x!=='Sensitivity to Aids'&&(x!=='Recovery'||s.recoverySequences>0)).find(x=>x===s.goal)||map[0];
+  const ar=HorseHealth.roll(HorseHealth.hash(h.id+'|'+s.id),'completion-attribute'),desired=ar<.30?.1:ar<.65?.2:ar<.90?.3:.4;
+  let attributeGain=0;
+  if(attribute&&attribute!=='Sensitivity to Aids'&&(attribute!=='Recovery'||s.recoverySequences>0)){
+    const value=t2attribute(h,attribute),prior=s.progress['Riding '+attribute]||0;attributeGain=Math.max(0,Math.min(desired-prior,10-value));
+    if(attribute==='Focus')h.focus+=attributeGain*10;else t.attributes[attribute]=value+attributeGain;
+    s.progress['Riding '+attribute]=prior+attributeGain;s.attributeGain+=attributeGain;
+  }
+  s.completionReward={id:s.id,focus:s.disciplineSkill,base,target,skillGain:s.progress[key],attribute,attributeGain:s.progress['Riding '+attribute]||0};t.completedRewardIds.push(s.id);t.completedRewardIds=t.completedRewardIds.slice(-500);
+}
+const COMPLETED_FOCUS_FINISH=t2finish;
+t2finish=function(h,s){completedFocusReward(h,s);const report=COMPLETED_FOCUS_FINISH(h,s);if(s.completionReward){report.completionReward=s.completionReward;if(!report.notes.includes("Today's main skill and attribute gains have been recorded."))report.notes.push(gameNarrative('Training completion quotes',10,{HORSE:h.name}));}return report;};

@@ -729,19 +729,19 @@ const definitions={
  },
  "fever": {
   "daily": [
-   0.0,
-   85.0,
-   10.0,
-   5.0
+   65.0,
+   25.0,
+   8.0,
+   2.0
   ],
   "quotes": [
    "[HORSE] appears unusually quiet and unwell.",
    "The veterinarian confirms an elevated temperature, but the cause remains uncertain.",
    "Additional findings are helping narrow the possible cause.",
    "The horse's condition has worsened, making further investigation important.",
-   "The underlying cause has been identified and an appropriate treatment plan established."
+   "The fever has resolved without an exact cause being confirmed."
   ],
-  "recoveryDescription": "Recovery: Determined by underlying cause, not an independent 10-day timer."
+  "recoveryDescription": "Recovery: Monitored fever can improve or resolve while investigation continues; a confirmed underlying cause uses its own care pathway."
  },
  "weight-loss": {
   "daily": [
