@@ -17,14 +17,8 @@
       <button id="skipDayBtn" type="button">Skip Day</button>
       <button id="skipHourBtn" type="button">Skip Hour</button>
       <button id="addMoneyBtn" type="button">Add $100,000</button>
-      <button id="toggleSavePanelBtn" type="button" aria-controls="savePanel" aria-expanded="false">Save/Load ▾</button>
-      <div id="savePanel" class="save-panel hidden" aria-hidden="true">
-        <input id="saveNameInput" type="text" placeholder="Save name" aria-label="Save game name" />
-        <select id="saveSlotSelect" aria-label="Saved games list"></select>
-        <button id="saveGameBtn" type="button">Save Game</button>
-        <button id="loadGameBtn" type="button">Load Game</button>
-        <button id="deleteSaveBtn" type="button">Delete Save</button>
-      </div>
+      <button id="saveGameBtn" type="button">Save</button>
+      <span id="saveStatus" class="small" role="status" aria-live="polite"></span>
       <button id="resetGameBtn" type="button">Reset Game</button>
     </div>
   </header>
@@ -99,7 +93,7 @@
   <script src="care-shops.js?v=23"></script>
   <script src="sales-ui.js?v=23"></script>
   <script src="medical-ui.js?v=longevity-2"></script>
-  <script src="save-fix.js?v=746f8afd1b3d"></script>
+  <script src="save-fix.js?v=8d6b409c4e12"></script>
   <script src="browser-inputs.js?v=23"></script>
   <script src="critical-ui.js?v=29"></script>
   <script src="veterinary3-ui.js?v=4"></script>

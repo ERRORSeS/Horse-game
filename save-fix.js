@@ -25,158 +25,100 @@
   target.setItem=function(key,value){const raw=String(value),old=cache.get(key);if(old?.raw===raw&&read.call(this,key)===old.stored)return;const packed=String(key).startsWith('horse_game')&&raw.length>512?pack(raw):raw;const stored=packed.length<raw.length?packed:raw;write.call(this,key,stored);cache.set(key,{stored,raw});};
   if(typeof localStorage.key==='function'){const keys=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));for(const key of keys)if(key?.startsWith('horse_game'))try{const raw=read.call(localStorage,key);if(raw&&!raw.startsWith(prefix)&&raw.length>512){const packed=pack(raw);if(packed.length<raw.length)write.call(localStorage,key,packed);}}catch(error){console.warn('Existing save compaction deferred',error);}}
 })();
-/* Manual slots are snapshots. Autosave belongs to the separate session key. */
+/* Manual slots are retired: all saves update one verified stable record. */
+const QUARTERLY_SAVE_KEY=SAVE_KEY+'_quarterly_v1';
+let singleSaveLoadBlocked=false;
 function saveFeedback(message,error=false){
   app.saveFeedback={message,error};
-  const panel=document.getElementById('savePanel');if(!panel)return;
-  let status=panel.querySelector?.('[data-save-status]');
-  if(!status){status=document.createElement('p');status.setAttribute('data-save-status','');panel.appendChild(status);}
+  const status=document.getElementById('saveStatus');if(!status)return;
   status.setAttribute('role',error?'alert':'status');status.textContent=message;
 }
-function readSaveStoreForWrite(){
-  const raw=localStorage.getItem(SAVE_SLOTS_KEY);if(!raw)return {activeSlot:'',slots:Object.create(null)};
-  const store=JSON.parse(raw);
-  if(!store||typeof store!=='object'||!store.slots||typeof store.slots!=='object'||Array.isArray(store.slots))throw new Error('The existing save list could not be read. It has been left unchanged.');
-  return {activeSlot:typeof store.activeSlot==='string'?store.activeSlot:'',slots:Object.assign(Object.create(null),store.slots)};
-}
-refreshSaveSlotsUi=function(selectedName=''){
-  const select=document.getElementById('saveSlotSelect');if(!select)return;
-  const previous=select.value,names=saveSlotNames(),chosen=selectedName||previous||names[0]||'';
-  select.innerHTML=names.length?names.map(name=>`<option value="${csEscape(name)}">${csEscape(name)}</option>`).join(''):'<option value="">No saves yet</option>';
-  if(names.includes(chosen))select.value=chosen;
-};
-saveGame=function(manual=true,saveName=''){
-  if(careMigrationBlocked){saveFeedback('Saving is blocked because the original save backup could not be stored.',true);return false;}
-  try{
-    app.careVersion=CARE_VERSION;
-    const payload=serializeAppState();
-    if(!manual){commitSaveValue(SAVE_KEY,payload);return true;}
-    const name=(saveName||resolveSelectedSaveName()).trim()||DEFAULT_SAVE_SLOT;
-    const store=readSaveStoreForWrite();
-    store.slots[name]={updatedAt:new Date().toISOString(),payload};store.activeSlot=name;
-    writeSaveSlotsStore(store);
-    let warning='';
-    try{commitSaveValue(SAVE_KEY,payload);}catch(error){warning=' The named save is stored, but the session autosave could not be updated.';}
-    refreshSaveSlotsUi(name);pushReport(`Game saved to "${name}".`);
-    saveFeedback(`Saved "${name}". This snapshot will stay unchanged until you save over it.`+warning,Boolean(warning));
-    return true;
-  }catch(error){
-    console.error('Save failed',error);
-    saveFeedback('Saving failed. Your existing named saves have not been replaced. '+(/quota|storage|space/i.test(error.name+' '+error.message)?'Browser storage may be full or unavailable.':error.message),true);return false;
-  }
-};
-loadGame=function(manual=true,saveName=''){
-  let rollback;
-  try{
-    const store=readSaveSlotsStore();
-    const name=(saveName||(manual?resolveLoadSaveName():'' )||'').trim();
-    let raw,nameUsed=name;
-    if(name){raw=Object.hasOwn(store.slots,name)?store.slots[name].payload:'';}
-    else if(!manual){raw=localStorage.getItem(SAVE_KEY);if(!raw){nameUsed=store.activeSlot||Object.keys(store.slots)[0]||'';raw=store.slots[nameUsed]?.payload;}}
-    else {nameUsed=store.activeSlot||'';raw=store.slots[nameUsed]?.payload;}
-    if(!raw){if(manual)saveFeedback(nameUsed?`Saved game "${nameUsed}" was not found.`:'No saved game is available yet.',true);return false;}
-    const data=JSON.parse(raw);if(!data||typeof data!=='object'||!Array.isArray(data.horses))throw new Error('The selected save does not contain a valid horse roster.');
-    rollback=serializeAppState();hydrateFromSave(data);if(nameUsed&&app.saveScope!=='slot:'+nameUsed){app.saveScope='slot:'+nameUsed;app.autosaveSchedule=null;ensureSaveSchedule();}
-    let warning='';
-    try{
-      commitSaveValue(SAVE_KEY,serializeAppState());
-      if(nameUsed){store.activeSlot=nameUsed;writeSaveSlotsStore(store);}
-    }catch(error){warning=' The game loaded, but browser storage could not update the current session.';}
-    refreshSaveSlotsUi(nameUsed||store.activeSlot);
-    if(manual){pushReport(`Game loaded from "${nameUsed}" successfully.`);saveFeedback(`Loaded "${nameUsed}". Money, date and horse progress have been restored.`+warning,Boolean(warning));}
-    return true;
-  }catch(error){
-    if(rollback)try{hydrateFromSave(JSON.parse(rollback));}catch(rollbackError){console.error('Unable to restore the previous session',rollbackError);}
-    console.error('Load failed',error);if(manual)saveFeedback('Loading failed. '+error.message,true);return false;
-  }
-};
-const SAVE_FEEDBACK_RENDER=render;
-render=function(...args){const result=SAVE_FEEDBACK_RENDER(...args);saveFeedback(app.saveFeedback?.message||'Manual saves and three-month backups are separate.',app.saveFeedback?.error||false);return result;};
-
-// Verified persistence and quarterly backups, isolated by the active save scope.
-const QUARTERLY_SAVE_KEY=SAVE_KEY+'_quarterly_v1';
-function commitSaveValue(key,value){
-  const previous=localStorage.getItem(key);
-  try{localStorage.setItem(key,value);if(localStorage.getItem(key)!==value)throw new Error('Browser storage did not confirm the saved data.');}
-  catch(error){try{if(localStorage.getItem(key)!==previous){if(previous===null)localStorage.removeItem(key);else localStorage.setItem(key,previous);}}catch(restoreError){console.error('Save rollback failed',restoreError);}throw error;}
-}
-writeSaveSlotsStore=function(store){commitSaveValue(SAVE_SLOTS_KEY,JSON.stringify({version:1,activeSlot:store.activeSlot||'',slots:store.slots||{}}));};
 function validatePersistentState(data){
   if(!data||!Array.isArray(data.horses)||!Number.isFinite(data.money))throw new Error('The current stable or currency data is invalid.');
   if(!Number.isInteger(data.year)||data.year<1||!Number.isInteger(data.month)||data.month<1||data.month>12||!Number.isInteger(data.day)||data.day<1||data.day>30)throw new Error('The current calendar is invalid.');
   const ids=new Set();for(const h of data.horses){if(!h||!h.id||typeof h.name!=='string'||ids.has(h.id))throw new Error('A horse has missing or duplicate identity data.');ids.add(h.id);}
   return data;
 }
+function commitSaveValue(key,value){
+  const previous=localStorage.getItem(key);
+  try{localStorage.setItem(key,value);if(localStorage.getItem(key)!==value)throw new Error('Browser storage did not confirm the saved data.');}
+  catch(error){try{if(localStorage.getItem(key)!==previous){if(previous===null)localStorage.removeItem(key);else localStorage.setItem(key,previous);}}catch(restoreError){console.error('Save rollback failed',restoreError);}throw error;}
+}
+function singleSaveKeys(){
+  const keys=[SAVE_KEY,SAVE_SLOTS_KEY,QUARTERLY_SAVE_KEY];
+  if(typeof localStorage.key==='function')for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('horse_game_pre_care_v1_'))keys.push(key);}
+  return [...new Set(keys)];
+}
+function persistSingleSave(payload){
+  // Replacing an existing storage value is atomic. If duplicates exhaust quota,
+  // replace the largest legacy record first, without deleting the last good save.
+  const records=singleSaveKeys().map(key=>{try{return {key,raw:localStorage.getItem(key)};}catch(error){return {key,raw:null,unreadable:true};}}),fallback=records.filter(r=>r.key!==SAVE_KEY&&r.raw!==null).sort((a,b)=>b.raw.length-a.raw.length);
+  let failure;
+  for(const record of [records[0],...fallback]){
+    try{commitSaveValue(record.key,payload);}catch(error){failure=error;continue;}
+    // Only retire old copies after the full new record has been read back.
+    for(const old of records)if(old.key!==record.key&&(old.raw!==null||old.unreadable))try{localStorage.removeItem(old.key);}catch(error){console.warn('Old save cleanup deferred',error);}
+    return record.key;
+  }
+  throw failure||new Error('Browser storage is unavailable.');
+}
 function saveMonthIndex(){return (app.year-1)*12+app.month-1;}
 function ensureSaveSchedule(){
-  if(!app.saveScope)app.saveScope='stable:'+HorseHealth.hash(app.horses.map(h=>h.id).join('|'));
+  app.saveScope='stable:single';
   if(!app.autosaveSchedule||app.autosaveSchedule.scope!==app.saveScope)app.autosaveSchedule={scope:app.saveScope,lastBoundary:saveMonthIndex(),nextBoundary:saveMonthIndex()+3,commits:[]};
   return app.autosaveSchedule;
 }
-const VERIFIED_SAVE=saveGame;
-saveGame=function(manual=true,name=''){
-  const priorScope=app.saveScope,priorSchedule=app.autosaveSchedule,priorSavedAt=app.lastSuccessfulSave;
+saveGame=function(manual=true){
+  const previous=app.lastSuccessfulSave;
   try{
-    validatePersistentState(app);
-    if(manual){const selected=(name||resolveSelectedSaveName()).trim()||DEFAULT_SAVE_SLOT;app.saveScope='slot:'+selected;}
-    ensureSaveSchedule();
-    app.lastSuccessfulSave=new Date().toISOString();const ok=VERIFIED_SAVE(manual,name);if(!ok)app.lastSuccessfulSave=priorSavedAt;
-    if(manual){if(!ok){app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;}saveFeedback(ok?'Game saved successfully.':'Save failed. Your previous valid save has been preserved.',!ok);}
-    return ok;
-  }catch(error){app.lastSuccessfulSave=priorSavedAt;app.saveScope=priorScope;app.autosaveSchedule=priorSchedule;saveFeedback('Save failed. Your previous valid save has been preserved.',true);console.error('Save validation or persistence failed',error);return false;}
+    if(singleSaveLoadBlocked)throw new Error('The existing save could not be loaded. Reload before saving to protect it.');
+    validatePersistentState(app);app.careVersion=CARE_VERSION;ensureSaveSchedule();app.lastSuccessfulSave=new Date().toISOString();
+    const payload=serializeAppState();persistSingleSave(payload);careMigrationBlocked=false;
+    saveFeedback('Saved · '+new Date(app.lastSuccessfulSave).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));return true;
+  }catch(error){app.lastSuccessfulSave=previous;saveFeedback('Save failed. Your previous save is preserved. '+(/quota|storage|space/i.test(error.name+' '+error.message)?'Browser storage is full or unavailable.':error.message),true);console.error('Save failed',error);return false;}
 };
-const SCHEDULE_HYDRATE=hydrateFromSave;
-hydrateFromSave=function(data){const result=SCHEDULE_HYDRATE(data);app.saveScope=data.saveScope||null;app.autosaveSchedule=data.autosaveSchedule?HorseHealth.copy(data.autosaveSchedule):null;ensureSaveSchedule();return result;};
+function singleSaveCandidates(){
+  const candidates=[];let found=false;
+  const add=(payload,priority)=>{try{const data=validatePersistentState(typeof payload==='string'?JSON.parse(payload):payload);candidates.push({data,priority});}catch(error){/* Try the next preserved legacy record. */}};
+  for(const key of singleSaveKeys()){
+    let raw;try{raw=localStorage.getItem(key);}catch(error){found=true;continue;}if(!raw)continue;found=true;
+    let data;try{data=JSON.parse(raw);}catch(error){continue;}
+    if(Array.isArray(data.horses)){add(data,0);continue;}
+    if(data.slots){const entries=Object.entries(data.slots).sort((a,b)=>String(b[1]?.updatedAt||'').localeCompare(String(a[1]?.updatedAt||'')));const active=data.slots[data.activeSlot];if(active)add(active.payload,2);for(const [,slot]of entries)add(slot?.payload,3);}
+    if(data.scopes)for(const scope of Object.values(data.scopes)){add(scope.current?.payload,4);add(scope.previous?.payload,5);}
+    if(data.source)add(data.source,6);
+  }
+  candidates.sort((a,b)=>a.priority-b.priority||(a.priority===0?String(b.data.lastSuccessfulSave||'').localeCompare(String(a.data.lastSuccessfulSave||'')):0));return {found,candidates};
+}
+loadGame=function(manual=true){
+  let rollback;
+  try{
+    const {found,candidates}=singleSaveCandidates();
+    if(!candidates.length){if(found)throw new Error('The saved stable could not be read. It has been left untouched.');return false;}
+    rollback=serializeAppState();hydrateFromSave(candidates[0].data);singleSaveLoadBlocked=false;
+    // Loading does not write or prune storage. The next successful save consolidates it.
+    saveFeedback('Progress restored automatically.');return true;
+  }catch(error){if(rollback)try{hydrateFromSave(JSON.parse(rollback));}catch(restoreError){console.error('Load rollback failed',restoreError);}singleSaveLoadBlocked=true;saveFeedback('Load failed. '+error.message,true);console.error('Load failed',error);return false;}
+};
+refreshSaveSlotsUi=function(){};
+// Migration can hydrate directly from the preserved source. It must not require
+// another full localStorage backup before loading a nearly-full storage area.
+csMigrate=function(){};
+const SINGLE_HYDRATE=hydrateFromSave;
+hydrateFromSave=function(data){const result=SINGLE_HYDRATE(data);app.lastSuccessfulSave=data.lastSuccessfulSave||null;app.saveScope='stable:single';app.autosaveSchedule=data.autosaveSchedule?HorseHealth.copy(data.autosaveSchedule):null;ensureSaveSchedule();return result;};
 function processQuarterlyAutosave(){
   const schedule=ensureSaveSchedule(),now=saveMonthIndex();if(now<schedule.nextBoundary)return false;
-  const before=HorseHealth.copy(schedule);
-  try{
-    const raw=localStorage.getItem(QUARTERLY_SAVE_KEY),store=raw?JSON.parse(raw):{version:1,scopes:{}};
-    if(!store.scopes||typeof store.scopes!=='object')throw new Error('The backup store is unreadable.');
-    schedule.lastBoundary=now;while(schedule.nextBoundary<=now)schedule.nextBoundary+=3;
-    schedule.commits.push({year:app.year,month:app.month,boundary:now});
-    const payload=serializeAppState();validatePersistentState(JSON.parse(payload));
-    const prior=store.scopes[app.saveScope];store.scopes[app.saveScope]={current:{payload,year:app.year,month:app.month,boundary:now},previous:validQuarterlyRecord(prior?.current,app.saveScope)?prior.current:validQuarterlyRecord(prior?.previous,app.saveScope)?prior.previous:null};
-    commitSaveValue(QUARTERLY_SAVE_KEY,JSON.stringify(store));
-    saveFeedback(`Autosaved — Year ${app.year}, Month ${app.month}`);return true;
-  }catch(error){app.autosaveSchedule=before;saveFeedback('Autosave failed. Please save manually.',true);console.error('Quarterly autosave failed',error);return false;}
+  const before=HorseHealth.copy(schedule);schedule.lastBoundary=now;while(schedule.nextBoundary<=now)schedule.nextBoundary+=3;
+  schedule.commits.push({year:app.year,month:app.month,boundary:now});schedule.commits=schedule.commits.slice(-12);
+  if(saveGame(false))return true;app.autosaveSchedule=before;return false;
 }
-function validQuarterlyRecord(record,scope){try{const data=validatePersistentState(JSON.parse(record?.payload));return !data.saveScope||data.saveScope===scope;}catch(error){return false;}}
-function loadQuarterlyBackup(previous=false){
-  let rollback;try{ensureSaveSchedule();const scope=app.saveScope,record=JSON.parse(localStorage.getItem(QUARTERLY_SAVE_KEY)||'{}').scopes?.[scope]?.[previous?'previous':'current'];if(!validQuarterlyRecord(record,scope))throw new Error('No valid backup exists for this save.');const data=validatePersistentState(JSON.parse(record.payload));rollback=serializeAppState();hydrateFromSave(data);if(!saveGame(false)){saveFeedback('The backup loaded, but current progress has not been confirmed as saved.',true);return true;}saveFeedback('Backup loaded successfully.');return true;}catch(error){if(rollback)try{hydrateFromSave(JSON.parse(rollback));}catch(restoreError){console.error('Backup rollback failed',restoreError);}saveFeedback('Loading failed. The backup has been left unchanged.',true);return false;}
-}
-const SCHEDULE_MONTH=monthlyProgress;
-monthlyProgress=function(...args){ensureSaveSchedule();const result=SCHEDULE_MONTH(...args);processQuarterlyAutosave();return result;};
-const SCHEDULE_RESET=resetGame;
-resetGame=function(...args){app.saveScope=null;app.autosaveSchedule=null;const result=SCHEDULE_RESET(...args);ensureSaveSchedule();return result;};
-const SCHEDULE_FEEDBACK=saveFeedback;
-saveFeedback=function(message,error=false){SCHEDULE_FEEDBACK(message,error);const panel=document.getElementById('savePanel');if(!panel||typeof document.createElement!=='function')return;let controls=panel.querySelector?.('[data-quarterly-controls]');if(!controls){controls=document.createElement('div');controls.setAttribute('data-quarterly-controls','');controls.innerHTML='<p data-quarterly-dates></p><button type="button" data-load-backup>Load Autosave</button><button type="button" data-load-previous>Load Previous Autosave</button>';panel.appendChild(controls);controls.querySelector('[data-load-backup]').onclick=()=>{if(loadQuarterlyBackup())render();};controls.querySelector('[data-load-previous]').onclick=()=>{if(loadQuarterlyBackup(true))render();};}const s=ensureSaveSchedule(),fmt=n=>`Year ${Math.floor(n/12)+1}, Month ${n%12+1}`;controls.querySelector('[data-quarterly-dates]').textContent=`Last autosave: ${s.commits.length?fmt(s.lastBoundary):'None yet'}. Next autosave: ${fmt(s.nextBoundary)}.`;};
-
-// Portable files use the same authoritative snapshot and validation as named saves.
+const SINGLE_MONTH=monthlyProgress;
+monthlyProgress=function(...args){ensureSaveSchedule();const result=SINGLE_MONTH(...args);processQuarterlyAutosave();return result;};
+const SINGLE_RESET=resetGame;
+resetGame=function(...args){singleSaveLoadBlocked=false;app.lastSuccessfulSave=null;app.saveScope=null;app.autosaveSchedule=null;return SINGLE_RESET(...args);};
+const SINGLE_RENDER=render;
+render=function(...args){const result=SINGLE_RENDER(...args);saveFeedback(app.saveFeedback?.message||'One save · Progress resumes automatically.',app.saveFeedback?.error||false);return result;};
+// Portable helpers remain compatible with previously exported files.
 function exportStableSave(){return JSON.stringify({format:'oxer-to-oxer',version:1,exportedAt:new Date().toISOString(),state:JSON.parse(serializeAppState())},null,2);}
-function validateImportedSave(text){
-  const file=JSON.parse(text);
-  if(file.format&&file.format!=='oxer-to-oxer')throw new Error('This file is not an Oxer to Oxer save.');
-  if(file.format&&file.version!==1)throw new Error('Unsupported save version.');
-  return validatePersistentState(file.format?file.state:file);
-}
-function importStableSave(text){
-  const data=validateImportedSave(text),before=serializeAppState();
-  try{hydrateFromSave(data);if(!saveGame(false))throw new Error('Imported progress could not be stored.');return true;}
-  catch(error){hydrateFromSave(JSON.parse(before));throw error;}
-}
-const PORTABLE_HYDRATE=hydrateFromSave;
-hydrateFromSave=function(data){const result=PORTABLE_HYDRATE(data);app.lastSuccessfulSave=data.lastSuccessfulSave||null;return result;};
-const PORTABLE_FEEDBACK=saveFeedback;
-saveFeedback=function(message,error=false){
-  PORTABLE_FEEDBACK(message,error);const panel=document.getElementById('savePanel');if(!panel||typeof Blob==='undefined')return;
-  let controls=panel.querySelector('[data-portable-save]');
-  if(!controls){controls=document.createElement('div');controls.setAttribute('data-portable-save','');controls.innerHTML='<p data-save-time></p><button type="button" data-export-save>Export Save</button><label>Import Save<input type="file" accept=".json,application/json" data-import-file></label><button type="button" data-validate-save>Validate Import</button><button type="button" data-import-save>Import Validated Save</button><p data-import-status role="status"></p>';panel.appendChild(controls);
-    let pending=null;
-    controls.querySelector('[data-import-file]').onchange=()=>{pending=null;controls.querySelector('[data-import-status]').textContent='Validate the selected file before importing.';};
-    controls.querySelector('[data-export-save]').onclick=()=>{const url=URL.createObjectURL(new Blob([exportStableSave()],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='oxer-to-oxer-save.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
-    controls.querySelector('[data-validate-save]').onclick=async()=>{try{const file=controls.querySelector('[data-import-file]').files[0];if(!file)throw new Error('Select a save file first.');const text=await file.text(),data=validateImportedSave(text);pending={text,file};controls.querySelector('[data-import-status]').textContent=`Valid save: ${data.horses.length} horses, year ${data.year}, month ${data.month}. Import will replace the current session; named saves remain available.`;}catch(error){pending=null;controls.querySelector('[data-import-status]').textContent=error.message;}};
-    controls.querySelector('[data-import-save]').onclick=()=>{try{if(!pending||controls.querySelector('[data-import-file]').files[0]!==pending.file)throw new Error('Validate the selected file first.');importStableSave(pending.text);pending=null;render();saveFeedback('Save imported successfully.');}catch(error){controls.querySelector('[data-import-status]').textContent=error.message;}};
-  }
-  controls.querySelector('[data-save-time]').textContent='Last successful save: '+(app.lastSuccessfulSave?new Date(app.lastSuccessfulSave).toLocaleString():'None yet');
-};
+function validateImportedSave(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer')throw new Error('This file is not an Oxer to Oxer save.');if(file.format&&file.version!==1)throw new Error('Unsupported save version.');return validatePersistentState(file.format?file.state:file);}
+function importStableSave(text){const data=validateImportedSave(text),before=serializeAppState();try{hydrateFromSave(data);if(!saveGame(false))throw new Error('Imported progress could not be stored.');return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
