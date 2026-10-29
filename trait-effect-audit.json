@@ -1,0 +1,938 @@
+[
+  {
+    "id": "Rushes Fences",
+    "name": "Rushes Fences",
+    "description": "Increases rushing in the jump context.",
+    "event": "rushing",
+    "value": 7,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] lifts its head to inspect the unfamiliar fence decorations.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Cautious Jumper",
+    "name": "Cautious Jumper",
+    "description": "Increases hesitation in the newFence context.",
+    "event": "hesitation",
+    "value": 5,
+    "trigger": "newFence",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse settles quickly despite the surrounding activity.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Bold Jumper"
+    ]
+  },
+  {
+    "id": "Bold Jumper",
+    "name": "Bold Jumper",
+    "description": "Reduces hesitation in the familiarFence context.",
+    "event": "hesitation",
+    "value": -4,
+    "trigger": "familiarFence",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] becomes increasingly eager as the next jump approaches.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Cautious Jumper"
+    ]
+  },
+  {
+    "id": "Hesitates at Fillers",
+    "name": "Hesitates at Fillers",
+    "description": "Increases hesitation in the filler context.",
+    "event": "hesitation",
+    "value": 9,
+    "trigger": "filler",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+9 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse hesitates, appearing to assess the unusual obstacle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Water-Shy",
+    "name": "Water-Shy",
+    "description": "Increases hesitation in the water context.",
+    "event": "hesitation",
+    "value": 12,
+    "trigger": "water",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+12 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] loses some impulsion through the corner.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Overjumps",
+    "name": "Overjumps",
+    "description": "Increases overjump in the jump context.",
+    "event": "overjump",
+    "value": 7,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse returns its focus after a quiet correction.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Careful Front End",
+    "name": "Careful Front End",
+    "description": "Reduces frontRail in the jump context.",
+    "event": "frontRail",
+    "value": -3,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] responds immediately to the subtle aid.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Trails Hind Legs",
+    "name": "Trails Hind Legs",
+    "description": "Increases hindRail in the jump context.",
+    "event": "hindRail",
+    "value": 4,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse becomes distracted by a nearby movement.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Long Stride Tendency",
+    "name": "Long Stride Tendency",
+    "description": "Increases distance in the shortLine context.",
+    "event": "distance",
+    "value": 3,
+    "trigger": "shortLine",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] approaches the unfamiliar ramp with confidence.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Short Stride Tendency"
+    ]
+  },
+  {
+    "id": "Short Stride Tendency",
+    "name": "Short Stride Tendency",
+    "description": "Increases distance in the longLine context.",
+    "event": "distance",
+    "value": 3,
+    "trigger": "longLine",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse appears more comfortable with the familiar transport routine.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Long Stride Tendency"
+    ]
+  },
+  {
+    "id": "Drifts Left to Fences",
+    "name": "Drifts Left to Fences",
+    "description": "Increases drift in the jump context.",
+    "event": "drift",
+    "value": 6,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] is reluctant to leave the stable aisle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Drifts Right to Fences"
+    ]
+  },
+  {
+    "id": "Drifts Right to Fences",
+    "name": "Drifts Right to Fences",
+    "description": "Increases drift in the jump context.",
+    "event": "drift",
+    "value": 6,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse maintains its usual relaxed demeanor during the noisy arrival.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Drifts Left to Fences"
+    ]
+  },
+  {
+    "id": "Strong After Fences",
+    "name": "Strong After Fences",
+    "description": "Increases postSpeed in the jump context.",
+    "event": "postSpeed",
+    "value": 6,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] lifts its head to inspect the unfamiliar fence decorations.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Careful but Slow",
+    "name": "Careful but Slow",
+    "description": "Reduces rail in the jump context.",
+    "event": "rail",
+    "value": -2,
+    "trigger": "jump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-2 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse settles quickly despite the surrounding activity.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Enjoys Jumping",
+    "name": "Enjoys Jumping",
+    "description": "Reduces resistance in the comfortableJump context.",
+    "event": "resistance",
+    "value": -3,
+    "trigger": "comfortableJump",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] becomes increasingly eager as the next jump approaches.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Strong on Left Rein",
+    "name": "Strong on Left Rein",
+    "description": "Increases turn in the left context.",
+    "event": "turn",
+    "value": 5,
+    "trigger": "left",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse hesitates, appearing to assess the unusual obstacle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Strong on Right Rein",
+    "name": "Strong on Right Rein",
+    "description": "Increases turn in the right context.",
+    "event": "turn",
+    "value": 5,
+    "trigger": "right",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] loses some impulsion through the corner.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Weak Left Canter Lead",
+    "name": "Weak Left Canter Lead",
+    "description": "Increases lead in the leftCanter context.",
+    "event": "lead",
+    "value": 7,
+    "trigger": "leftCanter",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse returns its focus after a quiet correction.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Weak Right Canter Lead",
+    "name": "Weak Right Canter Lead",
+    "description": "Increases lead in the rightCanter context.",
+    "event": "lead",
+    "value": 7,
+    "trigger": "rightCanter",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] responds immediately to the subtle aid.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Anticipates Transitions",
+    "name": "Anticipates Transitions",
+    "description": "Increases anticipation in the repeatedTransition context.",
+    "event": "anticipation",
+    "value": 6,
+    "trigger": "repeatedTransition",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse becomes distracted by a nearby movement.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Difficult Downward Transitions",
+    "name": "Difficult Downward Transitions",
+    "description": "Increases aid in the downward context.",
+    "event": "aid",
+    "value": 6,
+    "trigger": "downward",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] approaches the unfamiliar ramp with confidence.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Naturally Straight",
+    "name": "Naturally Straight",
+    "description": "Reduces straightness in the ordinary context.",
+    "event": "straightness",
+    "value": -3,
+    "trigger": "ordinary",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse appears more comfortable with the familiar transport routine.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Falls Inward on Circles",
+    "name": "Falls Inward on Circles",
+    "description": "Increases balance in the circle context.",
+    "event": "balance",
+    "value": 5,
+    "trigger": "circle",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] is reluctant to leave the stable aisle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Excellent Rhythm",
+    "name": "Excellent Rhythm",
+    "description": "Reduces rhythm in the familiar context.",
+    "event": "rhythm",
+    "value": -4,
+    "trigger": "familiar",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse maintains its usual relaxed demeanor during the noisy arrival.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Contact Sensitive",
+    "name": "Contact Sensitive",
+    "description": "Increases overreaction in the strongRein context.",
+    "event": "overreaction",
+    "value": 5,
+    "trigger": "strongRein",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] lifts its head to inspect the unfamiliar fence decorations.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Quick Learner",
+    "name": "Quick Learner",
+    "description": "Increases learn in the completed context.",
+    "event": "learn",
+    "value": 7,
+    "trigger": "completed",
+    "systems": [
+      "Training 2.0"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse settles quickly despite the surrounding activity.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Slow Learner"
+    ]
+  },
+  {
+    "id": "Slow Learner",
+    "name": "Slow Learner",
+    "description": "Reduces learn in the completed context.",
+    "event": "learn",
+    "value": -7,
+    "trigger": "completed",
+    "systems": [
+      "Training 2.0"
+    ],
+    "outcome": "-7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] becomes increasingly eager as the next jump approaches.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Quick Learner"
+    ]
+  },
+  {
+    "id": "Dislikes Repetition",
+    "name": "Dislikes Repetition",
+    "description": "Increases frustration in the third context.",
+    "event": "frustration",
+    "value": 5,
+    "trigger": "third",
+    "systems": [
+      "Training 2.0",
+      "Competition warm-up"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse hesitates, appearing to assess the unusual obstacle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Patient Worker"
+    ]
+  },
+  {
+    "id": "Patient Worker",
+    "name": "Patient Worker",
+    "description": "Reduces frustration in the repeated context.",
+    "event": "frustration",
+    "value": -4,
+    "trigger": "repeated",
+    "systems": [
+      "Training 2.0",
+      "Competition warm-up"
+    ],
+    "outcome": "-4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] loses some impulsion through the corner.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Dislikes Repetition"
+    ]
+  },
+  {
+    "id": "Easily Distracted",
+    "name": "Easily Distracted",
+    "description": "Increases distraction in the busy context.",
+    "event": "distraction",
+    "value": 5,
+    "trigger": "busy",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse returns its focus after a quiet correction.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Strong Work Ethic",
+    "name": "Strong Work Ethic",
+    "description": "Reduces resistance in the ordinary context.",
+    "event": "resistance",
+    "value": -3,
+    "trigger": "ordinary",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] responds immediately to the subtle aid.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Needs Encouragement",
+    "name": "Needs Encouragement",
+    "description": "Increases forward in the start context.",
+    "event": "forward",
+    "value": 5,
+    "trigger": "start",
+    "systems": [
+      "Training 2.0",
+      "Competition warm-up"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse becomes distracted by a nearby movement.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Frustrates Easily",
+    "name": "Frustrates Easily",
+    "description": "Increases frustration in the failedRepeat context.",
+    "event": "frustration",
+    "value": 6,
+    "trigger": "failedRepeat",
+    "systems": [
+      "Training 2.0",
+      "Competition warm-up"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] approaches the unfamiliar ramp with confidence.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Slow to Warm Up",
+    "name": "Slow to Warm Up",
+    "description": "Increases technical in the cold context.",
+    "event": "technical",
+    "value": 4,
+    "trigger": "cold",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse appears more comfortable with the familiar transport routine.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Quick to Settle",
+    "name": "Quick to Settle",
+    "description": "Increases recovery in the break context.",
+    "event": "recovery",
+    "value": 3,
+    "trigger": "break",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] is reluctant to leave the stable aisle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Nervous in New Arenas",
+    "name": "Nervous in New Arenas",
+    "description": "Increases tension in the newArena context.",
+    "event": "tension",
+    "value": 7,
+    "trigger": "newArena",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse maintains its usual relaxed demeanor during the noisy arrival.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Comfortable in New Arenas"
+    ]
+  },
+  {
+    "id": "Comfortable in New Arenas",
+    "name": "Comfortable in New Arenas",
+    "description": "Reduces tension in the newArena context.",
+    "event": "tension",
+    "value": -4,
+    "trigger": "newArena",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "-4 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] lifts its head to inspect the unfamiliar fence decorations.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Nervous in New Arenas"
+    ]
+  },
+  {
+    "id": "Distracted by Other Horses",
+    "name": "Distracted by Other Horses",
+    "description": "Increases distraction in the horses context.",
+    "event": "distraction",
+    "value": 6,
+    "trigger": "horses",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse settles quickly despite the surrounding activity.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Enjoys Working Around Horses",
+    "name": "Enjoys Working Around Horses",
+    "description": "Reduces tension in the calmHorses context.",
+    "event": "tension",
+    "value": -3,
+    "trigger": "calmHorses",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] becomes increasingly eager as the next jump approaches.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Wind Sensitive",
+    "name": "Wind Sensitive",
+    "description": "Increases spook in the wind context.",
+    "event": "spook",
+    "value": 6,
+    "trigger": "wind",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse hesitates, appearing to assess the unusual obstacle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Traffic Nervous",
+    "name": "Traffic Nervous",
+    "description": "Increases spook in the traffic context.",
+    "event": "spook",
+    "value": 9,
+    "trigger": "traffic",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+9 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] loses some impulsion through the corner.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Likes Open Spaces",
+    "name": "Likes Open Spaces",
+    "description": "Reduces tension in the outdoor context.",
+    "event": "tension",
+    "value": -3,
+    "trigger": "outdoor",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse returns its focus after a quiet correction.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Prefers Enclosed Spaces",
+    "name": "Prefers Enclosed Spaces",
+    "description": "Reduces tension in the indoor context.",
+    "event": "tension",
+    "value": -3,
+    "trigger": "indoor",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] responds immediately to the subtle aid.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Nervous Around Arena Gates",
+    "name": "Nervous Around Arena Gates",
+    "description": "Increases spook in the gate context.",
+    "event": "spook",
+    "value": 5,
+    "trigger": "gate",
+    "systems": [
+      "Training 2.0",
+      "Competition",
+      "Travel",
+      "Venue settling"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse becomes distracted by a nearby movement.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Enjoys Trail Work",
+    "name": "Enjoys Trail Work",
+    "description": "Reduces resistance in the trail context.",
+    "event": "resistance",
+    "value": -3,
+    "trigger": "trail",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] approaches the unfamiliar ramp with confidence.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Difficult to Mount",
+    "name": "Difficult to Mount",
+    "description": "Increases mount in the mount context.",
+    "event": "mount",
+    "value": 8,
+    "trigger": "mount",
+    "systems": [
+      "Training 2.0",
+      "Handling",
+      "Loading",
+      "Unloading"
+    ],
+    "outcome": "+8 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse appears more comfortable with the familiar transport routine.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Stands Quietly",
+    "name": "Stands Quietly",
+    "description": "Reduces mount in the standing context.",
+    "event": "mount",
+    "value": -5,
+    "trigger": "standing",
+    "systems": [
+      "Training 2.0",
+      "Handling",
+      "Loading",
+      "Unloading"
+    ],
+    "outcome": "-5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] is reluctant to leave the stable aisle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Sensitive to Grooming",
+    "name": "Sensitive to Grooming",
+    "description": "Increases groom in the roughGroom context.",
+    "event": "groom",
+    "value": 5,
+    "trigger": "roughGroom",
+    "systems": [
+      "Training 2.0",
+      "Grooming"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse maintains its usual relaxed demeanor during the noisy arrival.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Hoof-Handling Difficulties",
+    "name": "Hoof-Handling Difficulties",
+    "description": "Increases hoof in the hoof context.",
+    "event": "hoof",
+    "value": 8,
+    "trigger": "hoof",
+    "systems": [
+      "Training 2.0",
+      "Veterinary handling"
+    ],
+    "outcome": "+8 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] lifts its head to inspect the unfamiliar fence decorations.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Calm with Farrier",
+    "name": "Calm with Farrier",
+    "description": "Reduces farrier in the farrier context.",
+    "event": "farrier",
+    "value": -5,
+    "trigger": "farrier",
+    "systems": [
+      "Training 2.0",
+      "Veterinary handling"
+    ],
+    "outcome": "-5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse settles quickly despite the surrounding activity.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Nervous with Farrier"
+    ]
+  },
+  {
+    "id": "Nervous with Farrier",
+    "name": "Nervous with Farrier",
+    "description": "Increases farrier in the farrier context.",
+    "event": "farrier",
+    "value": 7,
+    "trigger": "farrier",
+    "systems": [
+      "Training 2.0",
+      "Veterinary handling"
+    ],
+    "outcome": "+7 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] becomes increasingly eager as the next jump approaches.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": [
+      "Calm with Farrier"
+    ]
+  },
+  {
+    "id": "Sensitive to Clipping",
+    "name": "Sensitive to Clipping",
+    "description": "Increases clip in the clip context.",
+    "event": "clip",
+    "value": 10,
+    "trigger": "clip",
+    "systems": [
+      "Training 2.0",
+      "Grooming"
+    ],
+    "outcome": "+10 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse hesitates, appearing to assess the unusual obstacle.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Equipment Cautious",
+    "name": "Equipment Cautious",
+    "description": "Increases hesitation in the newEquipment context.",
+    "event": "hesitation",
+    "value": 6,
+    "trigger": "newEquipment",
+    "systems": [
+      "Training 2.0",
+      "Competition"
+    ],
+    "outcome": "+6 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] loses some impulsion through the corner.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Mouths Equipment",
+    "name": "Mouths Equipment",
+    "description": "Increases fidget in the equipment context.",
+    "event": "fidget",
+    "value": 5,
+    "trigger": "equipment",
+    "systems": [
+      "Training 2.0",
+      "Handling",
+      "Loading",
+      "Unloading"
+    ],
+    "outcome": "+5 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "The horse returns its focus after a quiet correction.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  },
+  {
+    "id": "Very People-Oriented",
+    "name": "Very People-Oriented",
+    "description": "Reduces cooperation in the familiarHandler context.",
+    "event": "cooperation",
+    "value": -3,
+    "trigger": "familiarHandler",
+    "systems": [
+      "Training 2.0",
+      "Handling",
+      "Loading",
+      "Unloading"
+    ],
+    "outcome": "-3 percentage points in the existing contextual training model; bounded contextual competition/handling adjustment.",
+    "narrative": "[HORSE] responds immediately to the subtle aid.",
+    "frequency": "Numerical effect whenever the trigger applies; narrative 30%, ordinary response 60%, contextual deviation 10%.",
+    "conflicts": []
+  }
+]
