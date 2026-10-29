@@ -298,6 +298,11 @@
     if (!receipt)return {ok:false,message:'Insufficient funds.'};
     const report={id:eventId,day,type,clinicalSignature,horseId:h.id,observed:[],possible:[],diagnoses:[],recommendedTests:[],historyFindings:[],messages:[],tests:[exams[type][0]],restrictions:[],followup:day+7,uncertainty:'An examination cannot guarantee future soundness or exclude every subtle condition.',receipt:receipt.number};
     for (const c of h.medicalConditions.filter(c=>!c.resolved||c.residual)) {
+      if(type==='general'&&c.diagnosis!=='fever'){
+        const d=definition(c),intensity=c.asymptomatic?0:c.symptomIntensity??(c.resolved?0:c.severity==='minor'?20:c.severity==='moderate'?50:90),chance=intensity<=0?0:intensity<30?.4:intensity<70?.7:.9;
+        if(!c.resolved&&roll(h.healthSeed,`physical:${day}:${c.id}`)<chance){report.observed.push(...(c.currentSymptoms||d.signs));report.possible.push('A physical concern warrants focused investigation.');report.recommendedTests.push(...d.tests.filter(t=>t!=='general'));}
+        continue;
+      }
       if(c.diagnosis==='fever'&&['general','blood','respiratory','followup','intake'].includes(type)){investigateFever(state,h,c,type,day,report);continue;}
       const d=definition(c),movement=['muscle','hoof'].includes(d.category),relevant=(movement&&['soundness','lameness','joint'].includes(type))||d.tests.includes(type)||(type==='followup'&&c.confirmed)||(type==='intake'&&d.tests.includes('general'));
       if(!relevant)continue;
