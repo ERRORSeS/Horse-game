@@ -60,6 +60,19 @@ function persistSingleSave(payload){
     for(const old of records)if(old.key!==record.key&&(old.raw!==null||old.unreadable))try{localStorage.removeItem(old.key);}catch(error){console.warn('Old save cleanup deferred',error);}
     return record.key;
   }
+  // Multiple legacy copies can collectively prevent replacing even one copy.
+  // Keep one validated, readable stable throughout cleanup and retry atomically.
+  const keeper=records.find(r=>{
+    if(!r.raw)return false;
+    try{const data=JSON.parse(r.raw);validatePersistentState(data);return true;}catch(error){return false;}
+  });
+  if(keeper&&/quota/i.test((failure?.name||'')+' '+(failure?.message||''))){
+    for(const old of records)if(old.key!==keeper.key&&old.raw!==null){
+      try{localStorage.removeItem(old.key);}catch(error){console.warn('Legacy cleanup deferred',error);}
+    }
+    commitSaveValue(keeper.key,payload);
+    return keeper.key;
+  }
   throw failure||new Error('Browser storage is unavailable.');
 }
 function saveMonthIndex(){return (app.year-1)*12+app.month-1;}
