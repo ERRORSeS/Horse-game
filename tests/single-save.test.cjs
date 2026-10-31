@@ -56,3 +56,14 @@ test('a corrupt compressed duplicate cannot block a valid legacy stable from loa
   assert.equal(fresh.run('saveGame(true)'),true);assert.equal(game.store.size,1);
   const reloaded=runtime(game.store);assert.equal(reloaded.run('loadGame(false)'),true);assert.equal(reloaded.run('app.money'),1357);
 });
+test('quota retry frees duplicate records while retaining a validated stable',()=>{
+ const game=runtime();game.run('resetGame();saveGame(true);');
+ const primary=game.run('SAVE_KEY'),raw=game.store.get(primary);
+ game.store.set(game.run('SAVE_SLOTS_KEY'),raw);game.store.set(game.run('QUARTERLY_SAVE_KEY'),raw);
+ game.limits.quota=raw.length*3+100;
+ game.run("app.horses[0].quotaNotes=Array.from({length:20000},(_,i)=>String.fromCharCode(32+(i*7919%95))).join('');");
+ assert.equal(game.run('saveGame(true)'),true);
+ assert.equal(game.store.size,1);
+ assert.equal(game.run('loadGame(false)'),true);
+ assert.equal(game.run('app.horses[0].quotaNotes.length'),20000);
+});
