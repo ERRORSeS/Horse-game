@@ -77,7 +77,8 @@ const MG_STOCK_VERSION=3;
 const MG_ESSENTIALS=['Snaffle Bridle','Loose Ring Snaffle','All-Purpose Saddle','Basic Cotton Pad'];
 function mgSpecialty(t){return mgTier(t)==='Specialty'||['Double Bridle','Weymouth & Bradoon Set'].includes(t.id);}
 function mgCommonSizes(t){const sizes=mgItemSizes(t),common=sizes.filter(x=>['Pony','Cob','Full','Extra Full','4.75','5','5.25','5.5','16','16.5','17','17.5','18','66','69','72','75','78'].includes(String(x)));return common.length?common:sizes;}
-function mgStockRandom(){const s=mgState();let x=s.shopSeed||87391057;x^=x<<13;x^=x>>>17;x^=x<<5;s.shopSeed=x>>>0||87391057;return s.shopSeed/4294967296;}
+// Stock rolls only update their own seed; inventory valuation belongs to mgState.
+function mgStockRandom(){const s=app.management||mgState();let x=s.shopSeed||87391057;x^=x<<13;x^=x>>>17;x^=x<<5;s.shopSeed=x>>>0||87391057;return s.shopSeed/4294967296;}
 function mgStockInt(a,b){return a+Math.floor(mgStockRandom()*(b-a+1));}
 function mgStockPick(items){return items[Math.floor(mgStockRandom()*items.length)];}
 function mgGenerateStock(at){const stock=[];for(const t of MG_CATALOG){const special=mgSpecialty(t);if(!MG_ESSENTIALS.includes(t.id)&&mgStockRandom()>=(special?.65:.80))continue;const quantity=mgStockInt(special?2:5,special?6:15),valid=mgItemSizes(t),common=mgCommonSizes(t),sizes=[...common].sort(()=>0),required=special?Math.min(quantity,sizes.length):Math.ceil(sizes.length*.8),palette=mgPalette(t),leather=palette===MG_LEATHER,colors=palette.filter(c=>mgStockRandom()<mgColorChance(c,leather));if(!colors.length)colors.push(palette[0]);for(let n=0;n<quantity;n++){const size=n<required?sizes[n]:mgStockPick(valid),color=leather&&n<2?['Black','Brown'][n]:mgStockPick(colors);let row=stock.find(r=>r.type===t.id&&String(r.size)===String(size)&&r.color===color);if(!row){row={id:`stock-${at}-v3-${stock.length}`,type:t.id,size,color,quantity:0};stock.push(row);}row.quantity++;}}return stock;}
