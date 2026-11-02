@@ -1,0 +1,21 @@
+const fs=require('node:fs'),vm=require('node:vm');
+const setup=fs.readFileSync(__dirname+'/competition-completion.test.cjs','utf8').split("check('trait fixture'")[0];
+Promise.resolve(vm.runInNewContext('(async function(require,__dirname){'+setup+`
+const {TextEncoder,TextDecoder}=require('node:util'),{Buffer}=require('node:buffer');Object.assign(context,{TextEncoder,TextDecoder,btoa:s=>Buffer.from(s,'binary').toString('base64'),atob:s=>Buffer.from(s,'base64').toString('binary')});
+vm.runInContext("Object.defineProperty(localStorage,'length',{get:()=>Array.from(storageForTests.keys()).length});localStorage.key=i=>Array.from(storageForTests.keys())[i];",Object.assign(context,{storageForTests:storage}));
+vm.runInContext("render=()=>{};resetGame();app.horses[0].name='Stable One';",context);
+const first=await vm.runInContext("Save3.create('One')",context);
+vm.runInContext("resetGame();app.horses[0].name='Stable Two';app.money=12345;",context);
+const second=await vm.runInContext("Save3.create('Two')",context);
+assert.notEqual(first.id,second.id);assert.equal((await vm.runInContext('Save3.list()',context)).length,2);
+await vm.runInContext('Save3.load('+JSON.stringify(first.id)+')',context);
+assert.equal(vm.runInContext('app.horses[0].name',context),'Stable One');
+await vm.runInContext('Save3.load('+JSON.stringify(second.id)+')',context);
+assert.equal(vm.runInContext('app.horses[0].name',context),'Stable Two');
+const portable=vm.runInContext('Save3.exportFile()',context);await vm.runInContext('Save3.importFile('+JSON.stringify(portable)+')',context);assert.equal(vm.runInContext('app.saveIdentity.id',context),second.id);
+await assert.rejects(vm.runInContext("Save3.load('OXER-UNKNOWN')",context),/No accessible save/);
+const before=vm.runInContext('serializeAppState()',context);await assert.rejects(vm.runInContext("Save3.importFile(JSON.stringify({state:{horses:[],money:-1}}))",context));assert.equal(vm.runInContext('serializeAppState()',context),before);
+vm.runInContext("app.uiSelections={'settings||data-save3-code:|0':'OXER3.RAW.old.snapshot'}",context);assert.equal(JSON.parse(vm.runInContext('Save3.exportFile()',context)).state.uiSelections['settings||data-save3-code:|0'],undefined);
+const code=await vm.runInContext('Save3.portableCode()',context);storage.clear();vm.runInContext('resetGame()',context);await vm.runInContext('Save3.importCode('+JSON.stringify(code)+')',context);assert.equal(vm.runInContext('app.saveIdentity.id',context),second.id);assert.equal(vm.runInContext('app.horses[0].name',context),'Stable Two');await assert.rejects(vm.runInContext('Save3.importCode('+JSON.stringify(code.replace(/^(OXER3\.RAW\.)[^.]+/,'$1deadbeef'))+')',context),/damaged/);console.log('PASS portable code restores on independent empty storage and detects damaged codes');
+console.log('PASS independent IDs, lookup, unknown IDs, portable import and invalid-import rollback');
+`+'})(require,__dirname)',{require,__dirname,console},{filename:__filename})).catch(error=>{console.error(error);process.exitCode=1;});
