@@ -6644,6 +6644,15 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     const phaseText = String(step.phase || '').toLowerCase();
 
     if (session.discipline === 'jumping') {
+      if(!session.polePlan){
+        session.poleRoundId ||= 'rpg:'+(app.poleRoundSequence=(app.poleRoundSequence||0)+1);
+        session.polePlan=ShowjumpingRound.plan(horse,session.level,session.poleRoundId,session.steps.filter(s=>s.stage==='main_round').length,competitionTackSignal(horse),SHOW_RIDING_STYLES[showRidingStyle(session)]?.risk||1);
+      }
+      if(session.polePlan.version>=2){
+        const fence=session.steps.slice(0,session.stepIndex).filter(s=>s.stage==='main_round').length;
+        outcome=session.polePlan.refusalIndices.includes(fence)?'fail':outcome==='fail'?'partial':outcome;
+        session.lastRefusalReason=outcome==='fail'?session.polePlan.refusalReason:null;
+      }
       const poleDown = showjumpingSessionPole(session, horse, outcome);
       if (outcome !== 'fail' && !poleDown) {
         rs.clearJumps += 1;
@@ -6667,7 +6676,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
           displayOutcome = 'Elimination (2 refusals)';
         } else if (session.refusalCount === 1) {
           rs.faults += 4;
-          displayOutcome = 'Refusal (4 faults)';
+          displayOutcome = 'Refusal (4 faults)'+(session.lastRefusalReason?' — '+session.lastRefusalReason:'');
         }
       }
     } else if (session.discipline === 'hunter') {
@@ -6686,7 +6695,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
           rs.eliminationReason = rs.refusals >= 2 ? 'multiple refusals' : 'fall';
           displayOutcome = rs.eliminationReason === 'fall' ? 'Elimination (fall)' : 'Elimination (multiple refusals)';
         } else {
-          displayOutcome = 'Refusal (4 faults)';
+          displayOutcome = 'Refusal (4 faults)'+(session.lastRefusalReason?' — '+session.lastRefusalReason:'');
         }
       }
     } else if (session.discipline === 'dressage') {

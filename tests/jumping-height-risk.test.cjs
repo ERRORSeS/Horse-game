@@ -1,0 +1,4 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),R=require('../showjumping-round.js');
+const horse={id:'risk-test',personality:'Neutral',mood:'Neutral',training2:{attributes:{Confidence:8,Willingness:8,Balance:8,Focus:8,'Sensitivity to Aids':8}}};
+test('height bands and weighted modifiers',()=>{for(const [height,chance]of [[.7,.1],[.9,.1],[1,.3],[1.2,.3],[1.3,.4],[1.8,.4]])assert.equal(R.profile(horse,height).chance,chance);assert.equal(R.profile(horse,1,1,.03).chance,.375);});
+test('round plans persist luck, refusal reasons and bounded time effects',()=>{for(let i=0;i<200;i++){const p=R.plan(horse,1.3,'round'+i,12);assert.deepEqual(p,R.plan(horse,1.3,'round'+i,12));assert.ok(p.refusalIndices.length<=1);assert.ok(p.timeFactor>=.9&&p.timeFactor<=1.1);assert.equal(p.rails,p.indices.length);}const empty=R.plan(horse,1,'empty',0);assert.equal(empty.rails,0);assert.deepEqual(empty.refusalIndices,[]);});
