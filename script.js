@@ -6648,11 +6648,9 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         session.poleRoundId ||= 'rpg:'+(app.poleRoundSequence=(app.poleRoundSequence||0)+1);
         session.polePlan=ShowjumpingRound.plan(horse,session.level,session.poleRoundId,session.steps.filter(s=>s.stage==='main_round').length,competitionTackSignal(horse),SHOW_RIDING_STYLES[showRidingStyle(session)]?.risk||1);
       }
-      if(session.polePlan.version>=2){
-        const fence=session.steps.slice(0,session.stepIndex).filter(s=>s.stage==='main_round').length;
-        outcome=session.polePlan.refusalIndices.includes(fence)?'fail':outcome==='fail'?'partial':outcome;
-        session.lastRefusalReason=outcome==='fail'?session.polePlan.refusalReason:null;
-      }
+      // The displayed final chances own the outcome roll; a round plan must
+      // never overwrite that roll (or assign to its immutable result).
+      session.lastRefusalReason=outcome==='fail'?(session.polePlan.refusalReason||'Loss of confidence or willingness at the fence'):null;
       const poleDown = showjumpingSessionPole(session, horse, outcome);
       if (outcome !== 'fail' && !poleDown) {
         rs.clearJumps += 1;
