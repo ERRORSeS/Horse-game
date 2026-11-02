@@ -8943,30 +8943,31 @@ function renderSettings() {
 
 let renderedPanelsOnce=false;
 function render() {
+  app.uiActiveTab ||= 'dashboard';
   mgState();
   mgCleanupAssignments();
   ensurePastureRelationships();
   syncPastureSeparations();
   ensurePanels();
   safeRun('updateHeader', updateHeader);
-  if(!renderedPanelsOnce||app.uiActiveTab==='dashboard')safeRun('renderDashboard', renderDashboard);
-  if(!renderedPanelsOnce||app.uiActiveTab==='horses')safeRun('renderHorses', renderHorses);
-  if(!renderedPanelsOnce||app.uiActiveTab==='barn')safeRun('renderBarn', renderBarn);
-  if(!renderedPanelsOnce||app.uiActiveTab==='town')safeRun('renderTown', renderTown);
-  if(!renderedPanelsOnce||app.uiActiveTab==='market')safeRun('renderMarket', renderMarket);
-  if(!renderedPanelsOnce||app.uiActiveTab==='sales')safeRun('renderSales', renderSales);
-  if(!renderedPanelsOnce||app.uiActiveTab==='stud')safeRun('renderStud', renderStud);
-  if(!renderedPanelsOnce||app.uiActiveTab==='shows')safeRun('renderShows', renderShows);
-  if(!renderedPanelsOnce||app.uiActiveTab==='vet')safeRun('renderVet', renderVet);
-  if(!renderedPanelsOnce||app.uiActiveTab==='farrier')safeRun('renderFarrier', renderFarrier);
-  if(!renderedPanelsOnce||app.uiActiveTab==='training')safeRun('renderTraining', renderTraining);
-  if(!renderedPanelsOnce||app.uiActiveTab==='breeding')safeRun('renderBreeding', renderBreeding);
-  if(!renderedPanelsOnce||app.uiActiveTab==='registries')safeRun('renderRegistries', typeof renderRegistries === 'function' ? renderRegistries : renderRigistries);
-  if(!renderedPanelsOnce||app.uiActiveTab==='breeders')safeRun('renderBreeders', renderBreeders);
-  if(!renderedPanelsOnce||app.uiActiveTab==='freezer')safeRun('renderFreezer', renderFreezer);
-  if(!renderedPanelsOnce||app.uiActiveTab==='rescue')safeRun('renderRescue', renderRescue);
-  if(!renderedPanelsOnce||app.uiActiveTab==='calendar')safeRun('renderCalendar', renderCalendar);
-  if(!renderedPanelsOnce||app.uiActiveTab==='settings')safeRun('renderSettings', renderSettings);
+  if(app.uiActiveTab==='dashboard')safeRun('renderDashboard', renderDashboard);
+  if(app.uiActiveTab==='horses')safeRun('renderHorses', renderHorses);
+  if(app.uiActiveTab==='barn')safeRun('renderBarn', renderBarn);
+  if(app.uiActiveTab==='town')safeRun('renderTown', renderTown);
+  if(app.uiActiveTab==='market')safeRun('renderMarket', renderMarket);
+  if(app.uiActiveTab==='sales')safeRun('renderSales', renderSales);
+  if(app.uiActiveTab==='stud')safeRun('renderStud', renderStud);
+  if(app.uiActiveTab==='shows')safeRun('renderShows', renderShows);
+  if(app.uiActiveTab==='vet')safeRun('renderVet', renderVet);
+  if(app.uiActiveTab==='farrier')safeRun('renderFarrier', renderFarrier);
+  if(app.uiActiveTab==='training')safeRun('renderTraining', renderTraining);
+  if(app.uiActiveTab==='breeding')safeRun('renderBreeding', renderBreeding);
+  if(app.uiActiveTab==='registries')safeRun('renderRegistries', typeof renderRegistries === 'function' ? renderRegistries : renderRigistries);
+  if(app.uiActiveTab==='breeders')safeRun('renderBreeders', renderBreeders);
+  if(app.uiActiveTab==='freezer')safeRun('renderFreezer', renderFreezer);
+  if(app.uiActiveTab==='rescue')safeRun('renderRescue', renderRescue);
+  if(app.uiActiveTab==='calendar')safeRun('renderCalendar', renderCalendar);
+  if(app.uiActiveTab==='settings')safeRun('renderSettings', renderSettings);
   renderedPanelsOnce=true;
 }
 
