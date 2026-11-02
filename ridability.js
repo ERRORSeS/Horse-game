@@ -18,3 +18,5 @@ const RIDABILITY_USE=eqRecordUse;
 eqRecordUse=function(h,context='flatwork',ridden=true,token=null,...args){const result=RIDABILITY_USE(h,context,ridden,token,...args);if(result!==false&&ridden)recordZeroSoundnessRiding(h,csDay());return result;};
 const RIDABILITY_LOAD=hydrateFromSave;
 hydrateFromSave=function(...args){const r=RIDABILITY_LOAD(...args);for(const h of csHorses())syncRidability(h);return r;};
+const RIDABILITY_TACK_CHECK=eqTrainingAllowed;
+eqTrainingAllowed=function(h,context,...args){if(h&&h.age<3&&!['groundwork','lunging','Hand Work'].includes(context))return 'Ridden work requires age three and suitable riding education.';return RIDABILITY_TACK_CHECK(h,context,...args);};
