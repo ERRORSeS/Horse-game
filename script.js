@@ -6643,6 +6643,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     const rs = session.roundStats || { faults: 0, refusals: 0, clearJumps: 0, majorFaults: 0, eliminated: false, eliminationReason: '' };
     const phaseText = String(step.phase || '').toLowerCase();
 
+    if(outcome==='fail'){const text=(variant.title||'')+' '+(selected.option?.intent||'');session.lastShowIncident={cause:/runout|run out/i.test(text)?'Runout':/spook/i.test(text)?'Spook':/buck/i.test(text)?'Buck':/rear/i.test(text)?'Rear':/distance|landing|balance/i.test(text)?'Wrong Distance':'Refusal'};}
     if (session.discipline === 'jumping') {
       if(!session.polePlan){
         session.poleRoundId ||= 'rpg:'+(app.poleRoundSequence=(app.poleRoundSequence||0)+1);
@@ -6650,7 +6651,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
       }
       // The displayed final chances own the outcome roll; a round plan must
       // never overwrite that roll (or assign to its immutable result).
-      session.lastRefusalReason=outcome==='fail'?(session.polePlan.refusalReason||'Loss of confidence or willingness at the fence'):null;
+      session.lastRefusalReason=outcome==='fail'?ShowjumpingRound.refusal(horse,session.poleRoundId).reason:null;
       const poleDown = showjumpingSessionPole(session, horse, outcome);
       if (outcome !== 'fail' && !poleDown) {
         rs.clearJumps += 1;
@@ -6662,11 +6663,14 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
       } else {
         session.refusalCount += 1;
         rs.refusals += 1;
+        const causeText=(variant.title||'')+' '+(selected.option?.intent||'');
+        const incidentCause=/runout|run out/i.test(causeText)?'Runout':/spook/i.test(causeText)?'Spook':/buck/i.test(causeText)?'Buck':/rear/i.test(causeText)?'Rear':/distance/i.test(causeText)?'Wrong Distance':'Refusal';
+        session.lastShowIncident={cause:incidentCause,reason:session.lastRefusalReason};
         if (Math.random()*100 < 12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100)) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = 'fall';
-          displayOutcome = 'Elimination (fall)';
+          displayOutcome = 'Elimination (fall after '+(session.lastShowIncident?.cause||'Wrong Distance')+')';
         } else if (session.refusalCount >= 2) {
           session.eliminated = true;
           rs.eliminated = true;
@@ -6691,7 +6695,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = rs.refusals >= 2 ? 'multiple refusals' : 'fall';
-          displayOutcome = rs.eliminationReason === 'fall' ? 'Elimination (fall)' : 'Elimination (multiple refusals)';
+          displayOutcome = rs.eliminationReason === 'fall' ? 'Elimination (fall after '+(session.lastShowIncident?.cause||'Refusal')+')' : 'Elimination (multiple refusals)';
         } else {
           displayOutcome = 'Refusal (4 faults)'+(session.lastRefusalReason?' — '+session.lastRefusalReason:'');
         }
@@ -6754,7 +6758,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
             session.eliminated = true;
             rs.eliminated = true;
             rs.eliminationReason = 'fall';
-            displayOutcome = 'Elimination (fall)';
+            displayOutcome = 'Elimination (fall after '+(session.lastShowIncident?.cause||'Wrong Distance')+')';
           }
         } else {
           rs.refusals += 1;
