@@ -755,9 +755,19 @@
   function documentation(h,policy,day) { const rules=vaccinePolicies[policy];return rules?rules.competition.filter(vaccine=>!h.vaccinations.some(v=>v.vaccine===vaccine&&v.courseStatus==='Complete'&&v.nextDue>=day)):[]; }
   const backgroundConfig={previousMonthly:.04,monthly:.046,dailyBase:.04,dailyMax:.12,raisedDayFrequency:.10};
   function backgroundChance(h,day,mode='month'){
-    if(mode!=='day')return 1-Math.pow(1-backgroundConfig.monthly,1/30);
-    return roll(h.healthSeed,`background-vary:${day}`)<backgroundConfig.raisedDayFrequency?backgroundConfig.dailyBase+roll(h.healthSeed,`background-level:${day}`)*(backgroundConfig.dailyMax-backgroundConfig.dailyBase):backgroundConfig.dailyBase;
+    const base=mode!=='day'?1-Math.pow(1-backgroundConfig.monthly,1/30):roll(h.healthSeed,`background-vary:${day}`)<backgroundConfig.raisedDayFrequency?backgroundConfig.dailyBase+roll(h.healthSeed,`background-level:${day}`)*(backgroundConfig.dailyMax-backgroundConfig.dailyBase):backgroundConfig.dailyBase;
+    return Math.min(1,base*(h.age>=25?1.03:1));
   }
+  function lifespan(h){
+    if(Number.isFinite(h.naturalLifespanAge))return h.naturalLifespanAge;
+    const seed=hash(h.id+'|natural-lifespan'),band=weighted([{id:0,weight:30},{id:1,weight:25},{id:2,weight:15},{id:3,weight:10},{id:4,weight:5}],roll(seed,'band')).id;
+    const ranges=[[25,28],[29,34],[35,37],[38,40]],u=roll(seed,'age');
+    // The open-ended 41+ band has a declining tail rather than a hard age cap.
+    const age=band===4?41+Math.floor(-Math.log(1-u)/Math.LN2):ranges[band][0]+Math.floor(u*(ranges[band][1]-ranges[band][0]+1));
+    // Migrated horses that have already survived their sampled age keep living.
+    h.naturalLifespanAge=Math.max(age,Math.floor(h.age||0)+1);return h.naturalLifespanAge;
+  }
+
   const saleHealthWeights={healthy:55,minor:20,historical:12,active:10,serious:3};
   const activeSaleWeights={muscle:45,hoof:20,digestive:15,airway:10,other:10};
   const seriousSaleWeights={orthopedic:45,chronic:20,digestive:20,other:15};
@@ -806,6 +816,6 @@
     }
     return h.rehabilitationProfile;
   }
-  root.HorseHealth={clinicalDay,reviewHospital,recoveryDefinitions,hospitalRecord,hospitalDecision,completeCare,workloadAdvice,workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
+  root.HorseHealth={lifespan,clinicalDay,reviewHospital,recoveryDefinitions,hospitalRecord,hospitalDecision,completeCare,workloadAdvice,workExposure,backgroundConfig,backgroundChance,saleHealthWeights,activeSaleWeights,seriousSaleWeights,rescueProfileWeights,rescueSeverityWeights,seedRescueHealth,serviceOptions,emergencyResponse,probabilityAudit,services,narrative,careDay,clinicalService,linkUnderlying,lamenessGrade,seedSaleHealth,injuryOutcome,catalog,exams,supplies,medicines,farrierServices,vaccinePolicies,hash,roll,copy,ensure,add,definition,current,allowed,observe,publicView,ledger,examine,plan,purchase,administer,advance,incident,cooperation,farrier,vaccinate,documentation};
   if(typeof module!=='undefined')module.exports=root.HorseHealth;
 })(globalThis);
