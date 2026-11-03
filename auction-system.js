@@ -10,7 +10,27 @@ function auctionNotice(key,text){const s=auctionState();if(s.notices.some(n=>n.k
 function auctionIncrement(n){return n<5000?250:n<15000?500:n<50000?1000:n<100000?2500:5000;}
 function auctionHeld(){return auctionAllLots().reduce((n,l)=>n+(l.hold||0),0)+auctionState().contracts.reduce((n,c)=>n+(c.held||0),0);}
 function auctionAvailable(except=null){const s=auctionState(),lot=auctionAllLots().find(l=>l.id===except),contract=s.contracts.find(c=>c.lotId===except);return app.money+(lot?.hold||0)+(contract?.held||0);}
-function auctionLevel(h,d,potential=false){return SHOW_LEVELS[d][potential?auctionPotentialIndex(h,d):Math.max(0,Math.min(highestAllowedLevelIndex(h,d),Math.floor(effectiveDisciplineSkill(h,d)/100*(SHOW_LEVELS[d].length-1))))];}
+// Auction schooling bands affect current presentation only, never genetic potential.
+const AUCTION_SCHOOLING_BANDS={
+ jumping:{low:3,medium:6},
+ dressage:{low:2,medium:6},
+ eventing:{low:2,medium:5},
+ hunter:{low:2,medium:5}
+};
+function auctionSchoolingBand(d,level){const i=SHOW_LEVELS[d].indexOf(level),b=AUCTION_SCHOOLING_BANDS[d];return i<=b.low?'low':i<=b.medium?'medium':'high';}
+function auctionSchoolingLimit(h,d){const b=AUCTION_SCHOOLING_BANDS[d];return h.age<5?b.low:h.age<7?b.medium:SHOW_LEVELS[d].length-1;}
+function auctionLevel(h,d,potential=false){if(potential)return SHOW_LEVELS[d][auctionPotentialIndex(h,d)];return SHOW_LEVELS[d][Math.max(0,Math.min(auctionSchoolingLimit(h,d),highestAllowedLevelIndex(h,d),Math.floor(effectiveDisciplineSkill(h,d)/100*(SHOW_LEVELS[d].length-1))))];}
+function auctionLimitTraining(h){
+ if(h.age>=7)return;
+ let factor=1;
+ for(const d of Object.keys(AUCTION_SCHOOLING_BANDS)){
+  const next=SHOW_LEVELS[d][auctionSchoolingLimit(h,d)+1];
+  const cap=requiredSkillBand(d,next)[0]-(h.extraPotential?3:0)-0.01;
+  factor=Math.min(factor,cap/Math.max(1,horseDisciplineAverage(h,d)));
+ }
+ if(factor<1)for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]*=Math.max(0,factor);
+}
+function auctionSchoolingPrice(d,level,key){const [min,max]={low:[15000,25000],medium:[30000,45000],high:[50000,85000]}[auctionSchoolingBand(d,level)];return min+Math.floor(auctionRoll(key+':schooling-price')*((max-min)/250+1))*250;}
 function auctionPotentialIndex(h,d){let index=0;const score=d==='eventing'?Math.min(h.potential.eventing,(h.potential.dressage+h.potential.jumping)/2):h.potential[d];SHOW_LEVELS[d].forEach((level,i)=>{if(score>=requiredSkillBand(d,level)[0])index=i;});return index;}
 function auctionHorse(key,type,quality){let counter=0;const original=Math.random,rank={Ordinary:[0,60],Promising:[60,70],'Strong prospect':[70,78],'Exceptional prospect':[78,86],'Rare elite':[86,101]}[quality];Math.random=()=>auctionRoll(key+':horse-random:'+counter++);try{let best=null,distance=Infinity;for(let attempt=0;attempt<32;attempt++){const h=baseHorse(type,'npc'),score=Object.values(h.potential).reduce((a,b)=>a+b,0)/4,delta=score<rank[0]?rank[0]-score:score>=rank[1]?score-rank[1]+.01:0;if(delta<distance){best=h;distance=delta;}if(!delta)break;}return best;}finally{Math.random=original;}}
 function auctionDisciplineName(d){return {jumping:'Showjumping',dressage:'Dressage',eventing:'Eventing',hunter:'Hunters'}[d]||d;}
@@ -20,9 +40,10 @@ function auctionGenerate(at,slot=0){const s=auctionState(),id='collection:'+ ++s
  for(let n=1;n<=size;n++){
   const key=id+':lot:'+n,ageBand=auctionPick([[0,10],[1,30],[2,30],[3,25],[4,5]],key+'age'),ranges=[[2,3],[4,5],[6,8],[9,12],[13,16]],range=ranges[ageBand],age=range[0]+Math.floor(auctionRoll(key+'years')*(range[1]-range[0]+1)),experience=auctionPick([['Unstarted/young prospect',15],['Green but started',25],['Developing sport horse',30],['Established competition horse',25],['Highly experienced horse',5]],key+'experience'),quality=auctionPick([['Ordinary',25],['Promising',35],['Strong prospect',25],['Exceptional prospect',12],['Rare elite',3]],key+'quality');
   const h=auctionHorse(key,age<4||experience.startsWith('Unstarted')?'untrained':experience==='Highly experienced horse'?'elite':'trained',quality);h.id=key+':horse';h.age=age;h.owner='International breeder';h.isAuctionHorse=true;h.showResults=[];h.competitionResults=[];if(experience.startsWith('Unstarted'))h.requiresBreakingIn=true;if(age<3){h.requiresBreakingIn=true;for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]=Math.min(group[skill],10);}
+  auctionLimitTraining(h);
   HorseHealth.seedSaleHealth(h,Math.floor(at/24));
-  const disciplines=['jumping','dressage','eventing','hunter'],d=theme==='Showjumping Prospects'?'jumping':theme==='Dressage Selection'?'dressage':theme==='Eventing Prospects'?'eventing':theme==='Hunter & Amateur Sport Horses'?'hunter':disciplines.slice().sort((a,b)=>h.potential[b]-h.potential[a])[0],levels=SHOW_LEVELS[d],ceiling=auctionPotentialIndex(h,d),accuracy=auctionPick([['close',60],['optimistic',20],['conservative',15],['inaccurate',5]],key+'estimate'),offset=accuracy==='close'?0:accuracy==='optimistic'?1:accuracy==='conservative'?-1:auctionRoll(key+'direction')<.5?-1:1,estimated=levels[Math.max(0,Math.min(levels.length-1,ceiling+offset))],current=age<3||h.requiresBreakingIn?'Unstarted':auctionLevel(h,d),origin=auctionShipping(country),price=Math.max(1000,Math.round(horseWorth(h)*(1+(.15*auctionRoll(key+'price')))/250)*250),start=Math.round(price*.65/250)*250;
-  const lot={id:key,number:n,collectionId:id,horseId:h.id,horse:h,quality,experience:age<3?'Unstarted/young prospect':experience,discipline:d,current,estimate:estimated,accuracy,origin,country,seller:country+' Sport Breeder '+n,startingPrice:start,reserve:Math.round(price*.85/250)*250,bid:0,leader:null,bidCount:0,history:[],status:'Preview',openAt:collection.openAt,closeAt:collection.closeAt,schedule:[],cursor:0};
+  const disciplines=['jumping','dressage','eventing','hunter'],d=theme==='Showjumping Prospects'?'jumping':theme==='Dressage Selection'?'dressage':theme==='Eventing Prospects'?'eventing':theme==='Hunter & Amateur Sport Horses'?'hunter':disciplines.slice().sort((a,b)=>h.potential[b]-h.potential[a])[0],levels=SHOW_LEVELS[d],ceiling=auctionPotentialIndex(h,d),accuracy=auctionPick([['close',60],['optimistic',20],['conservative',15],['inaccurate',5]],key+'estimate'),offset=accuracy==='close'?0:accuracy==='optimistic'?1:accuracy==='conservative'?-1:auctionRoll(key+'direction')<.5?-1:1,estimated=levels[Math.max(0,Math.min(levels.length-1,ceiling+offset))],current=age<3||h.requiresBreakingIn?'Unstarted':auctionLevel(h,d),origin=auctionShipping(country),price=auctionSchoolingPrice(d,current,key),start=price;
+  const lot={schoolingPricingVersion:1,id:key,number:n,collectionId:id,horseId:h.id,horse:h,quality,experience:age<3?'Unstarted/young prospect':experience,discipline:d,current,estimate:estimated,accuracy,origin,country,seller:country+' Sport Breeder '+n,startingPrice:start,reserve:price,bid:0,leader:null,bidCount:0,history:[],status:'Preview',openAt:collection.openAt,closeAt:collection.closeAt,schedule:[],cursor:0};
   const count=1+Math.floor(auctionRoll(key+'buyers')*3),buyers=Array.from({length:count},(_,i)=>({id:'Buyer '+(i+1),max:Math.round(price*(.7+auctionRoll(key+'budget'+i)*.65)/250)*250}));
   const interest={Ordinary:.25,Promising:.4,'Strong prospect':.55,'Exceptional prospect':.7,'Rare elite':.7}[quality];for(let i=0;i<5&&buyers.length;i++)if(auctionRoll(key+'opportunity'+i)<interest){const buyer=buyers[Math.floor(auctionRoll(key+'bidder'+i)*buyers.length)];lot.schedule.push({at:collection.openAt+1+Math.floor(auctionRoll(key+'time'+i)*119),bidder:buyer.id,max:buyer.max});}lot.schedule.sort((a,b)=>a.at-b.at);lot.bidderCount=count;auctionEstimatedLevels(lot);collection.lots.push(lot);
  }
@@ -32,7 +53,17 @@ function auctionBid(lotId,amount){auctionAdvance(pastureCalendarHour());const l=
 function auctionRecordBid(l,amount,bidder,at){const outbid=l.leader==='player'&&bidder!=='player',oldHold=l.hold||0;if(l.hold){app.money+=l.hold;l.hold=0;}if(bidder==='player'){app.money-=amount;l.hold=amount;l.playerBid=amount;}const state=auctionState();state.cashMovements ||= [];if(bidder==='player'||outbid)state.cashMovements.push({lotId:l.id,kind:outbid?'Hold released':'Bid hold',amount:bidder==='player'?amount:oldHold,at});l.bid=amount;l.leader=bidder;l.bidCount++;l.history.push({amount,bidder,at});l.history=l.history.slice(-8);if(outbid)auctionNotice(l.id+':outbid:'+l.bidCount,'You Have Been Outbid — Lot '+l.number+'.');}
 function auctionClose(c){for(const l of c.lots){if(l.bid<l.reserve||!l.leader){l.status='Unsold';if(l.hold){app.money+=l.hold;l.hold=0;}continue;}l.status=l.leader==='player'?'Won':'Lost';if(l.status==='Won'){l.origin=auctionShipping(l.country);const costs=auctionCosts(l);auctionState().contracts.push({id:'import:'+l.id,lotId:l.id,collectionId:c.id,number:l.number,horse:l.horse,seller:l.seller,country:l.country,origin:l.origin,estimate:l.estimate,bid:l.bid,held:l.hold||0,costs,status:'Awaiting Contract',signed:false,paid:false,delivered:false,history:[],createdAt:c.closeAt});l.hold=0;auctionNotice(l.id+':won','Winning Bid Confirmed — '+l.horse.name+'. Contract Ready.');}}c.status='Closed';}
 function auctionCosts(l){const index=['Same country','Neighboring country','Regional international','Intercontinental'].indexOf(l.origin),transport=[350,1000,2500,6000][Math.max(0,index)],premium=Math.round(l.bid*.05);return {bid:l.bid,premium,transport,administration:150,documentation:300,arrivalVet:180,total:l.bid+premium+transport+630};}
+// Reprice only untouched listings; never change a bid or purchase already committed.
+function auctionUpgradeSchooling(l){
+ if(l.schoolingPricingVersion===1||l.bid>0||!['Preview','Open'].includes(l.status))return;
+ auctionLimitTraining(l.horse);
+ l.current=l.horse.age<3||l.horse.requiresBreakingIn?'Unstarted':auctionLevel(l.horse,l.discipline);
+ const old=l.startingPrice,newPrice=auctionSchoolingPrice(l.discipline,l.current,l.id);
+ l.startingPrice=newPrice;l.reserve=newPrice;l.schoolingPricingVersion=1;
+ for(const event of l.schedule)event.max=Math.round(event.max*newPrice/Math.max(1,old)/250)*250;
+}
 function auctionAdvance(target){const s=auctionState();if(s.processing)return;s.processing=true;try{
+ for(const l of s.collections.flatMap(c=>c.lots))auctionUpgradeSchooling(l);
  for(const c of s.collections)if(!c.country){c.country=AUCTION_COUNTRIES[Math.floor(auctionRoll(c.id+'country')*AUCTION_COUNTRIES.length)][0];for(const l of c.lots){l.country=c.country;l.origin=auctionShipping(c.country);}}
  if(s.collections.length===1&&target<s.nextAt)auctionGenerate(s.collections[0].previewAt,1);
  while(target>=s.nextAt){for(const c of s.collections){for(const l of c.lots)auctionEstimatedLevels(l);auctionProcessCollection(c,target);}for(const c of s.collections){s.history.push({id:c.id,name:c.name,country:c.country,closeAt:c.closeAt,lots:c.lots.map(l=>({id:l.id,number:l.number,name:l.horse.name,bid:l.bid,status:l.status}))});}s.history=s.history.slice(-18);const at=s.nextAt;s.collections=[];s.collection=null;for(let i=0;i<2;i++)auctionGenerate(at,i);s.selectedCollection=s.collection.id;}
