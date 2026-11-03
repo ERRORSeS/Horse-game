@@ -27,3 +27,25 @@ const RIDABILITY_LOAD=hydrateFromSave;
 hydrateFromSave=function(data,...args){const r=RIDABILITY_LOAD(data,...args);if(!data.ridingEducationRepairVersion){for(const h of app.horses)restoreBasicRidingEducation(h);}app.ridingEducationRepairVersion=1;for(const h of csHorses())syncRidability(h);return r;};
 const RIDABILITY_TACK_CHECK=eqTrainingAllowed;
 eqTrainingAllowed=function(h,context,...args){if(h&&h.age<3&&!['groundwork','lunging','Hand Work'].includes(context))return 'Ridden work requires age three and suitable riding education.';return RIDABILITY_TACK_CHECK(h,context,...args);};
+
+// Explicit repair for already-owned horses; sporting and medical history stay intact.
+function makeHorseRidable(horseId){
+ const h=app.horses.find(h=>h.id===horseId);
+ if(!h)return {ok:false,message:'Select a horse in your stable.'};
+ syncRidability(h);
+ if(h.deceased)return {ok:false,message:'A deceased horse cannot be made ridable.'};
+ if(h.age<3)return {ok:false,message:'This horse must be at least three years old for ridden work.'};
+ if(kissingSpines(h))return {ok:false,message:'Kissing Spines is lifelong; this horse cannot be made ridable.'};
+ restoreBasicRidingEducation(h);syncRidability(h);
+ return {ok:canRideUnderSaddle(h),message:canRideUnderSaddle(h)?'Riding eligibility repaired. This horse is now ridable.':'This horse still has a riding restriction.'};
+}
+const RIDABILITY_CARD=createHorseCard;
+createHorseCard=function(h,...args){
+ const node=RIDABILITY_CARD(h,...args);
+ if(!app.horses.some(owned=>owned.id===h.id))return node;
+ const controls=document.createElement('section');controls.className='ridability-repair';
+ const button=document.createElement('button');button.type='button';button.textContent='Make Horse Ridable';button.dataset.makeHorseRidable=h.id;
+ const status=document.createElement('p');status.setAttribute('role','status');status.textContent=h.ridabilityRepairMessage||'';
+ button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
+ controls.appendChild(button);controls.appendChild(status);node.appendChild(controls);return node;
+};
