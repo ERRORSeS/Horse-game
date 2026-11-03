@@ -49,3 +49,6 @@ createHorseCard=function(h,...args){
  button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
  controls.appendChild(button);controls.appendChild(status);node.appendChild(controls);return node;
 };
+
+// Ridable horses may enter competitions regardless of legacy administrative flags.
+canCompeteUnderSaddle=function(h){return canRideUnderSaddle(h);};
