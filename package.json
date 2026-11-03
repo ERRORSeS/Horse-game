@@ -6,6 +6,7 @@
     "test:recovery-population": "node tests/simulate-recovery.cjs",
     "test:benchmark": "node tests/benchmark-save.cjs",
     "test:expansion": "node tests/expansion.test.cjs",
-    "test:benchmark-expansion": "node tests/benchmark-expansion.cjs"
+    "test:benchmark-expansion": "node tests/benchmark-expansion.cjs",
+    "test:rider-realism": "node tests/rider-realism.test.cjs"
   }
 }

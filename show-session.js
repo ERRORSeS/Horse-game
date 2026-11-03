@@ -199,7 +199,7 @@ function showBeginJumpOff(show,strategy='Balanced'){
   const carried=HorseHealth.copy(show.rpg.warmupState),h=showHorse(show),rpg=buildCompetitionRpgSession(h,'jumping',show.level);rpg.warmupState=carried;rpg.steps=rpg.steps.filter(s=>s.stage==='main_round').slice(0,4);rpg.liveShowId=show.id;rpg.jumpOff=true;rpg.strategy=strategy;rpg.ridingStyle=strategy;rpg.choiceRecords=[];show.rpg=rpg;app.competitionRpg=rpg;show.stage='ride';showNote(show,'Congratulations. '+h.name+' has qualified for the jump-off. You study the shortened course and locate the inside turn.');
 }
 const SHOW_RIDING_STYLES=Object.freeze({Conservative:{risk:.80,time:1.12},Balanced:{risk:1,time:1},Competitive:{risk:1.15,time:.92},Aggressive:{risk:1.35,time:.84}});
-function showRidingStyle(session){return session.ridingStyle||session.strategy||'Balanced';}
+function showRidingStyle(session){return session?.ridingStyle||session?.strategy||'Balanced';}
 const LIVE_CHANCES=competitionOptionFinalChances;
 competitionOptionFinalChances=function(session,h,step,options){const rows=LIVE_CHANCES(session,h,step,options);if(step?.stage!=='main_round')return rows;const risk=SHOW_RIDING_STYLES[showRidingStyle(session)]?.risk||1;return rows.map(row=>{const fail=Math.max(0,100-row.successChance-row.computed.neutralChance),next=Math.min(95,(session.discipline==='jumping'?100*(1-Math.pow(1-ShowjumpingRound.refusal(h,session.poleRoundId||session.liveShowId||session.id).chance,1/Math.max(1,session.steps.filter(s=>s.stage==='main_round').length)))*(fail/25):fail)*risk),scale=(100-next)/Math.max(1,100-fail);return {...row,successChance:row.successChance*scale,computed:{...row.computed,neutralChance:row.computed.neutralChance*scale,failChance:next}};});};
 const LIVE_RESOLVE=resolveCompetitionRpgChoice;
@@ -275,7 +275,7 @@ renderShows=function(){
   if(show&&show.stage!=='ride'&&show.stage!=='complete'){showRenderSession(show);return;}
   LIVE_RENDER();showFormatInterface(document.getElementById('shows'));if(show&&show.stage!=='ride'&&show.stage!=='complete')return;const panel=document.getElementById('shows');
   if(show&&show.stage==='ride'){
-    const session=app.competitionRpg;show.rpg=session;const hint=panel.querySelector('.small');if(hint&&hint.textContent.includes('Press Enter'))hint.textContent='Choose an option. Result feedback advances automatically to the next scene.';
+    const session=app.competitionRpg||show.rpg;if(!session){show.stage='planning';show.feedback='Choose a horse and class to prepare this show.';showRenderSession(show);return;}app.competitionRpg=session;show.rpg=session;const hint=panel.querySelector('.small');if(hint&&hint.textContent.includes('Press Enter'))hint.textContent='Choose an option. Result feedback advances automatically to the next scene.';
     const next=document.getElementById('comp-enter');if(next){next.textContent='Continue';next.disabled=!session?.awaitingAdvance;next.onclick=()=>{if(session?.awaitingAdvance){showAdvanceRpg(session);saveGame(false);renderShows();}};}
     const retire=document.getElementById('comp-retire');if(retire)retire.onclick=()=>{session.eliminated=true;session.roundStats.eliminated=true;session.roundStats.eliminationReason='Retired';finalizeCompetitionRpgEntry(showHorse(show),session);renderShows();};
     if(session?.awaitingAdvance)showScheduleAdvance(session);
