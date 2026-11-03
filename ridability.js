@@ -1,7 +1,14 @@
 /* Permanent ridability is independent of age and sporting longevity estimates. */
 function kissingSpines(h){return (h.medicalConditions||[]).find(c=>c.diagnosis==='kissing-spines'||/kissing spines/i.test(c.legacyName||c.name||''));}
+function restoreBasicRidingEducation(h){
+ if(!h||h.deceased||h.age<3)return h;
+ h.requiresBreakingIn=false;
+ h.behavior=Math.max(500,Number(h.behavior)||0);
+ return h;
+}
 function syncRidability(h){
  if(!h)return h;
+ if(h.isAuctionHorse||h.auctionPurchase)restoreBasicRidingEducation(h);
  let c=kissingSpines(h);
  const legacy=[...(h.legacyMedicalRecords||[]),...(h.illnesses||[])].find(c=>/kissing spines/i.test(c.name||''));
  if(!c&&legacy){c=HorseHealth.add(h,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true,cause:'Recorded rescue or historical diagnosis'});}
@@ -17,6 +24,6 @@ function recordZeroSoundnessRiding(h,day){syncRidability(h);if((h.soundnessRemai
 const RIDABILITY_USE=eqRecordUse;
 eqRecordUse=function(h,context='flatwork',ridden=true,token=null,...args){const result=RIDABILITY_USE(h,context,ridden,token,...args);if(result!==false&&ridden)recordZeroSoundnessRiding(h,csDay());return result;};
 const RIDABILITY_LOAD=hydrateFromSave;
-hydrateFromSave=function(...args){const r=RIDABILITY_LOAD(...args);for(const h of csHorses())syncRidability(h);return r;};
+hydrateFromSave=function(data,...args){const r=RIDABILITY_LOAD(data,...args);if(!data.ridingEducationRepairVersion){for(const h of app.horses)restoreBasicRidingEducation(h);}app.ridingEducationRepairVersion=1;for(const h of csHorses())syncRidability(h);return r;};
 const RIDABILITY_TACK_CHECK=eqTrainingAllowed;
 eqTrainingAllowed=function(h,context,...args){if(h&&h.age<3&&!['groundwork','lunging','Hand Work'].includes(context))return 'Ridden work requires age three and suitable riding education.';return RIDABILITY_TACK_CHECK(h,context,...args);};
