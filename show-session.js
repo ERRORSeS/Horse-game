@@ -275,7 +275,7 @@ renderShows=function(){
   if(show&&show.stage!=='ride'&&show.stage!=='complete'){showRenderSession(show);return;}
   LIVE_RENDER();showFormatInterface(document.getElementById('shows'));if(show&&show.stage!=='ride'&&show.stage!=='complete')return;const panel=document.getElementById('shows');
   if(show&&show.stage==='ride'){
-    const session=app.competitionRpg||show.rpg;if(!session){show.stage='planning';show.feedback='Choose a horse and class to prepare this show.';showRenderSession(show);return;}app.competitionRpg=session;show.rpg=session;const hint=panel.querySelector('.small');if(hint&&hint.textContent.includes('Press Enter'))hint.textContent='Choose an option. Result feedback advances automatically to the next scene.';
+    const session=app.competitionRpg||show.rpg;if(!session){showRecoverMissingSession(show);showRenderSession(show);return;}app.competitionRpg=session;show.rpg=session;const hint=panel.querySelector('.small');if(hint&&hint.textContent.includes('Press Enter'))hint.textContent='Choose an option. Result feedback advances automatically to the next scene.';
     const next=document.getElementById('comp-enter');if(next){next.textContent='Continue';next.disabled=!session?.awaitingAdvance;next.onclick=()=>{if(session?.awaitingAdvance){showAdvanceRpg(session);saveGame(false);renderShows();}};}
     const retire=document.getElementById('comp-retire');if(retire)retire.onclick=()=>{session.eliminated=true;session.roundStats.eliminated=true;session.roundStats.eliminationReason='Retired';finalizeCompetitionRpgEntry(showHorse(show),session);renderShows();};
     if(session?.awaitingAdvance)showScheduleAdvance(session);
@@ -426,3 +426,13 @@ createBarnShowEvent=function(...args){const event=FIELD_GENERATE_EVENT(...args);
 
 function showCanLeaveBeforeWarmup(show){return Boolean(show?.stage?.startsWith('overnight-'))||['entry','planning','horse-preparation','arrival-queue','check-in','stall-allocation','unloading','stable-walk','stall-inspection','settling','exploration','practice','preparation','overnight-evening','overnight-morning','overnight-care'].includes(show?.stage);}
 function showLeaveBeforeWarmup(show){if(!showCanLeaveBeforeWarmup(show)||app.activeShow!==show)return false;show.withdrawnBeforeWarmup=true;showNote(show,'Withdrawn before warm-up. No competition result or placing was awarded.');if(!show.home&&show.travel?.arrival!=null){show.stage='return';}else showFinish(show);return true;}
+
+function showRecoverMissingSession(show){
+ const h=showHorse(show);if(!h){show.stage='complete';show.feedback='The selected horse is unavailable. Choose another horse and class.';return null;}
+ const restored=buildCompetitionRpgSession(h,show.discipline,show.level);restored.liveShowId=show.id;
+ show.rpg=restored;app.competitionRpg=restored;
+ const player=show.competitors?.find(entry=>entry.player);
+ show.stage=player&&Object.keys(player.scores||{}).length?'results':'preparation';
+ show.feedback=show.stage==='results'?'Your recorded results are preserved. Continue from the results screen.':'The missing riding session was restored. Check tack and begin warm-up again.';
+ return restored;
+}
