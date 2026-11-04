@@ -6666,7 +6666,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         const causeText=(variant.title||'')+' '+(selected.option?.intent||'');
         const incidentCause=/runout|run out/i.test(causeText)?'Runout':/spook/i.test(causeText)?'Spook':/buck/i.test(causeText)?'Buck':/rear/i.test(causeText)?'Rear':/distance/i.test(causeText)?'Wrong Distance':'Refusal';
         session.lastShowIncident={cause:incidentCause,reason:session.lastRefusalReason};
-        if (Math.random()*100 < 12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100)) {
+        const incident51=typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,incidentCause,variant.title||''):null;
+        if (incident51?incident51.fell:Math.random()*100 < 12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100)) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = 'fall';
@@ -6691,7 +6692,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
       } else {
         rs.refusals += 1;
         rs.faults += 4;
-        if (rs.refusals >= 2 || rnd(1, 100) <= 10) {
+        const incident51=typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,session.lastShowIncident?.cause||'Refusal',variant.title||''):null;
+        if (rs.refusals >= 2 || (incident51?incident51.fell:rnd(1, 100) <= 10)) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = rs.refusals >= 2 ? 'multiple refusals' : 'fall';
@@ -6754,7 +6756,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
             rs.eliminationReason = 'cross-country refusals';
             displayOutcome = 'Elimination (XC refusals)';
           }
-          if (!rs.eliminated && Math.random()*100 < 10*(1-equipmentModifiers(horse,'eventing-cross-country').fallReduction/100)) {
+          const incident51=!rs.eliminated&&typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,session.lastShowIncident?.cause||'Refusal',variant.title||''):null;
+          if (!rs.eliminated && (incident51?incident51.fell:Math.random()*100 < 10*(1-equipmentModifiers(horse,'eventing-cross-country').fallReduction/100))) {
             session.eliminated = true;
             rs.eliminated = true;
             rs.eliminationReason = 'fall';
@@ -6778,6 +6781,11 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
       }
     }
 
+    // Stadium jumping uses the same incident resolution, without adding a roll to dressage or a clear.
+    if(session.discipline==='eventing'&&!phaseText.includes('dressage')&&!phaseText.includes('cross-country')&&outcome==='fail'&&!rs.eliminated&&typeof tb51ShowIncident==='function'&&rrEnabled()){
+      const incident51=tb51ShowIncident(horse,session,session.lastShowIncident?.cause||'Refusal',variant.title||'');
+      if(incident51.fell){session.eliminated=true;rs.eliminated=true;rs.eliminationReason='fall';displayOutcome='Elimination (fall after '+(session.lastShowIncident?.cause||'Refusal')+')';}
+    }
     session.roundStats = rs;
     if (rs.eliminated) session.eliminated = true;
   }

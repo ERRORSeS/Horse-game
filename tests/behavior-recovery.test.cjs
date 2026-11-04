@@ -1,13 +1,13 @@
 const {check}=require('./behavior5-harness.cjs');
-check('reassessment investigation breaks and reorganization share live state and a four-point cap',`{
+check('reassessment investigation breaks and reorganization share live state and no fixed session cap',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'}),b=rrHorse(h).learned;s.phase='main';b['Learned Fence Avoidance']=65;
  let recovered=0,previous=b['Learned Fence Avoidance'];
  for(let n=1;n<=20;n++){s.attempts=n;s.lastResult=5;s.log.push({exerciseId:'crossrail',resultIndex:5});tbRecord(h,s,'refusal','jumping',false);previous=b['Learned Fence Avoidance'];s.tension=60;
   const event=tbRecovery(h,s,n%3===0?'investigate':n%3===1?'break':'reorganize');const delta=previous-b['Learned Fence Avoidance'];recovered+=delta;if(delta<0||delta>2)throw Error('recovery amount');
   if(event.changes['Learned Fence Avoidance']?.before!==undefined&&event.changes['Learned Fence Avoidance'].before!==previous)throw Error('stale baseline');
  }
- if(recovered!==4||s.behavior5.learningCaps.nonJumpingAvoidanceReduction!==4)throw Error('shared cap');
- s.tension=60;const before=b['Learned Fence Avoidance'],t=s.tension;tbRecovery(h,s,'break');if(b['Learned Fence Avoidance']!==before||s.tension>=t)throw Error('cap should still allow temporary recovery');
+ if(recovered<=4||s.behavior5.learningCaps.nonJumpingAvoidanceReduction!==recovered)throw Error('recovery still capped');
+ s.tension=60;const before=b['Learned Fence Avoidance'],t=s.tension;tbRecovery(h,s,'break');if(b['Learned Fence Avoidance']>before||s.tension>=t)throw Error('genuine recovery blocked');
 }`);
 check('weighted recovery tables include genuine no-improvement outcomes and never fabricate a clean jump',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],original=tbRandom;
