@@ -160,7 +160,8 @@ With Rider Realism enabled, learned fence avoidance uses one refusal/runout rate
 
 | Score | Refusal/runout rate per jump |
 | --- | --- |
-| 0–10 | 15–25% |
+| 0–2 | 4% |
+| 3–10 | 15–25% |
 | 11–30 | 30–40% |
 | 31–50 | 45–55% |
 | 51–75 | 65–75% |

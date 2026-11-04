@@ -1,5 +1,6 @@
 /* One refusal/runout rate per jump, independent of fence type or remembered venue. */
 const FA_BANDS=[
+ {max:2,min:4,high:4,label:'Minimal learned avoidance'},
  {max:10,min:15,high:25,label:'Little learned avoidance'},
  {max:30,min:30,high:40,label:'Mild avoidance'},
  {max:50,min:45,high:55,label:'Noticeable avoidance'},
@@ -15,7 +16,7 @@ function fenceAvoidanceOverLevel(s={}){
 function fenceAvoidanceProfile(h,s={}){
  const score=clamp(Number(rrHorse(h).learned['Learned Fence Avoidance'])||0,0,100),band=FA_BANDS.findIndex(b=>score<=b.max),row=FA_BANDS[band],level=rrSettings().level,experience=rrSettings().experience.jumping,over=fenceAvoidanceOverLevel(s);
  // Professional exception for strong avoidance: ordinary low-avoidance risk remains.
- const professionalException=band===3&&level==='Professional',min=professionalException?15:row.min,max=professionalException?25:row.high;
+ const professionalException=row.max===75&&level==='Professional',min=professionalException?15:row.min,max=professionalException?25:row.high;
  const rider={Beginner:1,Novice:.8,Intermediate:.6,Advanced:.25,Professional:0}[level]??.6;
  const chance=min+(max-min)*clamp(rider+over/25,0,1);
  return {score,band,label:row.label,min,max,chance,modifier:chance,over,experience,professionalException};
