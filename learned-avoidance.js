@@ -202,7 +202,7 @@ const TB_TA_RESOLVE=taResolve;taResolve=function(h,s,e,result){
  if(rrEnabled()&&!s.rrCurrentError&&!['aid','overreaction'].includes(result?.event))return null;
  const event=TB_TA_RESOLVE(h,s,e,result);if(!rrEnabled()||!event)return event;
  const state=tbSession(h,s);
- const learned=tbEvent(h,s,'communication:'+(s.attempts??s.stepIndex??0),'communication',{failed:true,mounted:true,flags:{contactError:event.kind==='contact',legError:event.kind==='leg',riderError:true}});
+ const learned=tbEvent(h,s,'communication:'+(s.attempts??s.stepIndex??0),'communication',{failed:true,mounted:true,severity:event.severity,flags:{contactError:event.kind==='contact',legError:event.kind==='leg',riderError:true}});
  if(learned){
   const severe=event.severity==='Significant';if(event.severity!=='Minor')tbApply(h,s,learned,'Rider Trust in Aids',-tbRange(h,s,learned.key,2,5));
   if(taContext(e,s).collection&&!state.events.some(row=>row.attempt===learned.attempt&&row.changes['Collection Confidence']))tbApply(h,s,learned,'Collection Confidence',-tbRange(h,s,learned.key+'|collection',2,4));
@@ -229,7 +229,7 @@ const TB_CHANCES=competitionOptionFinalChances;competitionOptionFinalChances=fun
  const rows=TB_CHANCES(s,h,step,options);if(!rrEnabled()||step?.stage!=='main_round'||s.discipline==='dressage'||String(step.phase).toLowerCase().includes('dressage'))return rows;
  const profile=fenceAvoidanceProfile(h,s);return rows.map(row=>{const total=row.successChance+row.computed.neutralChance,remaining=100-profile.chance,success=total?row.successChance/total*remaining:remaining;return {...row,successChance:success,computed:{...row.computed,neutralChance:remaining-success,failChance:profile.chance},learnedAvoidance:profile};});
 };
-const TB_CARD=createHorseCard;createHorseCard=function(h,...args){const node=TB_CARD(h,...args),p=document.createElement('p'),profile=fenceAvoidanceProfile(h);p.textContent='Learned Fence Avoidance: '+profile.score+'/100 — '+profile.label+'. Base risk '+Number(profile.base.toFixed(2))+'%; current rider risk '+Number(profile.chance.toFixed(2))+'% per jump. Refusal risk uses rider experience, Jump Confidence, Rider Trust and live Tension. Recovery actions share a four-point session limit.';node.appendChild(p);return node;};
+const TB_CARD=createHorseCard;createHorseCard=function(h,...args){const node=TB_CARD(h,...args),p=document.createElement('p'),profile=fenceAvoidanceProfile(h);p.textContent='Learned Fence Avoidance: '+profile.score+'/100 — '+profile.label+'. Base risk '+Number(profile.base.toFixed(2))+'%; current rider risk '+Number(profile.chance.toFixed(2))+'% per jump. Refusal risk uses rider experience, Jump Confidence, Rider Trust and live Tension. Recovery actions use the current live score and require a genuine relevant experience.';node.appendChild(p);return node;};
 function tbNarrativeFacts(h,s,event){
  const state=tbSession(h,s),b=rrHorse(h),attempts=state.events.filter(row=>row.type==='attempt'),successes=attempts.filter(row=>row.clean),last=attempts.at(-1),setback=attempts.findLast(row=>row.failed),prior=attempts.slice(0,-1),sessions=(b.completedBehaviorSessions||[]).filter(row=>row.positive&&row.rider===event.riderId&&row.scope===tbScope(s)),delta=event.changes;
  const improvement=Object.entries(b.learned).some(([stat,n])=>(/Avoidance|Sensitivity|Anticipation/.test(stat)?-1:1)*(n-state.initialBehavior[stat])>0);
