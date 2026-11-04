@@ -124,3 +124,37 @@ check('actual training failures preserve expert confidence and keep recovery cum
   rrFollowup(h,s,'assess');if(before-afterBreak<1||before-afterBreak>2||afterBreak-b.learned['Learned Fence Avoidance']<1||afterBreak-b.learned['Learned Fence Avoidance']>2)throw Error('recovery not cumulative');
  }
 }`);
+check('rewarded successful jumps independently improve confidence below fifty and avoidance above seventy-five', `{
+ for(const [confidence,avoidance,expectedConfidence,expectedAvoidance]of [[49,76,50,75],[49,75,50,75],[50,76,50,75],[50,75,50,75],[49.5,75.5,50.5,74.5]]){
+  resetGame();rrSettings().enabled=true;const h=app.horses[0],b=rbState(h);
+  b.learned['Jump Confidence']=confidence;b.learned['Learned Fence Avoidance']=avoidance;
+  const s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.lastResult=0;s.log.push({exerciseId:'crossrail',resultIndex:0,result:'Clean/Correct',text:'Actual jump'});
+  const skills=JSON.stringify(h.stats),potential=JSON.stringify(h.potential);
+  if(!t2rewardSuccessfulAttempt(h,s)||!s.encouraged)throw Error('reward did not run');
+  if(b.learned['Jump Confidence']!==expectedConfidence||b.learned['Learned Fence Avoidance']!==expectedAvoidance)throw Error('independent thresholds '+JSON.stringify([confidence,avoidance]));
+  if(t2rewardSuccessfulAttempt(h,s)||b.learned['Jump Confidence']!==expectedConfidence||b.learned['Learned Fence Avoidance']!==expectedAvoidance)throw Error('repeat click rewarded');
+  if(JSON.stringify(h.stats)!==skills||JSON.stringify(h.potential)!==potential)throw Error('reward changed technical skill');
+ }
+}`);
+check('reward requires a successful jumping effort and cannot add recovery to failed, finished or automatic work', `{
+ for(const options of [{lastResult:5},{lastResult:2},{finished:true},{automatic:true},{exerciseId:'large-circle'},{enabled:false}]){
+  resetGame();rrSettings().enabled=options.enabled!==false;const h=app.horses[0],b=rbState(h);
+  b.learned['Jump Confidence']=40;b.learned['Learned Fence Avoidance']=80;
+  const s=t2newSession(h,{discipline:'jumping',exerciseId:options.exerciseId||'crossrail'});Object.assign(s,{phase:'main',attempts:1,lastResult:0},options);
+  s.log.push({exerciseId:s.exerciseId,resultIndex:s.lastResult,result:'Attempt',text:'Recorded effort'});t2rewardSuccessfulAttempt(h,s);
+  if(b.learned['Jump Confidence']!==40||b.learned['Learned Fence Avoidance']!==80)throw Error('unqualified behavior reward '+JSON.stringify(options));
+ }
+}`);
+check('jump rewards share the current recovered scores and remain once per attempt after save/load', `{
+ resetGame();rrSettings().enabled=true;const h=app.horses[0],b=rbState(h);
+ b.learned['Jump Confidence']=40;b.learned['Learned Fence Avoidance']=80;
+ const s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.lastResult=0;s.tension=30;
+ s.log.push({exerciseId:'crossrail',resultIndex:0,result:'Clean/Correct',text:'Actual jump'});
+ t2break(h,s);const afterBreak=b.learned['Learned Fence Avoidance'];t2rewardSuccessfulAttempt(h,s);
+ if(b.learned['Learned Fence Avoidance']!==afterBreak-1||b.learned['Jump Confidence']!==41)throw Error('reward did not build on current score');
+ const stored=JSON.parse(JSON.stringify(s)),savedAvoidance=b.learned['Learned Fence Avoidance'];hydrateFromSave(JSON.parse(serializeAppState()));
+ const restored=app.horses[0];stored.rewardedAttempts=[];t2rewardSuccessfulAttempt(restored,stored);
+ if(rrHorse(restored).learned['Jump Confidence']!==41||rrHorse(restored).learned['Learned Fence Avoidance']!==savedAvoidance)throw Error('save replay rewarded twice');
+ stored.attempts=2;stored.log.push({exerciseId:'crossrail',resultIndex:0,result:'Clean/Correct',text:'Next successful jump'});t2rewardSuccessfulAttempt(restored,stored);
+ if(rrHorse(restored).learned['Jump Confidence']!==42||rrHorse(restored).learned['Learned Fence Avoidance']!==savedAvoidance-1)throw Error('new attempt not rewarded');
+}`);
