@@ -2162,6 +2162,7 @@ function trainingOptionFinalChances(session, horse, options) {
 }
 
 function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedChance = null) {
+  const bondBefore = horse.bond || 0;
   const chanceProfile = precomputedChance || trainingOptionChances(option, horse, session, optionIndex);
   const successChance = chanceProfile.successChance;
   const neutralChance = chanceProfile.neutralChance;
@@ -2172,6 +2173,7 @@ function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedCh
   else if (roll <= successChance + neutralChance) outcome = 'neutral';
 
   const confidenceField = disciplineConfidenceField(session.discipline);
+  const confidenceBefore = horse[confidenceField] ?? 50;
   const skillBase = option.effects?.skill || 0;
   const bondDelta = option.effects?.bond || 0;
   let fatigueGain = outcome === 'success' ? rnd(2, 4) : outcome === 'neutral' ? rnd(3, 5) : rnd(4, 7);
@@ -2193,7 +2195,7 @@ function resolveRpgOption(option, horse, session, optionIndex = 0, precomputedCh
   } else if (outcome === 'fail') {
     horse.bond = clamp((horse.bond || 0) + Math.min(0, bondDelta), horse.isRescue ? -50 : 0, 100);
   }
-  return { outcome, successChance, neutralChance, failChance, skillBase, confidenceDelta, fatigueGain, bondDelta: outcome === 'success' ? Math.max(0, bondDelta) : outcome === 'fail' ? Math.min(0, bondDelta) : 0 };
+  return { outcome, successChance, neutralChance, failChance, skillBase, confidenceDelta: horse[confidenceField] - confidenceBefore, fatigueGain, bondDelta: (horse.bond || 0) - bondBefore };
 }
 
 function normalizeMarkingForBreed(marking, breed) {
@@ -4067,6 +4069,9 @@ function bondModifiers(horse) {
 
 function updateBondMonthly(horse) {
   if (horse.retiredForever) return;
+  const bondMonth = app.year * 12 + app.month;
+  if (horse.bondProgressMonth === bondMonth) return;
+  horse.bondProgressMonth = bondMonth;
   let nextBond = horse.bond || 0;
   nextBond += 1;
   if (horse.manualTrainingThisMonth) nextBond += 3;
@@ -6605,7 +6610,7 @@ function competitionOptionFinalChances(session, horse, step, options) {
 function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const step = session.steps[session.stepIndex];
   const variant = competitionPromptForStep(session);
-  if (!step || !variant) return;
+  if (!step || !variant || session.awaitingAdvance) return;
   const optionOutcomes = competitionOptionFinalChances(session, horse, step, variant.options);
   const selected = optionOutcomes.find((entry) => entry.index === choiceIndex);
   if (!selected) return;
@@ -6613,7 +6618,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
   const successChance = selected.successChance;
   const neutralChance = computed.neutralChance;
   const failChance = Math.max(1, 100 - successChance - neutralChance);
-  const roll = rnd(1, 100);
+  const jumpDecision = typeof tb52ShowJumpDecision === 'function' ? tb52ShowJumpDecision(horse, session, step, failChance) : null;
+  const roll = jumpDecision ? 100 - jumpDecision.roll : rnd(1, 100);
   const outcome = roll <= successChance ? 'success' : roll <= successChance + neutralChance ? 'partial' : 'fail';
   const mod = outcome === 'success' ? rnd(2, 5) : outcome === 'partial' ? rnd(-1, 2) : rnd(-8, -3);
   session.modifier += mod;
@@ -7597,7 +7603,7 @@ function renderTraining() {
         else if (result.outcome === 'neutral') summary.neutralCount = (summary.neutralCount || 0) + 1;
         else summary.failCount = (summary.failCount || 0) + 1;
         summary.confidence += result.confidenceDelta;
-        summary.bond += result.bondDelta + (session.pendingEvent?.bondBonus || 0);
+        summary.bond += result.bondDelta;
         summary.fatigue += result.fatigueGain;
         if (session.pendingEvent) summary.notableEvent = session.pendingEvent.text;
         session.summary = summary;
@@ -7622,8 +7628,10 @@ function renderTraining() {
             notableEvent: summary.notableEvent || 'Steady session with no standout event.',
             reflection: `${horse.name} finished the session feeling ${horse.mood.toLowerCase()} with ${horse.fatigue || 0}% fatigue. Progress was earned through repetition rather than automatic success.`
           };
-          pushReport(`${horse.name} session summary — Skill ${summary.skill >= 0 ? '+' : ''}${summary.skill}, Confidence ${summary.confidence >= 0 ? '+' : ''}${summary.confidence}, Bond ${summary.bond >= 0 ? '+' : ''}${summary.bond}.`);
+          const actualSummary = [['Skill', summary.skill], ['Confidence', summary.confidence], ['Bond', summary.bond]].filter(([,delta]) => Math.abs(delta) > 0.00001).map(([stat,delta]) => `${stat} ${delta > 0 ? '+' : ''}${delta}`).join(', ');
+          if (actualSummary) pushReport(`${horse.name} session summary — ${actualSummary}.`);
         }
+        saveGame(false);
         renderTraining();
       };
     });
@@ -7661,7 +7669,7 @@ function renderTraining() {
     </div>
     ${app.trainingRpgSummary ? `<div class='box'><h3>Session Summary</h3>
       <p><strong>${app.trainingRpgSummary.horseName}</strong> — ${cap(app.trainingRpgSummary.discipline)}</p>
-      <p>Skill change (${app.trainingRpgSummary.trainedSkill || 'selected skill'}): ${app.trainingRpgSummary.skill >= 0 ? '+' : ''}${app.trainingRpgSummary.skill} | Confidence change: ${app.trainingRpgSummary.confidence >= 0 ? '+' : ''}${app.trainingRpgSummary.confidence} | Bond change: ${app.trainingRpgSummary.bond >= 0 ? '+' : ''}${app.trainingRpgSummary.bond} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
+      <p>${[[`Skill (${app.trainingRpgSummary.trainedSkill || 'selected skill'})`, app.trainingRpgSummary.skill], ['Confidence', app.trainingRpgSummary.confidence], ['Bond', app.trainingRpgSummary.bond]].filter(([,delta]) => Math.abs(delta) > 0.00001).map(([stat,delta]) => `${stat}: ${delta > 0 ? '+' : ''}${delta}`).join(' | ')} | Fatigue: +${app.trainingRpgSummary.fatigue}</p>
       <p>Notable event: ${app.trainingRpgSummary.notableEvent}</p>
       <p class='small'>${app.trainingRpgSummary.reflection}</p>
     </div>` : ''}
@@ -7851,6 +7859,8 @@ function renderTraining() {
 function applyBarnActivity(horse, activity, options = {}) {
   if (!horse) return;
   const silent = options.silent === true;
+  const bondBefore = horse.bond || 0;
+  const bondChange = () => { const delta = (horse.bond || 0) - bondBefore; return delta ? ` (Bond ${delta > 0 ? '+' : ''}${delta})` : ''; };
   const log = (text) => {
     if (!silent) pushReport(text);
   };
@@ -7858,7 +7868,7 @@ function applyBarnActivity(horse, activity, options = {}) {
     horse.bond = clamp((horse.bond || 0) + 8, horse.isRescue ? -50 : 0, 100);
     horse.dailyGrooming = clamp((horse.dailyGrooming || 65) + 6, 0, 100);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
-    log(`Barn: ${horse.name} was groomed by hand (+Bond, +QOL).`);
+    log(`Barn: ${horse.name} was groomed by hand${bondChange()}.`);
   }
   if (activity === 'clean-stall') {
     horse.stallCleanliness = clamp((horse.stallCleanliness || 65) + 8, 0, 100);
@@ -7869,7 +7879,7 @@ function applyBarnActivity(horse, activity, options = {}) {
     horse.bond = clamp((horse.bond || 0) + 5, horse.isRescue ? -50 : 0, 100);
     horse.mood = pick(POSITIVE_MOODS);
     horse.barnActivityQuality = clamp((horse.barnActivityQuality || 0) + 2, 0, 10);
-    log(`Barn: ${horse.name} enjoyed hand grazing (+Bond, mood improved).`);
+    log(`Barn: ${horse.name} enjoyed hand grazing${bondChange()}.`);
   }
   if (activity === 'lunge') {
     horse.bond = clamp((horse.bond || 0) + 3, horse.isRescue ? -50 : 0, 100);
@@ -7976,6 +7986,7 @@ function renderBarn() {
       if (btn.dataset.barn === 'care-all') {
         if (!privateHorses.length) return;
         careForAllBarnHorses(privateHorses);
+        saveGame(false);
         app.barnHorseSelectionId = document.getElementById('barn-horse')?.value || app.barnHorseSelectionId;
         renderBarn();
         return;
@@ -7989,6 +8000,7 @@ function renderBarn() {
       if (!horse) return;
       applyBarnActivity(horse, btn.dataset.barn);
       app.barnHorseSelectionId = horseId;
+      saveGame(false);
       renderBarn();
     };
   });
