@@ -153,3 +153,21 @@ Visible-panel redraws, faster compatible save compression and scoped UI-state sc
 ## Soundness longevity, therapy and round pole faults
 
 Soundness now uses an integer-month clock and years.months display. Veterinary therapy is an interactive fourteen-day course; routine history/receipt controls preserve authoritative clinical and financial records. Showjumping uses one height-based pole-event chance per whole round. See [SOUNDNESS-THERAPY-VALIDATION.md](SOUNDNESS-THERAPY-VALIDATION.md) for effective rules, migration details and all validation results.
+
+## Learned fence avoidance
+
+With Rider Realism enabled, learned fence avoidance uses one refusal/runout rate per jumping effort in training and shows. Fence type and changing venues do not bypass it.
+
+| Score | Refusal/runout rate per jump |
+| --- | --- |
+| 0–10 | 15–25% |
+| 11–30 | 30–40% |
+| 31–50 | 45–55% |
+| 51–75 | 65–75% |
+| 76–100 | 85–90% |
+
+Less experienced riders and heights above their experience move the rate toward the upper end. Advanced and professional riders still face refusals. For the professional exception at 51–75, the rate is 15–25%; severe avoidance remains 85–90% even for professionals.
+
+Actual repeated refusals, frightening fence experiences, unresolved distress, rider errors, obstacle spooks, negative jumping behavior, and neglectful responses reinforce avoidance. Beginner/novice riders using demanding leverage bits, double bridles, or tack the horse strongly dislikes also reinforce it. Suitable successful work gradually reduces avoidance, including in new contexts. Familiar surroundings, sensible adjustments and higher rider skill support that recovery; changing settings, resting or switching riders alone does not erase learned behavior. Existing daily/session learning limits and save persistence remain in place.
+
+“Behavioral concern — reassess before continuing” is a training control. Shows record their outcomes and continue through the normal show flow, including when an older save contains a pending concern.
