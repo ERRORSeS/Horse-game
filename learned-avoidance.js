@@ -61,6 +61,15 @@ function fenceAvoidanceRecover(h,s,reason,amount){
 function fenceAvoidanceRecoveryAmount(h,s,reason){
  return 1+Math.floor(HorseHealth.roll(HorseHealth.hash(h.id+'|'+rrSessionId(s)+'|'+reason),'recovery')*2);
 }
+function fenceAvoidanceReward(h,s){
+ if(!fenceAvoidanceTraining(s)||s.finished||s.phase!=='main'||![0,1].includes(s.lastResult)||!fenceAvoidanceJumpWorked(s,true))return false;
+ const b=rbState(h),id=rrSessionId(s),key=id+'|reward-success:'+s.attempts;
+ if(b.processed.includes(key)||b.processed.includes(id+'|experience|'+s.attempts+'|welfare'))return false;
+ b.processed.push(key);b.processed=b.processed.slice(-200);
+ if(b.learned['Jump Confidence']<50)recordBehaviorRecovery(h,s,'Rewarded successful jump confidence:'+s.attempts,'Jump Confidence',1);
+ if(b.learned['Learned Fence Avoidance']>75)fenceAvoidanceRecover(h,s,'Rewarded successful jump avoidance:'+s.attempts,1);
+ return true;
+}
 const FA_FOLLOWUP=rrFollowup;
 rrFollowup=function(h,s,action){
  const refusal=s.rrConcern&&/refusal|runout/i.test(s.rrConcern.kind||''),eligible=!s.finished&&fenceAvoidanceTraining(s)&&fenceAvoidanceJumpWorked(s,true);
