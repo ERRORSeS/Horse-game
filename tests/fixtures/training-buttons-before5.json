@@ -1,0 +1,125 @@
+{
+  "buttons": [
+    [
+      "walk",
+      "Continue Walking"
+    ],
+    [
+      "trot",
+      "Transition to Trot"
+    ],
+    [
+      "canter",
+      "Transition to Canter"
+    ],
+    [
+      "circles",
+      "Ride Large Circles"
+    ],
+    [
+      "transitions",
+      "Add Simple Transitions"
+    ],
+    [
+      "walk",
+      "Return to Walk"
+    ],
+    [
+      "main",
+      "Begin Main Exercise"
+    ],
+    [
+      "attempt",
+      "Repeat the Exercise"
+    ],
+    [
+      "simplify",
+      "Simplify the Exercise"
+    ],
+    [
+      "harder",
+      "Increase Difficulty"
+    ],
+    [
+      "switch",
+      "Switch Direction"
+    ],
+    [
+      "encourage",
+      "Offer Encouragement"
+    ],
+    [
+      "reward",
+      "Reward Successful Attempt"
+    ],
+    [
+      "next",
+      "Continue Lesson"
+    ],
+    [
+      "circle-away",
+      "Circle Away"
+    ],
+    [
+      "flatwork",
+      "Return to Flatwork"
+    ],
+    [
+      "break",
+      "Take a Walk Break"
+    ],
+    [
+      "cooldown",
+      "Begin Cooldown"
+    ],
+    [
+      "finish",
+      "End Session"
+    ],
+    [
+      "add-exercise",
+      "Add Exercise"
+    ],
+    [
+      "save-plan",
+      "Save as Lesson Plan"
+    ],
+    [
+      "start",
+      "Start Interactive Training"
+    ],
+    [
+      "quick",
+      "Quick Training"
+    ],
+    [
+      "back",
+      "Back to Preparation"
+    ],
+    [
+      "builder",
+      "Continue to Lesson Builder"
+    ],
+    [
+      "add-fence",
+      "Add Fence"
+    ],
+    [
+      "save-course",
+      "Save Course"
+    ],
+    [
+      "duplicate-course",
+      "Duplicate Course"
+    ],
+    [
+      "delete-course",
+      "Delete Course"
+    ],
+    [
+      "start-course",
+      "Start Schooling"
+    ]
+  ],
+  "extraActionsSHA256": "978831f11e21cb93b192681dba452060c2f6ee57fc8a48d938ca7f853d516665"
+}
