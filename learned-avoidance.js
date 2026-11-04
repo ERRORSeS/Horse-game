@@ -41,19 +41,22 @@ function fenceAvoidanceJumpWorked(s,latest=false){
  if(attempts.length)return (latest?[attempts.at(-1)]:attempts).some(row=>t2exercise(row.exerciseId)?.category==='Jumping');
  return s.attempts>0&&t2exercise(s.exerciseId)?.category==='Jumping';
 }
-function fenceAvoidanceRecover(h,s,reason,amount){
+function recordBehaviorRecovery(h,s,reason,stat,change){
  if(!fenceAvoidanceTraining(s))return 0;
  const b=rbState(h),key=rrSessionId(s)+'|fence-recovery|'+reason;
  s.faRecoveries ||= {};
  if(s.faRecoveries[reason]||b.processed.includes(key))return 0;
- const before=b.learned['Learned Fence Avoidance'],after=Math.max(0,before-amount),delta=before-after;
+ const before=b.learned[stat],after=clamp(before+change,0,100),delta=after-before;
  s.faRecoveries[reason]=true;b.processed.push(key);b.processed=b.processed.slice(-200);
- b.learned['Learned Fence Avoidance']=after;
- const text='Learned Fence Avoidance: '+before+' → '+after+' (−'+delta+'). '+reason.split(':')[0]+'.';
- b.history.push({key,day:rrDay(s),sessionId:rrSessionId(s),context:rbContext(s),kind:'Fence avoidance recovery',positive:true,changes:{'Learned Fence Avoidance':{before,after,delta:-delta}},observation:text,recovery:'Improving'});
+ b.learned[stat]=after;
+ const text=stat+': '+before+' → '+after+' ('+(delta>0?'+':'')+delta+'). '+reason.split(':')[0]+'.';
+ b.history.push({key,day:rrDay(s),sessionId:rrSessionId(s),context:rbContext(s),kind:'Rider behavior recovery',positive:true,changes:{[stat]:{before,after,delta}},observation:text,recovery:'Improving'});
  b.history=b.history.slice(-50);s.log ||= [];s.log.push({kind:'Behavior outcome',text,elapsed:s.elapsed});
  if(s.report)s.report.notes.push(text);
  return delta;
+}
+function fenceAvoidanceRecover(h,s,reason,amount){
+ return -recordBehaviorRecovery(h,s,reason,'Learned Fence Avoidance',-amount);
 }
 function fenceAvoidanceRecoveryAmount(h,s,reason){
  return 1+Math.floor(HorseHealth.roll(HorseHealth.hash(h.id+'|'+rrSessionId(s)+'|'+reason),'recovery')*2);
@@ -80,9 +83,10 @@ t2break=function(h,s,minutes=2){
 };
 const FA_FINISH=t2finish;
 t2finish=function(h,s){
- const eligible=!s.finished&&fenceAvoidanceTraining(s)&&fenceAvoidanceJumpWorked(s)&&['Advanced','Professional'].includes(rrSettings().level);
+ const experienced=!s.finished&&fenceAvoidanceTraining(s)&&['Advanced','Professional'].includes(rrSettings().level),eligible=experienced&&fenceAvoidanceJumpWorked(s),trustEligible=experienced&&s.attempts>0;
  const result=FA_FINISH(h,s);
  if(eligible&&s.finished)fenceAvoidanceRecover(h,s,'Experienced rider session',.5);
+ if(trustEligible&&s.finished)recordBehaviorRecovery(h,s,'Experienced rider trust session','Rider Trust in Aids',3);
  return result;
 };
 
