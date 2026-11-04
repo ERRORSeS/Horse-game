@@ -1,0 +1,77 @@
+{
+  "seed": "HorseHealth.hash/roll, stable per course and jump",
+  "rows": [
+    {
+      "score": 1,
+      "base": 4,
+      "finalPercent": 6,
+      "attempts": 10000,
+      "refusals": 622,
+      "observedPercent": 6.22,
+      "courses": 1000,
+      "clearCourses": 418,
+      "eliminatedCourses": 145,
+      "maxAttempts": 12
+    },
+    {
+      "score": 5,
+      "base": 20,
+      "finalPercent": 22,
+      "attempts": 10000,
+      "refusals": 2197,
+      "observedPercent": 21.97,
+      "courses": 1000,
+      "clearCourses": 38,
+      "eliminatedCourses": 815,
+      "maxAttempts": 12
+    },
+    {
+      "score": 20,
+      "base": 34.73684210526316,
+      "finalPercent": 36.73684210526316,
+      "attempts": 10000,
+      "refusals": 3721,
+      "observedPercent": 37.21,
+      "courses": 1000,
+      "clearCourses": 3,
+      "eliminatedCourses": 978,
+      "maxAttempts": 12
+    },
+    {
+      "score": 40,
+      "base": 49.73684210526316,
+      "finalPercent": 51.73684210526316,
+      "attempts": 10000,
+      "refusals": 5111,
+      "observedPercent": 51.11,
+      "courses": 1000,
+      "clearCourses": 0,
+      "eliminatedCourses": 994,
+      "maxAttempts": 12
+    },
+    {
+      "score": 60,
+      "base": 68.75,
+      "finalPercent": 70.75,
+      "attempts": 10000,
+      "refusals": 7145,
+      "observedPercent": 71.45,
+      "courses": 1000,
+      "clearCourses": 0,
+      "eliminatedCourses": 1000,
+      "maxAttempts": 8
+    },
+    {
+      "score": 85,
+      "base": 86.875,
+      "finalPercent": 88.875,
+      "attempts": 10000,
+      "refusals": 8885,
+      "observedPercent": 88.85,
+      "courses": 1000,
+      "clearCourses": 0,
+      "eliminatedCourses": 1000,
+      "maxAttempts": 4
+    }
+  ]
+}

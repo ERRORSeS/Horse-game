@@ -154,25 +154,16 @@ Visible-panel redraws, faster compatible save compression and scoped UI-state sc
 
 Soundness now uses an integer-month clock and years.months display. Veterinary therapy is an interactive fourteen-day course; routine history/receipt controls preserve authoritative clinical and financial records. Showjumping uses one height-based pole-event chance per whole round. See [SOUNDNESS-THERAPY-VALIDATION.md](SOUNDNESS-THERAPY-VALIDATION.md) for effective rules, migration details and all validation results.
 
-## Learned fence avoidance
+## Training Behavior Engine 5.0
 
-With Rider Realism enabled, learned fence avoidance uses one refusal/runout rate per jumping effort in training and shows. Fence type and changing venues do not bypass it.
+Enable Rider Realism in the existing settings to use the behavior engine. The existing Training 2.0 buttons, exercises, Quick/Auto training, skill progression and competition controls remain in place. Learned values live on each horse; every actual action or resolved attempt continues from the current values.
 
-| Score | Refusal/runout rate per jump |
-| --- | --- |
-| 0–2 | 4% |
-| 3–10 | 15–25% |
-| 11–30 | 30–40% |
-| 31–50 | 45–55% |
-| 51–75 | 65–75% |
-| 76–100 | 85–90% |
+Refusal/run-out risk is calculated per eligible jump. Scores 0–2 have a **4% base risk**. For scores above 2, the supplied piecewise interpolation is used (for example: 5 → 20%, 20 → 34.74%, 40 → 49.74%, 60 → 68.75%, 85 → 86.88%). Rider level, height experience, Jump Confidence, Rider Trust and live Tension then modify that base. The final chance is clamped to **5–95%**, as specified; the 4% override is the base, not an exemption from those modifiers. Fence type, filler and an “unknown obstacle” do not add refusal risk. Environmental spooks remain separate, as do fallen poles and existing elimination rules.
 
-Less experienced riders and heights above their experience move the rate toward the upper end. Advanced and professional riders still face refusals. For the professional exception at 51–75, the rate is 15–25%; severe avoidance remains 85–90% even for professionals.
+Reassessment, investigation, walk breaks and successful reorganization use weighted outcomes, including no permanent improvement. They share a maximum of **−4 avoidance per session**. Actual clean jumps earn +2/+3/+4 Jump Confidence with 40%/40%/20% weights, capped at **+12 ordinary confidence per session**. Reward Successful Attempt adds +1 confidence below 50 and −1 avoidance above 75, independently and once per successful jump.
 
-Actual repeated refusals, frightening fence experiences, unresolved distress, rider errors, obstacle spooks, negative jumping behavior, and neglectful responses reinforce avoidance. Beginner/novice riders using demanding leverage bits, double bridles, or tack the horse strongly dislikes also reinforce it. Suitable successful work gradually reduces avoidance, including in new contexts. Familiar surroundings and sensible adjustments support recovery through suitable work. After a refusal, Pause and assess or Allow time to investigate reduces avoidance by 1–2 points, once for that refusal. A walk break or Circle Away that actually lowers tension after a jumping effort reduces avoidance by 1–2 points, once per effort. An Advanced or Professional rider reduces avoidance by exactly 0.5 once per completed jumping session. Opening or ending an empty session, repeating the same recovery action, and automatic work grant no recovery. Breaks and refusal reassessment share the horse’s current overall avoidance score: every change starts from the latest value, including after recovery earlier in the same session. Older session baselines never restore a higher score. Fractional scores and recovery records persist in saves.
+Advanced/Professional riders earn −0.5 avoidance only after verified positive jumping work without disqualifying distress. Their +3 Rider Trust bonus requires verified positive mounted communication. Compatible aids can earn a separate +1 trust only after actual positive communication. Merely opening or ending an empty session, omitting tack, or advancing time earns no learning. A novice’s unsuccessful jump does not automatically lower confidence: a real rider error must contribute. Welfare incidents have separate adverse consequences and grant no performance reward.
 
-Clean/correct and clear jump attempts earn 2–4 Jump Confidence, with a further +1 for suitable, consistent aids without neglectful methods. The +1 requires no spurs below 20 Leg Stability and no Pelham bit below 20 Hand Stability. An unpunished unsuccessful jump lowers Jump Confidence only for Beginner/Novice riders; punishment lowers it at every rider level. Advanced/Professional riders gain +3 Rider Trust in Aids once per completed worked training session. Repeated finish calls do not duplicate the bonus or reset trust to an earlier session value. Existing daily/session confidence learning limits and the 0–100 bounds still apply.
+All nine learned statistics have contextual effects and event-based progression. The 140 supplied quotes are filtered by actual rider/trainer identity, action, outcome, stat direction and history. Instructor identities, personality, session caps, event IDs, fractional values and learned scores persist in saves. Training reports show each statistic’s actual start and finish values. The behavioral reassessment panel remains exclusive to training.
 
-After a successful jump, Reward Successful Attempt adds +1 Jump Confidence when the current value is below 50 and reduces Learned Fence Avoidance by 1 when its current value is above 75. Each condition is independent, so both can apply. The reward uses the same current scores as breaks and refusal reassessment and can be applied only once to that completed attempt. Failed attempts, non-jumping work, finished sessions and automatic training receive no extra behavior reward.
-
-“Behavioral concern — reassess before continuing” is a training control. Shows record their outcomes and continue through the normal show flow, including when an older save contains a pending concern.
+Run `npm test` for game regressions and `npm run test:behavior5-simulation` for seeded single-jump, course and actual-session validation. See [the implementation and validation report](TRAINING-BEHAVIOR5-REPORT.md) and [simulation results](outputs/training-behavior5-simulation.json).

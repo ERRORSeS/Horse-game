@@ -6110,7 +6110,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   if (discipline === 'jumping') {
     rails = rpgRoundStats ? (rpgRoundStats.rails || 0) : showjumpingRoundPlan(horse, level, interaction?.poleRoundKey, jumpCount).rails;
     const refusalChance = clamp(clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60) + equipmentModifiers(horse,discipline).refusal, 0, 100);
-    refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
+    refusals = typeof tbQuickJumpRefusals==='function'&&rrEnabled()&&!rpgRoundStats&&app.horses.some(owned=>owned.id===horse.id) ? tbQuickJumpRefusals(horse,discipline,level,interaction,jumpCount) : rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
     const fall = Math.random()*100 < Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8))*(1-equipmentModifiers(horse,discipline).fallReduction/100);
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
     overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
@@ -6162,7 +6162,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   } else if (discipline === 'eventing') {
     rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias)) + (hotBloodedPenalty ? 2 : 0) + (excitablePenalty ? 1 : 0), 0, 6);
     const refusalChance = clamp(clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 55) + equipmentModifiers(horse,discipline).refusal, 0, 100);
-    refusals = rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
+    refusals = typeof tbQuickJumpRefusals==='function'&&rrEnabled()&&!rpgRoundStats&&app.horses.some(owned=>owned.id===horse.id) ? tbQuickJumpRefusals(horse,discipline,level,interaction,jumpCount) : rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
     const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
     overSeconds = Math.max(0, rnd(0, 20) - Math.floor(jump.Speed / 4));
