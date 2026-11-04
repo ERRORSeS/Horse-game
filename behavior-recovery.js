@@ -17,7 +17,8 @@ function rbRecord(h,s,kind,discipline,positive=false){
  s.rbLearning ||= {};b.behaviorDaily ||= {day,used:{}};if(b.behaviorDaily.day!==day)b.behaviorDaily={day,used:{}};
  const apply=(stat,delta)=>{const used=s.rbLearning[stat]||0,daily=b.behaviorDaily.used[stat]||0,n=Math.min(Math.abs(delta),Math.max(0,8-used),Math.max(0,8-daily));s.rbLearning[stat]=used+n;b.behaviorDaily.used[stat]=daily+n;b.learned[stat]=clamp(b.learned[stat]+Math.sign(delta)*n,0,100);};
  const e=t2exercise(s.exerciseId),jump=e?e.category==='Jumping':['jumping','hunter','eventing'].includes(discipline),collection=/collect|shoulder|half-pass|piaffe|passage/.test(s.exerciseId||''),ground=e?e.category==='Groundwork'||e.id.startsWith('lunge-'):discipline==='groundwork',confidence=ground?'Handling Confidence':jump?'Jump Confidence':'Flatwork Confidence',direction=positive?1:-1;
- apply(confidence,direction*amount);
+ const confidenceGain=jump&&positive&&index<=1?2+Math.floor(HorseHealth.roll(HorseHealth.hash(key),'clean-jump-confidence')*3)+(avoidanceCare.suitable&&fenceAvoidanceSafeAids(h,s)?1:0):direction*amount;
+ apply(confidence,confidenceGain);
  if(collection)apply('Collection Confidence',direction*amount);
  const memoryContext=rrContextKey(s),memory=b.memories.find(m=>m.context===memoryContext)||{context:memoryContext,avoidance:0,successes:0};if(!b.memories.includes(memory))b.memories.push(memory);
  if(jump){

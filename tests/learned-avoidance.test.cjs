@@ -8,3 +8,64 @@ check('actual training jump attempts use the absolute rate before interruptions 
 check('show choices expose the exact bands and stale concerns never block a show refusal or the next choice',`{resetGame();rrSettings().enabled=true;const h=app.horses[0],s=buildCompetitionRpgSession(h,'jumping','0.70');rrHorse(h).learned['Learned Fence Avoidance']=90;s.stepIndex=s.steps.findIndex(x=>x.stage==='main_round');const step=s.steps[s.stepIndex],options=competitionPromptForStep(s).options;for(const row of competitionOptionFinalChances(s,h,step,options)){if(row.computed.failChance<85||row.computed.failChance>90||Math.abs(row.successChance+row.computed.neutralChance+row.computed.failChance-100)>1e-8)throw Error('show bands');}const random=Math.random;s.rrConcern={kind:'refusal'};Math.random=()=>.5;try{resolveCompetitionRpgChoice(s,h,0);}finally{Math.random=random;}if(s.roundStats.refusals!==1||s.rrConcern)throw Error('show concern interrupted or persisted');const box=rrConcernControls(h,{discipline:'jumping',exerciseId:'crossrail',rrConcern:{kind:'refusal'}});if(!box.innerHTML.includes('Behavioral concern'))throw Error('training control removed');}`);
 check('automatic round plans apply learned avoidance per fence and preserve legacy behavior when disabled',`{resetGame();rrSettings().enabled=true;const h=app.horses[0];rrHorse(h).learned['Learned Fence Avoidance']=90;let refused=0,total=0;for(let i=0;i<100;i++){const p=ShowjumpingRound.plan(h,'0.70','learned-'+i,12);refused+=p.refusalIndices.length;total+=12;}const rate=refused/total;if(rate<.82||rate>.93)throw Error('round plans not per jump '+rate);rrSettings().enabled=false;for(let i=0;i<20;i++)if(ShowjumpingRound.plan(h,'0.70','legacy-'+i,12).refusalIndices.length>1)throw Error('disabled behavior changed');}`);
 check('show advancement clears saved concerns and advances normally',`{resetGame();rrSettings().enabled=true;const h=app.horses[0],s=buildCompetitionRpgSession(h,'jumping','0.70');s.stepIndex=s.steps.findIndex(x=>x.stage==='main_round');s.awaitingAdvance=true;s.rrConcern={kind:'refusal'};const prior=s.stepIndex;showAdvanceRpg(s);if(s.stepIndex!==prior+1||s.awaitingAdvance||s.rrConcern)throw Error('show advancement blocked');}`);
+check('reassessing or investigating each real refusal reduces avoidance once by one or two', `{
+ for(const action of ['assess','investigate']){
+  resetGame();rrSettings().enabled=true;
+  const h=app.horses[0],b=rbState(h);b.learned['Learned Fence Avoidance']=50;
+  const s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});
+  s.phase='main';s.attempts=1;s.lastResult=5;s.rrConcern={kind:'refusal'};
+  if(!rrFollowup(h,s,action))throw Error('action failed');
+  const loss=50-b.learned['Learned Fence Avoidance'];
+  if(loss<1||loss>2)throw Error('reassessment loss '+loss);
+  s.rrConcern={kind:'refusal'};rrFollowup(h,s,action==='assess'?'investigate':'assess');
+  if(b.learned['Learned Fence Avoidance']!==50-loss)throw Error('same refusal rewarded twice');
+  const stored=JSON.parse(JSON.stringify(s));delete stored.faRecoveries;
+  hydrateFromSave(JSON.parse(serializeAppState()));stored.rrConcern={kind:'refusal'};
+  rrFollowup(app.horses[0],stored,action);
+  if(rrHorse(app.horses[0]).learned['Learned Fence Avoidance']!==50-loss)throw Error('save replay rewarded');
+ }
+}`);
+check('walk breaks and circling away recover only after a jump and actual tension reduction', `{
+ resetGame();rrSettings().enabled=true;const h=app.horses[0],b=rbState(h);
+ b.learned['Learned Fence Avoidance']=50;
+ const s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.tension=30;
+ if(t2break(h,s)<=0)throw Error('fixture did not relax');
+ const loss=50-b.learned['Learned Fence Avoidance'];if(loss<1||loss>2)throw Error('break loss');
+ s.tension=30;t2break(h,s);if(b.learned['Learned Fence Avoidance']!==50-loss)throw Error('repeated break rewarded');
+ const before=b.learned['Learned Fence Avoidance'];s.attempts++;s.tension=0;t2break(h,s);
+ if(b.learned['Learned Fence Avoidance']!==before)throw Error('no tension recovered avoidance');
+ const flat=t2newSession(h,{discipline:'flatwork',exerciseId:'large-circle'});flat.phase='main';flat.attempts=1;flat.tension=30;t2break(h,flat);
+ if(b.learned['Learned Fence Avoidance']!==before)throw Error('flatwork granted jump recovery');
+ s.attempts++;s.elapsed+=12;s.tension=30;t2break(h,s);
+ if(b.learned['Learned Fence Avoidance']>=before)throw Error('circle-away did not recover');
+ const after=b.learned['Learned Fence Avoidance'];s.finished=true;s.tension=30;t2break(h,s);
+ if(b.learned['Learned Fence Avoidance']!==after)throw Error('finished work recovered');
+}`);
+check('experienced riders earn exactly half a point per completed jumping session and preserve fractions', `{
+ for(const level of ['Advanced','Professional','Intermediate']){
+  resetGame();rrSettings().enabled=true;rrSettings().level=level;
+  const h=app.horses[0],b=rbState(h);b.learned['Learned Fence Avoidance']=50;
+  const make=(exerciseId='crossrail')=>{const s=t2newSession(h,{discipline:'jumping',exerciseId});s.phase='main';s.attempts=1;s.elapsed=4;s.lastResult=5;s.log.push({exerciseId,resultIndex:5,result:'Refusal',text:'Actual attempt'});return s;};
+  const s=make();t2finish(h,s);const expected=level==='Intermediate'?50:49.5;
+  if(b.learned['Learned Fence Avoidance']!==expected)throw Error('session amount '+level);
+  t2finish(h,s);if(b.learned['Learned Fence Avoidance']!==expected)throw Error('finish replay');
+  const empty=make();empty.attempts=0;empty.log=[];t2finish(h,empty);
+  const flat=make('large-circle');t2finish(h,flat);
+  const automatic=make();automatic.automatic=true;t2finish(h,automatic);
+  if(b.learned['Learned Fence Avoidance']!==expected)throw Error('unqualified session earned recovery');
+  hydrateFromSave(JSON.parse(serializeAppState()));
+  if(rrHorse(app.horses[0]).learned['Learned Fence Avoidance']!==expected)throw Error('fraction lost');
+ }
+}`);
+check('clean jumps earn two to four confidence plus one for safe aids with exact stability boundaries', `{
+ for(const [leg,spurs,hand,pelham,neglect,error,bonus]of [[19,false,60,false,false,false,true],[19,true,60,false,false,false,false],[20,true,60,false,false,false,true],[60,false,19,true,false,false,false],[60,false,19,false,false,false,true],[60,false,20,true,false,false,true],[60,false,60,false,true,false,false],[60,false,60,false,false,true,false]]){
+  resetGame();rrSettings().enabled=true;app.settings.tackOwnership=false;const r=rrSettings();r.abilities['Leg Stability']=leg;r.abilities['Hand Stability']=hand;
+  const h=app.horses[0],b=rbState(h);h.tack={...h.tack,bit:pelham?'Pelham Bit':'Loose Ring Snaffle'};
+  const s={id:'clean-aids',discipline:'jumping',exerciseId:'crossrail',setup:{height:.7},attempts:1,lastResult:0,intensity:2,riderAid:spurs?'Spurs':'None',rrCurrentError:error,rbJumpingNeglect:neglect?{}:null};
+  const base=2+Math.floor(HorseHealth.roll(HorseHealth.hash(rrSessionId(s)+'|experience|1|exercise'),'clean-jump-confidence')*3),before=b.learned['Jump Confidence'];
+  rrRecord(h,s,'exercise','jumping',true);
+  if(b.learned['Jump Confidence']-before!==base+(bonus?1:0))throw Error('confidence mismatch '+JSON.stringify([leg,spurs,hand,pelham,neglect,error]));
+  const after=b.learned['Jump Confidence'];rrRecord(h,s,'exercise','jumping',true);
+  if(b.learned['Jump Confidence']!==after)throw Error('clean effort rewarded twice');
+ }
+}`);
