@@ -1,0 +1,15 @@
+{
+  "trials": 10000,
+  "expectedPercent": {
+    "Minor": 65,
+    "Moderate": 27,
+    "Serious": 7,
+    "Critical": 1
+  },
+  "counts": {
+    "Minor": 6431,
+    "Moderate": 2727,
+    "Serious": 740,
+    "Critical": 102
+  }
+}

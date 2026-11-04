@@ -57,10 +57,10 @@ function tbApply(h,s,event,stat,delta,cap=null,limit=Infinity){
 }
 function tbCommit(h,s,event){
  const state=tbSession(h,s),b=rbState(h);tbEnrichEvent(h,s,event);event.positive=Object.entries(event.changes).some(([stat,c])=>(/Avoidance|Sensitivity|Anticipation/.test(stat)?-c.delta:c.delta)>0);
- event.kind=event.type;event.rider=event.riderId;event.cause=event.type;event.recovery=event.positive?'Improving':'Unresolved';event.consequence=Object.entries(event.changes).map(([stat,c])=>stat+': '+c.before+' → '+c.after).join('; ')||'No permanent learned change';
+ event.kind=event.type;event.rider=event.riderId;event.cause=event.type;event.recovery=event.positive?'Improving':'Unresolved';event.consequence=typeof tb52ChangeText==='function'?tb52ChangeText(event.changes):Object.entries(event.changes).map(([stat,c])=>stat+': '+c.before+' → '+c.after).join('; ');
  b.history.push(event);b.history=b.history.slice(-100);b.experiences.push(event);b.experiences=b.experiences.slice(-200);s.rbLatestExperience=event.key;
  if(event.type==='attempt'){b.behavior5Setbacks ||= {};const scope=tbScope(s);if(event.failed&&Object.keys(event.changes).length){b.behaviorSetbacks[event.context]={key:event.key,day:event.day,sessionId:event.sessionId};b.behavior5Setbacks[scope]={key:event.key,day:event.day,successfulAttempts:0};}else if(event.clean&&b.behavior5Setbacks[scope])b.behavior5Setbacks[scope].successfulAttempts++;}
- s.log ||= [];s.log.push({kind:'Behavior outcome',text:event.consequence,elapsed:s.elapsed,eventId:event.key});
+ s.log ||= [];if(event.consequence)s.log.push({kind:'Behavior outcome',text:event.consequence,elapsed:s.elapsed,eventId:event.key});
  tbNarrate(h,s,event);return event;
 }
 function tbRecord(h,s,kind,discipline,positive=false){
@@ -248,12 +248,12 @@ function tbNarrativeEligible(rule,h,s,event,facts=null){
 }
 function tbNarrate(h,s,event){
  if(event.narrated)return event.observation;
- const facts=tbNarrativeFacts(h,s,event),candidates=TB5_NARRATIVES.filter(rule=>tbNarrativeEligible(rule,h,s,event,facts));
+ const facts=tbNarrativeFacts(h,s,event),candidates=TB5_NARRATIVES.filter(rule=>(typeof tb52SilentStatText!=='function'||!tb52SilentStatText(rule.text))&&tbNarrativeEligible(rule,h,s,event,facts));
  const rule=candidates.length?candidates[Math.floor(tbRandom(h,s,event.key+'|narrative')*candidates.length)]:null;
  const changed=rule?.requiredStatDirection?event.changes[rule.requiredStatDirection.stat]:event.changes['Learned Fence Avoidance']||event.changes['Jump Confidence'];
- event.observation=(rule?.text||event.type+' recorded. '+event.consequence).replaceAll('[HORSE]',h.name).replaceAll('[VALUE]',String(rrHorse(h).learned['Jump Confidence'])).replaceAll('[OLD]',String(changed?.before??'')).replaceAll('[NEW]',String(changed?.after??''));
+ event.observation=(rule?.text||'').replaceAll('[HORSE]',h.name).replaceAll('[VALUE]',String(rrHorse(h).learned['Jump Confidence'])).replaceAll('[OLD]',String(changed?.before??'')).replaceAll('[NEW]',String(changed?.after??''));
  event.narrativeId=rule?.id||null;event.narrated=true;s.rrNarrative=event.observation;
- s.log ||= [];s.log.push({kind:'Behavior observation',text:event.observation,eventId:event.key,elapsed:s.elapsed});return event.observation;
+ s.log ||= [];if(event.observation)s.log.push({kind:'Behavior observation',text:event.observation,eventId:event.key,elapsed:s.elapsed});return event.observation;
 }
 // The old prose-first layers are superseded; their quote catalogs remain readable for old saves.
 rrScene=function(){return null;};rrTrainerEvent=function(){return null;};taNarratives=function(){return null;};rbNarrate=function(){return null;};
@@ -293,7 +293,9 @@ function tbEnrichEvent(h,s,event){
 }
 const TB_REPORT=t2reportMarkup;t2reportMarkup=function(report){
  const html=TB_REPORT(report);if(!report.behavior)return html;
- return html+`<section class='box'><h4>Behavior during this session</h4><table><thead><tr><th>Statistic</th><th>Start</th><th>Finish</th></tr></thead><tbody>${RR_LEARNED.map(stat=>`<tr><td>${mgEscape(stat)}</td><td>${report.behavior.initial[stat]}</td><td>${report.behavior.final[stat]}</td></tr>`).join('')}</tbody></table><p>Avoidance recovery from pauses and reorganization: ${report.behavior.caps.nonJumpingAvoidanceReduction}/4. Jump Confidence earned from successful jumps: ${report.behavior.caps.successfulJumpConfidenceGain}/12.</p></section>`;
+ const changes=typeof getActualChanges==='function'?getActualChanges(report.behavior.initial,report.behavior.final):RR_LEARNED.filter(stat=>report.behavior.initial[stat]!==report.behavior.final[stat]).map(stat=>({stat,delta:report.behavior.final[stat]-report.behavior.initial[stat]}));
+ if(!changes.length)return html;
+ return html+`<section class='box'><h4>Behavior during this session</h4><table><thead><tr><th>Statistic</th><th>Start</th><th>Finish</th><th>Change</th></tr></thead><tbody>${changes.map(({stat,delta})=>`<tr><td>${mgEscape(stat)}</td><td>${report.behavior.initial[stat]}</td><td>${report.behavior.final[stat]}</td><td>${delta>0?'+':''}${Number(delta.toFixed(5))}</td></tr>`).join('')}</tbody></table></section>`;
 };
 const TB_RENDER_TRAINING=renderTraining;renderTraining=function(){
  TB_RENDER_TRAINING();if(!rrEnabled())return;
@@ -305,9 +307,9 @@ function tbQuickJumpRefusals(h,discipline,level,interaction={},jumpCount=12){
  if(!app.horses.some(horse=>horse.id===h.id))return 0;
  const b=rrHorse(h);b.quickRefusalPlans ||= {};const id=interaction?.behavior5RoundId||interaction?.poleRoundKey||'quick-round:'+(app.behaviorQuickRoundSequence=(app.behaviorQuickRoundSequence||0)+1);
  if(b.quickRefusalPlans[id])return b.quickRefusalPlans[id].refusals;
- const chance=fenceAvoidanceProfile(h,{discipline:'jumping',level,tension:interaction?.tension||0}).chance,seed=HorseHealth.hash(h.id+'|'+id),limit=discipline==='eventing'?3:2,attempts=[];let refusals=0;
- for(let jump=0;jump<jumpCount&&refusals<limit;jump++){const refused=HorseHealth.roll(seed,'jump:'+jump)*100<chance;attempts.push({jump,refused});if(refused)refusals++;}
- b.quickRefusalPlans[id]={id,chance,refusals,attempts};for(const key of Object.keys(b.quickRefusalPlans).slice(0,-100))delete b.quickRefusalPlans[key];return refusals;
+ const seed=HorseHealth.hash(h.id+'|'+id),limit=discipline==='eventing'?3:2,attempts=[];let refusals=0;
+ for(let jump=0;jump<jumpCount&&refusals<limit;jump++){const profile=fenceAvoidanceProfile(h,{discipline:'jumping',level,tension:interaction?.tension||0}),roll=HorseHealth.roll(seed,'jump:'+jump)*100,refused=roll<profile.chance;attempts.push({id:id+'|jump:'+jump,jump,score:profile.score,chance:profile.chance,roll,refused});if(refused)refusals++;}
+ b.quickRefusalPlans[id]={id,chance:attempts[0]?.chance??null,refusals,attempts};for(const key of Object.keys(b.quickRefusalPlans).slice(0,-100))delete b.quickRefusalPlans[key];return refusals;
 }
 const TB_QUICK_RESULT=calculateCompetitionResult;calculateCompetitionResult=function(h,d,level,interaction=null,entry=null){
  if(!rrEnabled()||interaction?.rpgSession||!['jumping','eventing'].includes(d))return TB_QUICK_RESULT(h,d,level,interaction,entry);

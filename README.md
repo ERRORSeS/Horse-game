@@ -154,9 +154,15 @@ Visible-panel redraws, faster compatible save compression and scoped UI-state sc
 
 Soundness now uses an integer-month clock and years.months display. Veterinary therapy is an interactive fourteen-day course; routine history/receipt controls preserve authoritative clinical and financial records. Showjumping uses one height-based pole-event chance per whole round. See [SOUNDNESS-THERAPY-VALIDATION.md](SOUNDNESS-THERAPY-VALIDATION.md) for effective rules, migration details and all validation results.
 
-## Training Behavior Engine 5.1
+## Training Behavior Engine 5.2
 
-Enable Rider Realism in the existing settings. Training 2.0 controls, exercises, skill progression, Quick/Auto training, competition scoring, genetics, Bond and QOL are preserved. Learned scores update directly on the horse after each real event and persist with decimal precision.
+Enable Rider Realism in the existing settings. Training 2.0 controls, exercises, skill progression, Quick/Auto training, competition scoring, genetics and QOL are preserved; Bond keeps its existing rewards and limits. Learned scores update directly on the horse after each real event and persist with decimal precision.
+
+Each genuine jump has its own saved refusal/run-out decision using the latest horse and rider values. Numerical Quick rounds recalculate inside the fence loop; replaying a resolved attempt or reopening a menu cannot reroll it. Fallen poles retain their separate round-level model.
+
+Barn care buttons now save completed Bond activities, including Care for all. Groom remains +8 and Hand Graze +5, with actual bounded gains displayed. The existing monthly rewards are protected against duplicate processing; no new daily passive reward or activity cap was introduced.
+
+Outcome messages and session summaries announce only actual before/after changes. Falls record their real cause, Minor/Moderate/Serious/Critical severity, relevant learned losses and assessment state. All 24 supplied fall quotes and eight status quotes require matching recorded evidence. Serious and critical incidents use the existing medical review pathways without diagnosing an injury from severity alone.
 
 Refusal/run-out baseline is **4% for avoidance 0–2**, then linear interpolation across 3–10 (15–25%), 11–30 (30–40%), 31–50 (45–55%), 51–75 (65–75%) and 76–100 (85–90%). Rider level, height experience, confidence, effective rider trust and current tension modify it; final risk is **1–95%**. Fence type and unfamiliar obstacles add no refusal probability.
 
@@ -168,6 +174,8 @@ Spooks require actual environmental stimuli. Natural Spookiness, learned sensiti
 
 All weather remains available indoors and outdoors. Outdoor warnings require player review before Interactive or Quick training in poor conditions. Footing controls slip risk; sheltered indoor arenas use their actual footing without outdoor weather penalties. Auto Training retains its delegated scheduling and actual event resolution.
 
-The 140 existing and 88 additional narrative rules describe recorded evidence after effects resolve. Reports show actual start/finish values, trust, recovery and incidents. The behavioral reassessment panel remains exclusive to training.
+The 140 existing, 88 Engine 5.1 and 32 Engine 5.2 narrative rules describe recorded evidence after effects resolve. Reports show actual start/finish values, trust, recovery and incidents. The behavioral reassessment panel remains exclusive to training.
 
 Validation: `npm test`, `npm run test:behavior5-simulation` and `npm run test:behavior51-simulation`. See [the 5.1 implementation report](TRAINING-BEHAVIOR51-REPORT.md) and [conditional incident simulation results](outputs/training-behavior51-simulation.json). The [5.0 report](TRAINING-BEHAVIOR5-REPORT.md) records the historical rules superseded by this addendum.
+
+See [the 5.2 investigation and validation report](TRAINING-BEHAVIOR52-REPORT.md). Run `npm run test:behavior52-simulation` for the conditional severity distribution.

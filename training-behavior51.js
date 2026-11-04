@@ -104,7 +104,7 @@ function tb51Temporary(s,focusLoss,tensionGain){const before=s.tension||0;s.tens
 function tb51Assessment(h,s,incident){
  const old=h.trainingIncidentAssessment;
  h.trainingIncidentAssessment={incidentId:incident.id,status:'pending',horseId:h.id,riderId:rrSettings().riderId,day:csDay(),requiresVeterinary:incident.horseFell,vetVisitCount:(h.vetVisits||[]).length,requiresRider:true,veterinaryReviewed:false,riderReviewed:false,rotational:incident.rotational,context:tbScope(s),kind:incident.kind,environmentRelated:incident.environmentRelated};
- s.assessmentRequired=true;s.rrConcern={kind:'incident assessment',context:s.discipline};
+ s.assessmentRequired=true;if(!s.steps)s.rrConcern={kind:'incident assessment',context:s.discipline};else delete s.rrConcern;
  h.vetNotes ||= [];h.vetNotes.unshift({date:pastureDateLabel(pastureCalendarHour()),text:'Training incident '+incident.id+': '+(incident.rotational?'rotational horse-and-rider fall':incident.horseFell?'horse-and-rider fall':'rider fall')+'. Appropriate assessment is pending.'});
  if(old?.status==='pending')h.trainingIncidentAssessment.previousIncidentId=old.incidentId;
 }
@@ -140,11 +140,11 @@ t2xIncident=function(h,s,kind,record,extra={}){
  if(incident.horseFallChance>0){incident.horseFallRolls=1;incident.horseFallRoll=t2random(s)*100;incident.horseFell=incident.horseFallRoll<incident.horseFallChance;}
  if(incident.horseFell){incident.fell=true;if(horse.seriousJump){incident.rotationalRolls=1;incident.rotational= t2random(s)*100<horse.rotationalChance;}}
  else if(mounted){const profile=tb51FallProfile(h,s,kind);incident.fallProfile=profile;incident.fallChance=profile.chance;if(profile.chance>0){incident.fallRolls=1;incident.fallRoll=t2random(s)*100;incident.fell=incident.fallRoll<profile.chance;}}
- incident.fell=!!incident.fell;incident.horseFell=!!incident.horseFell;incident.rotational=!!incident.rotational;record.incident=incident;s.incidents ||= [];s.incidents.push(incident);
+ incident.fell=!!incident.fell;incident.horseFell=!!incident.horseFell;incident.rotational=!!incident.rotational;if(typeof tb52PrepareIncident==='function')tb52PrepareIncident(h,s,incident);record.incident=incident;s.incidents ||= [];s.incidents.push(incident);
  if(incident.fell){s.riderFell=true;s.horseFell=incident.horseFell;s.mountedStopped=true;s.phase='cooldown';s.safetyStop=incident.rotational?'Rotational fall':incident.horseFell?'Horse-and-rider fall':'Rider fall';record.resultIndex=6;record.result='Safety stop';s.lastResult=6;tb51Assessment(h,s,incident);}
  else if(['bolt','severeSpook','strongBuck','repeatedBuck','briefRear','highRear'].includes(kind)){s.recoveryRequired=true;s.controlLost=kind==='bolt';}
  if(['briefRear','highRear'].includes(kind))s.mountedStopped=true;
- record.text=(record.text||'')+' '+(incident.rotational?'A rotational fall occurred. Work has stopped; veterinary and rider assessments are required.':incident.horseFell?'The horse and rider fell. Work has stopped pending assessment.':incident.fell?'The rider fell. Mounted work has stopped pending assessment.':kind==='slip'?'The horse slipped and regained its footing.':kind==='bolt'?'A distinct bolt interrupted the exercise; the rider remained mounted.':kind==='mildSpook'?'A brief startle interrupted attention without a fall.':'The incident was resolved without a fall.');
+ record.text=(record.text||'')+' '+(incident.fell&&typeof tb52FallDescription==='function'?tb52FallDescription(h,s,incident):incident.rotational?'A rotational fall occurred. Work has stopped; veterinary and rider assessments are required.':incident.horseFell?'The horse and rider fell. Work has stopped pending assessment.':incident.fell?'The rider fell. Mounted work has stopped pending assessment.':kind==='slip'?'The horse slipped and regained its footing.':kind==='bolt'?'A distinct bolt interrupted the exercise; the rider remained mounted.':kind==='mildSpook'?'A brief startle interrupted attention without a fall.':'The incident was resolved without a fall.');
  tb51ApplyIncident(h,s,incident,record);if(incident.rotational&&!s.steps)t2finish(h,s);return incident;
 };
 const TB51_OLD_MAJOR=t2xBehaviorProfiles;t2xBehaviorProfiles=function(h,s,e){const p=TB51_OLD_MAJOR(h,s,e);return rrEnabled()?{...p,bolt:0}:p;};
@@ -202,7 +202,7 @@ const TB51_FOLLOWUP=rrFollowup;rrFollowup=function(h,s,action){
 const TB51_EXAM=HorseHealth.examine;HorseHealth.examine=function(state,h,type,day,eventId){
  const result=TB51_EXAM.apply(this,arguments),pending=h.trainingIncidentAssessment;
  if(result.ok&&!result.reused&&pending?.status==='pending'&&pending.requiresVeterinary&&['general','soundness','lameness','emergency','followup'].includes(type)&&result.report?.horseId===h.id&&(h.vetVisits||[]).length>(pending.vetVisitCount||0)){
-  pending.veterinaryReviewed=true;pending.veterinaryReportId=result.report.id;
+  pending.veterinaryReviewed=true;pending.veterinaryReportId=result.report.id;if(typeof tb52RecordExamination==='function')tb52RecordExamination(h,pending,result.report);
   if(!pending.riderReviewed&&typeof confirm==='function'&&confirm('The veterinary examination is recorded. Confirm only if the rider has also received an appropriate assessment after the incident.'))pending.riderReviewed=true;
   tb51ClearAssessment(h);
   const s={id:'assessment:'+pending.incidentId,discipline:pending.context==='jumping'?'jumping':'flatwork',createdHour:pastureCalendarHour()},event=tbEvent(h,s,'veterinary:'+result.report.id,'assessment',{flags:{vetExam:true,assessmentPending:pending.status==='pending'},assessment:{...pending}});if(event)tbCommit(h,s,event);
@@ -242,7 +242,7 @@ const TB51_FACTS=tbNarrativeFacts;tbNarrativeFacts=function(h,s,event){
 };
 const TB51_NARRATE=tbNarrate;tbNarrate=function(h,s,event){
  if(event.narrated)return event.observation;
- const facts=tbNarrativeFacts(h,s,event),candidates=TB51_NARRATIVES.filter(rule=>tbNarrativeEligible(rule,h,s,event,facts));
+ const facts=tbNarrativeFacts(h,s,event),candidates=TB51_NARRATIVES.filter(rule=>(typeof tb52SilentStatText!=='function'||!tb52SilentStatText(rule.text))&&tbNarrativeEligible(rule,h,s,event,facts));
  if(!candidates.length)return TB51_NARRATE(h,s,event);
  const rule=candidates[Math.floor(tbRandom(h,s,event.key+'|narrative51')*candidates.length)];event.observation=rule.text.replaceAll('[HORSE]',h.name);event.narrativeId=rule.id;event.narrated=true;s.rrNarrative=event.observation;s.log ||= [];s.log.push({kind:'Behavior observation',text:event.observation,eventId:event.key,elapsed:s.elapsed});return event.observation;
 };
