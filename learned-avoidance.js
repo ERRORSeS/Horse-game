@@ -229,7 +229,8 @@ const TB_CHANCES=competitionOptionFinalChances;competitionOptionFinalChances=fun
  const rows=TB_CHANCES(s,h,step,options);if(!rrEnabled()||step?.stage!=='main_round'||s.discipline==='dressage'||String(step.phase).toLowerCase().includes('dressage'))return rows;
  const profile=fenceAvoidanceProfile(h,s);return rows.map(row=>{const total=row.successChance+row.computed.neutralChance,remaining=100-profile.chance,success=total?row.successChance/total*remaining:remaining;return {...row,successChance:success,computed:{...row.computed,neutralChance:remaining-success,failChance:profile.chance},learnedAvoidance:profile};});
 };
-const TB_CARD=createHorseCard;createHorseCard=function(h,...args){const node=TB_CARD(h,...args),p=document.createElement('p'),profile=fenceAvoidanceProfile(h);p.textContent='Learned Fence Avoidance: '+profile.score+'/100 — '+profile.label+'. Base risk '+Number(profile.base.toFixed(2))+'%; current rider risk '+Number(profile.chance.toFixed(2))+'% per jump. Refusal risk uses rider experience, Jump Confidence, Rider Trust and live Tension. Recovery actions use the current live score and require a genuine relevant experience.';node.appendChild(p);return node;};
+function fenceAvoidanceSummary(h){const p=fenceAvoidanceProfile(h);return 'Learned Fence Avoidance: '+p.score.toFixed(1)+'/100 — '+p.label+'. Base refusal/run-out risk: '+p.base.toFixed(1)+'% per jump.';}
+const TB_CARD=createHorseCard;createHorseCard=function(h,...args){const node=TB_CARD(h,...args),p=document.createElement('p');p.dataset.fenceAvoidanceSummary='';p.textContent=fenceAvoidanceSummary(h);node.appendChild(p);return node;};
 function tbNarrativeFacts(h,s,event){
  const state=tbSession(h,s),b=rrHorse(h),attempts=state.events.filter(row=>row.type==='attempt'),successes=attempts.filter(row=>row.clean),last=attempts.at(-1),setback=attempts.findLast(row=>row.failed),prior=attempts.slice(0,-1),sessions=(b.completedBehaviorSessions||[]).filter(row=>row.positive&&row.rider===event.riderId&&row.scope===tbScope(s)),delta=event.changes;
  const improvement=Object.entries(b.learned).some(([stat,n])=>(/Avoidance|Sensitivity|Anticipation/.test(stat)?-1:1)*(n-state.initialBehavior[stat])>0);
@@ -301,7 +302,7 @@ const TB_RENDER_TRAINING=renderTraining;renderTraining=function(){
  TB_RENDER_TRAINING();if(!rrEnabled())return;
  const s=t2state().session,h=s&&t2findHorse(s.horseId),panel=document.getElementById('training');if(!h||!panel)return;
  panel.querySelector('[data-behavior5-status]')?.remove();const status=document.createElement('p');status.dataset.behavior5Status='';status.setAttribute('role','status');const b=rrHorse(h).learned;
- status.textContent='Current behavior — Jump Confidence '+b['Jump Confidence']+' · Learned Fence Avoidance '+b['Learned Fence Avoidance']+' · Rider Trust in Aids '+b['Rider Trust in Aids'];panel.appendChild(status);
+ status.textContent='Current behavior — Jump Confidence '+b['Jump Confidence'].toFixed(1)+' · Learned Fence Avoidance '+b['Learned Fence Avoidance'].toFixed(1)+' · Rider Trust in Aids '+b['Rider Trust in Aids'].toFixed(1);panel.appendChild(status);
 };
 function tbQuickJumpRefusals(h,discipline,level,interaction={},jumpCount=12){
  if(!app.horses.some(horse=>horse.id===h.id))return 0;

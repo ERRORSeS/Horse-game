@@ -134,20 +134,20 @@ function showScore(show,entry,phase,records,stats={}){
   const skill=entry.skills.discipline,seed=HorseHealth.hash(show.id+'|'+entry.id+'|'+phase),difficulty=entry.difficulty||0,r=(key)=>HorseHealth.roll(seed,key),judged=phase==='dressage'||phase==='hunter';
   if(!records)records=Array.from({length:phase==='jump-off'?4:8},(_,i)=>{const v=r('effort:'+i),success=clamp(.45+skill*.004-difficulty*.025,.2,.9);return {quality:v<success?1:v<success+.2?.6:0,title:judged?'Movement '+(i+1):'Fence '+(i+1),faults:judged?0:v<success+.2?0:phase==='cross-country'?20:4,time:7+r('time:'+i)*2};});
   if(!entry.player&&['showjumping','jump-off'].includes(phase)){const plan=ShowjumpingRound.plan({id:entry.horseId,personality:entry.personality,mood:entry.mood,training2:{traits:entry.traits||[],attributes:entry.attributes||{}}},show.level,show.id+'|'+phase,records.length);entry.polePlans ||= {};entry.polePlans[phase] ||= plan;records=records.map((r,i)=>({...r,faults:(entry.polePlans[phase].indices.includes(i)||entry.polePlans[phase].refusalIndices?.includes(i))?4:0,time:r.time*(entry.polePlans[phase].timeFactor||1)}));}
-  const eliminated=Boolean(stats.eliminated),faults=records.reduce((n,x)=>n+(x.faults||0),0),time=records.reduce((n,x)=>n+(x.time||8),0),marks=records.map((x,i)=>({movement:x.title||'Movement '+(i+1),mark:Math.round(clamp(3+skill*.04+x.quality*2-difficulty*.15+(r('mark:'+i)-.5)*.4,0,10)*10)/10,coefficient:i===records.length-1?2:1,comment:x.quality>=.8?'Accurate, balanced and rhythmic.':x.quality>0?'Some loss of rhythm and accuracy.':'Significant correction affected this movement.'}));
+  const eliminated=Boolean(stats.eliminated),status=eliminated?{eliminationReason:stats.eliminationReason||'',...(stats.fallSeverity?{fallSeverity:stats.fallSeverity}:{})}:{},faults=records.reduce((n,x)=>n+(x.faults||0),0),time=records.reduce((n,x)=>n+(x.time||8),0),marks=records.map((x,i)=>({movement:x.title||'Movement '+(i+1),mark:Math.round(clamp(3+skill*.04+x.quality*2-difficulty*.15+(r('mark:'+i)-.5)*.4,0,10)*10)/10,coefficient:i===records.length-1?2:1,comment:x.quality>=.8?'Accurate, balanced and rhythmic.':x.quality>0?'Some loss of rhythm and accuracy.':'Significant correction affected this movement.'}));
   const percentage=marks.length?Math.round(marks.reduce((n,x)=>n+x.mark*x.coefficient,0)/marks.reduce((n,x)=>n+x.coefficient*10,0)*10000)/100:0;
-  if(phase==='dressage')return {phase,percentage,penalties:100-percentage,movements:marks,comments:marks.map(x=>x.comment),eliminated};
+  if(phase==='dressage')return {phase,percentage,penalties:100-percentage,movements:marks,comments:marks.map(x=>x.comment),eliminated,...status};
   if(phase==='hunter'){
     const criteria=['Rhythm','Smoothness','Jumping form','Distances','Straightness','Flow','Rider quietness','Presentation'].map((name,i)=>({name,score:Math.round(clamp(45+skill*.35+(records[i%records.length]?.quality||0)*20-difficulty,0,100)*10)/10})),score=criteria.reduce((n,c)=>n+c.score,0)/criteria.length;
-    return {phase,score:Math.round(score*100)/100,criteria,comments:criteria.map(c=>c.name+': '+(c.score>=75?'Positive impression.':'Needs greater consistency.')),eliminated};
+    return {phase,score:Math.round(score*100)/100,criteria,comments:criteria.map(c=>c.name+': '+(c.score>=75?'Positive impression.':'Needs greater consistency.')),eliminated,...status};
   }
   const allowed=phase==='cross-country'?65:phase==='jump-off'?38:75,timePenalties=phase==='cross-country'?Math.max(0,Math.round((time-allowed)*.4*10)/10):Math.max(0,Math.ceil(time-allowed));
-  return {phase,faults,time:Math.round(time*100)/100,timePenalties,penalties:faults+timePenalties,eliminated};
+  return {phase,faults,time:Math.round(time*100)/100,timePenalties,penalties:faults+timePenalties,eliminated,...status};
 }
 function showPhase(show){return show.discipline==='eventing'?['dressage','cross-country','showjumping'][show.round]:show.round===1?'jump-off':show.discipline==='jumping'?'showjumping':show.discipline;}
 function showPlayerResult(show,session){
   const entry=show.competitors.find(e=>e.player),phase=showPhase(show);if(entry.scores[phase])return;
-  const records=(session.choiceRecords||[]).filter(x=>show.discipline!=='eventing'||x.phase===phase),result=showScore(show,entry,phase,records,session.roundStats);
+  const records=(session.choiceRecords||[]).filter(x=>show.discipline!=='eventing'||x.phase===phase),fall=session.incidents?.findLast(i=>i.fell),result=showScore(show,entry,phase,records,{...session.roundStats,...(fall?.fallSeverity?{fallSeverity:fall.fallSeverity}:{})});
   entry.scores[phase]=result;entry.state='Performance Complete';show.phaseScores[phase]=result;
   for(const npc of show.competitors.filter(e=>!e.player&&e.startOrder<entry.startOrder&&(phase!=='jump-off'||show.qualifiers?.includes(e.id)))){if(!npc.scores[phase])npc.scores[phase]=showScore(show,npc,phase);npc.state='Performance Complete';}
   show.stage='results';showNote(show,'The provisional score appears on the board. The leaderboard updates immediately.');
@@ -164,7 +164,7 @@ function showNextCompetitor(show){
   if(pool.every(e=>e.scores[phase]))showCompletePhase(show);return Boolean(npc);
 }
 function showCompletePhase(show){
-  if(show.discipline==='eventing'&&show.round<2){const player=show.competitors.find(e=>e.player);if(Object.values(player.scores).some(s=>s.eliminated)){for(let i=show.round+1;i<3;i++){const phase=['dressage','cross-country','showjumping'][i];for(const entry of show.competitors)entry.scores[phase]=entry.player?{phase,penalties:0,faults:0,time:0,timePenalties:0,eliminated:true}:showScore(show,entry,phase);}show.round=2;}else{show.stage='phase-results';return;}}
+  if(show.discipline==='eventing'&&show.round<2){const player=show.competitors.find(e=>e.player),eliminatedScore=Object.values(player.scores).find(s=>s.eliminated);if(eliminatedScore){for(let i=show.round+1;i<3;i++){const phase=['dressage','cross-country','showjumping'][i];for(const entry of show.competitors)entry.scores[phase]=entry.player?{phase,penalties:0,faults:0,time:0,timePenalties:0,eliminated:true,eliminationReason:eliminatedScore.eliminationReason||'',...(eliminatedScore.fallSeverity?{fallSeverity:eliminatedScore.fallSeverity}:{})}:showScore(show,entry,phase);}show.round=2;}else{show.stage='phase-results';return;}}
   const ranked=showStandings(show);
   if(show.discipline==='jumping'&&show.round===0&&show.format==='jump-off'){
     show.firstRoundStandings ||= HorseHealth.copy(ranked);for(const e of show.competitors){e.firstRound ||= HorseHealth.copy(e.scores.showjumping);e.firstRoundQualified=!e.firstRound.eliminated&&e.firstRound.penalties===0;}
@@ -177,10 +177,11 @@ function showCompletePhase(show){
 function showPersistResults(show){
   const h=showHorse(show),player=show.finalStandings.find(e=>e.player);if(!h||!player)return;
   h.showResults ||= [];if(h.showResults.some(r=>r.entryId===show.id))return;
-  const record={entryId:show.id,eventId:show.eventId,date:dateLabel(),discipline:show.discipline,level:show.level,score:player.total,placing:player.rank,prize:0,status:player.eliminated?'ELIMINATED':null,resultText:showResultText(player.result),phaseScores:HorseHealth.copy(show.phaseScores),finalStandings:HorseHealth.copy(show.finalStandings),awarded:false};h.showResults.push(record);h.processedCompetitionIds ||= [];h.processedCompetitionIds.push(show.id);
+  const record={entryId:show.id,eventId:show.eventId,date:dateLabel(),discipline:show.discipline,level:show.level,score:player.total,placing:player.rank,prize:0,status:player.eliminated?'ELIMINATED':null,...(player.eliminated?{eliminationReason:player.result.eliminationReason||''}:{}),resultText:showResultText(player.result),phaseScores:HorseHealth.copy(show.phaseScores),finalStandings:HorseHealth.copy(show.finalStandings),awarded:false};h.showResults.push(record);h.processedCompetitionIds ||= [];h.processedCompetitionIds.push(show.id);
   if(show.eventId){const event=calendarFindEvent(show.eventId);if(event){event.results ||= {};event.results[show.id]={...record,horseId:h.id};event.status='Completed';}}
 }
-function showResultText(r){return r.movements?`${r.percentage.toFixed(2)}%`:r.criteria?`Hunter score ${r.score.toFixed(2)}`:`${r.faults} jumping faults · ${r.timePenalties} time penalties · ${r.time.toFixed(2)} seconds`;}
+function showEliminationReason(result){const reason=result?.eliminationReason||'';return /fall/i.test(reason)?'Fall':/refus|run.?out/i.test(reason)?'Refusal':reason;}
+function showResultText(r){if(r.eliminated){const reason=showEliminationReason(r);return 'Eliminated'+(reason?' — '+reason:'')+(r.fallSeverity?' · Fall intensity: '+r.fallSeverity:'');}return r.movements?`${r.percentage.toFixed(2)}%`:r.criteria?`Hunter score ${r.score.toFixed(2)}`:`${r.faults} jumping faults · ${r.timePenalties} time penalties · ${r.time.toFixed(2)} seconds`;}
 function showAward(show){
   if(show.awarded)return;const h=showHorse(show),player=show.finalStandings.find(e=>e.player),rank=player?.rank,prize=rank&&rank<=6?Math.round((show.eventSnapshot?.prizeMoney||600)/rank):0;
   const economy=app.careEconomy ||= {receipts:[],inventory:[],operations:{}},transactionKey=show.id+':award';if(economy.operations[transactionKey]){show.awarded=true;show.award=economy.operations[transactionKey].award;return;}
