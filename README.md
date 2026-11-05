@@ -205,3 +205,9 @@ Some horses have saved buyout offers with individual 1–6 month deadlines. Offe
 Barns below 2 lesson stars overwork their lesson horses, reflected in fatigue, and sometimes assign personality-mismatched tack. Other barns select suitable tack. Barn equipment works with Tack Ownership both on and off. Footing commentary is limited to once per training session. Jumping show refusals cost 4 faults for the first and eliminate on the second, including both eventing jumping phases; falls still eliminate.
 
 See [training, show and lesson-horse validation](TRAINING-LEASE-UPDATE.md).
+
+### Leased riding and session gains
+
+The barn Train button opens the active leased copy, and older saved leases recover their player-owned availability flags. The source remains unavailable to the lesson program while leased.
+
+A qualifying completed session now totals +3–5 in its main technical skill and +1.5–2.0 in its relevant riding attribute, including exercise-led sessions. These amounts include progress already earned during the lesson. Actual relevant work is required; short, empty, unsuccessful or unrelated lessons do not receive a completion award. Genetic skill ceilings and the 10-point riding-attribute maximum still apply. Completion rewards do not alter Behavior & Temperament scores, and cannot be claimed again by finishing or viewing a report twice or reloading a save.
