@@ -270,14 +270,15 @@ function t2xRefusalProfile(h,s,c,gear){const p=T2X.refusal,confidence=t2attribut
 function t2xFallChance(h,s,kind){const relevant=!['refusal','abruptRefusal'].includes(kind),balance=t2attribute(h,'Balance',s);return clamp((T2X.falls[kind]||0)+(relevant?(balance<4?1:balance>=8?-.5:0):0)+((h.fatigue||0)>=70?1:0)+(s.tension>=70?1:0),0,kind==='highRear'?16:12);}
 function t2xSay(h,id){return (T2X_TEXT[id]||'').replaceAll('[HORSE]',h.name);}
 function t2xPickSeverity(weights,s){let roll=t2random(s)*100;return Math.max(0,weights.findIndex(n=>(roll-=n)<=0));}
+function t2xAwaitingRemount(s){return !!s.riderFell&&!s.finished&&!s.steps&&!s.quick&&!s.automatic;}
 function t2xIncident(h,s,kind,record,extra={}){
- if(record.incident)return record.incident;const incident={id:s.id+'-incident-'+s.attempts,kind,...extra,fallRolls:0};record.incident=incident;s.incidents=s.incidents||[];s.incidents.push(incident);
+ if(record.incident)return record.incident;if(['refusal','abruptRefusal','runout'].includes(kind))s.tension=clamp((s.tension||0)+5,0,100);const incident={id:s.id+'-incident-'+s.attempts,kind,...extra,fallRolls:0};record.incident=incident;s.incidents=s.incidents||[];s.incidents.push(incident);
  const narratives={refusal:'R1',abruptRefusal:'R2',runout:s.setup.direction==='Right'?'R5':'R4',landing:null,stumble:null,mildSpook:'S1',moderateSpook:'S8',severeSpook:'S8',bolt:s.location==='Indoor'?'B4':t2exercise(s.exerciseId).category==='Trail'?'B5':'B3',smallBuck:'K2',strongBuck:'K6',repeatedBuck:'K7',briefRear:'RE4',highRear:'RE5'};
  // Serious stumble has no supplied non-fall scene: keep the existing technical observation until the stability outcome.
  record.supplements=record.supplements||[];if(kind==='smallBuck'&&s.gait!=='Canter'&&s.log.at(-2)?.exerciseId&&t2exercise(s.log.at(-2).exerciseId)?.category==='Jumping')narratives.smallBuck='K4';if(kind==='mildSpook'&&s.tension>20)narratives.mildSpook='S8';if(narratives[kind])record.supplements.push(t2xSay(h,narratives[kind]));
  if(kind==='stumble')record.text+=` ${h.name} stumbles and loses balance during the attempted movement.`;if(kind==='landing')record.text+=` ${h.name} lands awkwardly and needs to reorganize.`;const mounted=t2exercise(record.exerciseId||s.exerciseId).category!=='Groundwork';
  if(mounted){incident.fallChance=t2xFallChance(h,s,kind);incident.fallRolls=1;incident.fell=t2random(s)*100<incident.fallChance;}
- if(incident.fell){s.riderFell=true;s.safetyStop='Rider fall';s.phase='cooldown';const fallId=kind==='abruptRefusal'?'RF1':kind==='refusal'?'RF14':kind==='runout'?'RF2':kind==='landing'?'RF3':kind==='stumble'?'RF4':kind.includes('Spook')?'RF5':kind==='bolt'?'RF6':kind==='repeatedBuck'?'RF8':kind.includes('Buck')?'RF7':'RF9';record.supplements.push(t2xSay(h,fallId));s.mountedStopped=true;}
+ if(incident.fell){s.fallResumePhase=s.phase;s.riderFell=true;s.safetyStop='Rider fall';s.phase='cooldown';const fallId=kind==='abruptRefusal'?'RF1':kind==='refusal'?'RF14':kind==='runout'?'RF2':kind==='landing'?'RF3':kind==='stumble'?'RF4':kind.includes('Spook')?'RF5':kind==='bolt'?'RF6':kind==='repeatedBuck'?'RF8':kind.includes('Buck')?'RF7':'RF9';record.supplements.push(t2xSay(h,fallId));s.mountedStopped=true;}
  else if(kind==='briefRear'||kind==='highRear'){s.safetyStop='Rearing welfare stop';s.phase='cooldown';s.mountedStopped=true;record.supplements.push(t2xSay(h,'RF13'),t2xSay(h,'PI6'));}
  else if(['bolt','strongBuck','repeatedBuck','severeSpook'].includes(kind)){s.demandingStopped=true;s.recoveryRequired=true;s.controlLost=kind==='bolt';s.tension=clamp(s.tension+15,0,100);record.supplements.push(t2xSay(h,kind==='bolt'?'B10':kind==='repeatedBuck'?'PI5':'PI9'));}
  else if(kind==='moderateSpook'){s.recoveryRequired=true;record.supplements.push(t2xSay(h,'S10'));}
@@ -300,7 +301,7 @@ function t2xBeforeAttempt(h,s,e){
  if(roll<profiles.rear)kind=s.tension>=95?'highRear':'briefRear';else if(roll<profiles.rear+profiles.bolt)kind='bolt';else if(roll<profiles.rear+profiles.bolt+profiles.buck)kind=['smallBuck','strongBuck','repeatedBuck'][t2xPickSeverity(T2X.buck.severity,s)];
  if(!kind)return null;
  s.attempts++;s.elapsed+=e.duration;h.fatigue=clamp((h.fatigue||0)+e.intensity,0,100);s.repetitions[e.id]=(s.repetitions[e.id]||0)+1;
- const record={exercise:e.name,exerciseId:e.id,result:'Exercise abandoned',resultIndex:6,event:kind,text:'The planned exercise was interrupted before completion.',changes:{},elapsed:s.elapsed,setup:{...s.setup},probabilities:{majorBehavior:{chance:profiles.rear+profiles.bolt+profiles.buck,cap:22}}};s.log.push(record);t2xIncident(h,s,kind,record);s.lastResult=6;if(s.riderFell)t2state().lastReport=t2finish(h,s);return record;
+ const record={exercise:e.name,exerciseId:e.id,result:'Exercise abandoned',resultIndex:6,event:kind,text:'The planned exercise was interrupted before completion.',changes:{},elapsed:s.elapsed,setup:{...s.setup},probabilities:{majorBehavior:{chance:profiles.rear+profiles.bolt+profiles.buck,cap:22}}};s.log.push(record);t2xIncident(h,s,kind,record);s.lastResult=6;if(s.riderFell&&!t2xAwaitingRemount(s))t2state().lastReport=t2finish(h,s);return record;
 }
 function t2xAfterAttempt(h,s,e,r,c,observation){
  if(c.jump&&r.resultIndex===5){const key=t2attemptKey(e,s.setup,s);s.refusals=s.refusals||{};s.refusals[key]=(s.refusals[key]||0)+1;
@@ -319,7 +320,7 @@ function t2xAfterAttempt(h,s,e,r,c,observation){
  if(t2xLunging(e,s)&&r.event==='excitement'&&e.id.includes('trot'))r.rushing=true;const supplements=t2xExerciseNarratives(h,s,e,r,c);if(s.pendingRecoveryNarrative){supplements.push('PI11');s.pendingRecoveryNarrative=false;}
  for(const id of supplements){const text=t2xSay(h,id);if(text&&!r.text.includes(text))r.text+=' '+text;}
  if(t2xLunging(e,s)&&s.lungingMode===T2X.lungingModes[1]){const aid=t2xAidStatus(h,e,s);r.text+=' '+t2xSay(h,r.resultIndex<=1?(aid.bonus?(e.primary==='Balance'?'A5':'A6'):'A7'):'A8');}
- if((s.automatic||s.quick)&&r.resultIndex===5&&c.jump&&!s.riderFell){s.setup.height=Math.max(.2,Math.round((s.setup.height-.1)*100)/100);s.difficulty=Math.max(-2,s.difficulty-1);s.adjustedAfterRefusal=true;s.log.push({kind:'Automatic adjustment',text:t2xSay(h,'PI7'),elapsed:s.elapsed});}if(s.riderFell){t2state().lastReport=t2finish(h,s);}
+ if((s.automatic||s.quick)&&r.resultIndex===5&&c.jump&&!s.riderFell){s.setup.height=Math.max(.2,Math.round((s.setup.height-.1)*100)/100);s.difficulty=Math.max(-2,s.difficulty-1);s.adjustedAfterRefusal=true;s.log.push({kind:'Automatic adjustment',text:t2xSay(h,'PI7'),elapsed:s.elapsed});}if(s.riderFell&&!t2xAwaitingRemount(s)){t2state().lastReport=t2finish(h,s);}
 }
 function t2xNarrativeEligibility(h,s,e,r,c){
  const correct=r.resultIndex<=1,partial=r.resultIndex===2,error=r.resultIndex===3,prior=s.log.slice(0,-1).filter(x=>x.exerciseId===e.id),improved=correct&&prior.some(x=>x.resultIndex>=2),last=prior.at(-1),incident=r.incident,kind=incident?.kind,lunging=t2xLunging(e,s),map=t2xMapping(e,s),transition=/transition|walk-|downward/.test(e.id),circle=/circle/.test(e.id),jump=c.jump,flat=e.category==='Flatwork',recovered=Boolean(s.pendingRecoveryNarrative),ids=[];

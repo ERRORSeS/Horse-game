@@ -34,8 +34,8 @@ check('ordinary failed jumps lower confidence at every rank and punishment rever
   s.attempts=2;s.lastResult=0;s.log.push({exerciseId:s.exerciseId,resultIndex:0});const beforeClean=b['Jump Confidence'];tbRecord(h,s,'exercise','jumping',true);const stale=JSON.parse(JSON.stringify(s));if(!fenceAvoidanceReward(h,s))throw Error('clean reward');tbRecord(h,s,'welfare','jumping',false);if(b['Jump Confidence']!==Math.max(0,beforeClean-2)||fenceAvoidanceReward(h,s)||fenceAvoidanceReward(h,stale))throw Error('punishment kept reward '+level);const values=JSON.stringify(b);tbRecord(h,s,'welfare','jumping',false);if(JSON.stringify(b)!==values)throw Error('duplicate punishment');t2finish(h,s);if(s.behavior5.learningCaps.sessionTrustGain)throw Error('punished session trust gain');
  }
 }`);
-check('successful-attempt rewards add confidence at every level, reduce avoidance only above 30 and survive reload without replay',`{
- for(const [confidence,avoidance,nextC,nextA]of [[20,30,21,30],[80,31,81,30],[99.5,30.5,100,29.5],[100,50,100,49]]){
+check('successful-attempt rewards add confidence at every level, reduce avoidance at all positive values and survive reload without replay',`{
+ for(const [confidence,avoidance,nextC,nextA]of [[20,30,21,29],[80,31,81,30],[99.5,30.5,100,29.5],[100,50,100,49]]){
   ${ready} s.attempts=1;s.lastResult=0;s.log.push({exerciseId:s.exerciseId,resultIndex:0});tbRecord(h,s,'exercise','jumping',true);const b=rrHorse(h).learned;b['Jump Confidence']=confidence;b['Learned Fence Avoidance']=avoidance;if(!fenceAvoidanceReward(h,s)||b['Jump Confidence']!==nextC||b['Learned Fence Avoidance']!==nextA)throw Error('reward thresholds');const copy=JSON.parse(JSON.stringify(s));hydrateFromSave(JSON.parse(serializeAppState()));fenceAvoidanceReward(app.horses[0],copy);if(rrHorse(app.horses[0]).learned['Jump Confidence']!==nextC||rrHorse(app.horses[0]).learned['Learned Fence Avoidance']!==nextA)throw Error('reward replay');
  }
 }`);
@@ -43,11 +43,11 @@ check('actual show falls still eliminate once with a recorded cause and intensit
  ${ready} const show=buildCompetitionRpgSession(h,'jumping','.70');show.stepIndex=show.steps.findIndex(step=>step.stage==='main_round');const chances=competitionOptionFinalChances,random=Math.random,physical=t2random;try{competitionOptionFinalChances=()=>[{index:0,successChance:0,computed:{neutralChance:0}}];Math.random=()=>0;t2random=()=>0;resolveCompetitionRpgChoice(show,h,0);if(!show.eliminated||show.roundStats.eliminationReason!=='fall'||show.incidents.length!==1||!show.feedback.includes('Fall intensity:'))throw Error('show fall record');const count=show.outcomes.length;resolveCompetitionRpgChoice(show,h,0);if(show.outcomes.length!==count||show.incidents.length!==1)throw Error('show fall replay');}finally{competitionOptionFinalChances=chances;Math.random=random;t2random=physical;}
 }`);
 
-check('Beginner and Novice recovery lowers tension and avoidance without restoring jump confidence, while clean work still earns it',`{
+check('all rider levels recover jumping confidence from breaks and clean work',`{
  for(const level of ['Beginner','Novice','Intermediate','Advanced','Professional']){
   ${ready} rrSettings().level=level;s.attempts=1;s.lastResult=5;s.tension=35;s.log.push({exerciseId:s.exerciseId,resultIndex:5});tbRecord(h,s,'refusal','jumping',false);const b=rrHorse(h).learned,confidence=b['Jump Confidence'],avoidance=b['Learned Fence Avoidance'],random=tbRandom;try{
    tbRandom=()=>.1;for(const action of ['assess','investigate','break','circle-away','reorganize'])tbRecovery(h,s,action);recordBehaviorRecovery(h,s,'give-time-test','Jump Confidence',1);
-   if(s.tension>=35||b['Learned Fence Avoidance']>=avoidance)throw Error('recovery blocked other benefits '+level);if(['Beginner','Novice'].includes(level)?b['Jump Confidence']!==confidence:b['Jump Confidence']<=confidence)throw Error('passive confidence recovery '+level);
+   if(s.tension>=35||b['Learned Fence Avoidance']>=avoidance)throw Error('recovery blocked other benefits '+level);if(b['Jump Confidence']<=confidence)throw Error('passive confidence recovery '+level);
    s.attempts=2;s.lastResult=0;s.log.push({exerciseId:s.exerciseId,resultIndex:0});const before=b['Jump Confidence'];tbRecord(h,s,'exercise','jumping',true);if(b['Jump Confidence']!==before+2||!fenceAvoidanceReward(h,s)||b['Jump Confidence']!==before+3)throw Error('earned confidence blocked '+level);
   }finally{tbRandom=random;}
  }

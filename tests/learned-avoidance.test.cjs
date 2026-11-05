@@ -19,7 +19,7 @@ check('fence type, filler and venue never change the avoidance baseline or add u
  if(rrSuspectedCauses(h,s).some(c=>/unfamiliar|unknown/i.test(c)))throw Error('invented refusal cause');
 }`);
 check('post-jump reward is conditional for each stat, uses live values and is once per actual success',`{
- for(const [confidence,avoidance,expectedConfidence,expectedAvoidance]of [[49,80,50,79],[70,80,71,79],[49,50,50,49],[50,75,51,74],[70,30,71,30],[100,31,100,30]]){
+ for(const [confidence,avoidance,expectedConfidence,expectedAvoidance]of [[49,80,50,79],[70,80,71,79],[49,50,50,49],[50,75,51,74],[70,30,71,29],[100,31,100,30]]){
   resetGame();rrSettings().enabled=true;const h=app.horses[0],s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.lastResult=0;s.log.push({exerciseId:'crossrail',resultIndex:0});tbRecord(h,s,'exercise','jumping',true);
   const b=rrHorse(h).learned;b['Jump Confidence']=confidence;b['Learned Fence Avoidance']=avoidance;t2rewardSuccessfulAttempt(h,s);
   if(b['Jump Confidence']!==expectedConfidence||b['Learned Fence Avoidance']!==expectedAvoidance)throw Error('threshold');

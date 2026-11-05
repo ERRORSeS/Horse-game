@@ -6192,15 +6192,15 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
         timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
         resultText = penaltiesText;
       }
-    } else if (fall || refusals >= 3 || rnd(1, 100) <= bridleBitFailureRisk) {
+    } else if (fall || refusals >= 2 || rnd(1, 100) <= bridleBitFailureRisk) {
       eliminated = true;
-      eliminationReason = fall ? 'fall' : refusals >= 3 ? '3 refusals' : 'Equipment';
+      eliminationReason = fall ? 'fall' : refusals >= 2 ? '2 refusals' : 'Equipment';
       score = 0;
       penaltiesText = 'Eliminated';
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     } else {
-      const penalties = rails * 4 + refusals * 8 + overSeconds * 0.4;
+      const penalties = rails * 4 + refusals * 4 + overSeconds * 0.4;
       score = clamp(baseScore - penalties * 0.6, 0, 100);
       penaltiesText = penalties <= 0.01 ? 'Clear Round' : `${penalties.toFixed(1)} penalties`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -6676,8 +6676,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         rs.rails = (rs.rails || 0) + 1;
         displayOutcome = 'Knockdown (4 faults)';
       } else {
-        session.refusalCount += 1;
-        rs.refusals += 1;
+        rs.refusals = (rs.refusals || 0) + 1;
+        session.refusalCount = rs.refusals;
         const causeText=(variant.title||'')+' '+(selected.option?.intent||'');
         const incidentCause=/runout|run out/i.test(causeText)?'Runout':/spook/i.test(causeText)?'Spook':/buck/i.test(causeText)?'Buck':/rear/i.test(causeText)?'Rear':/distance/i.test(causeText)?'Wrong Distance':'Refusal';
         session.lastShowIncident={cause:incidentCause,reason:session.lastRefusalReason};
@@ -6760,11 +6760,8 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         } else if (phaseText.includes('cross-country')) {
           rs.refusals += 1;
           if (rs.refusals === 1) {
-            rs.faults += 8;
-            displayOutcome = 'XC Refusal (8 penalties)';
-          } else if (rs.refusals === 2) {
-            rs.faults += 16;
-            displayOutcome = 'XC Refusal (16 penalties)';
+            rs.faults += 4;
+            displayOutcome = 'XC Refusal (4 faults)';
           } else {
             session.eliminated = true;
             rs.eliminated = true;
@@ -6783,9 +6780,6 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
           if (rs.refusals === 1) {
             rs.faults += 4;
             displayOutcome = 'Stadium Refusal (4 faults)';
-          } else if (rs.refusals === 2) {
-            rs.faults += 8;
-            displayOutcome = 'Stadium Refusal (8 faults)';
           } else {
             session.eliminated = true;
             rs.eliminated = true;
@@ -8228,7 +8222,8 @@ function monthlyProgress(fromDayRollover = false) {
     resetTrainingWindow(h);
     if (!processAgingAndMortality(h)) {
       if (h.isLeased && Number.isFinite(h.leaseMonthsRemaining)) {
-        const leaseMonthlyCost = Number(h.leaseMonthlyCost) || 0;
+        const leaseMonthlyCost = h.leasePrepaidFirstMonth ? 0 : Number(h.leaseMonthlyCost) || 0;
+        h.leasePrepaidFirstMonth = false;
         if (leaseMonthlyCost > 0) {
           if (app.money >= leaseMonthlyCost) {
             app.money -= leaseMonthlyCost;
