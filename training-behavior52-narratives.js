@@ -235,7 +235,7 @@ const TB52_NARRATIVES=[
   },
   {
     "id": "TB52-22",
-    "text": "The horse falls after losing its footing. The session ends pending assessment.",
+    "text": "The horse falls after losing its footing. Training is interrupted; the rider chooses whether to continue or end the session.",
     "requiredConditions": [
       "slip",
       "horseFall",
@@ -257,7 +257,7 @@ const TB52_NARRATIVES=[
   },
   {
     "id": "TB52-24",
-    "text": "A rotational fall occurs during the jumping incident. The session ends immediately, and both horse and rider require urgent assessment.",
+    "text": "A rotational fall occurs during the jumping incident. Training is interrupted, and the fall is recorded as critical.",
     "requiredConditions": [
       "rotational",
       "sessionEnded",

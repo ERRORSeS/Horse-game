@@ -140,7 +140,7 @@ function fenceAvoidanceReward(h,s){
  const event=tbEvent(h,s,'reward:'+s.attempts,'reward',{action:'reward',flags:{selectedAction:true}});if(!event)return false;
  const learned=rrHorse(h).learned;
  if(learned['Jump Confidence']<100)tbApply(h,s,event,'Jump Confidence',1);
- if(learned['Learned Fence Avoidance']>30)tbApply(h,s,event,'Learned Fence Avoidance',-1);
+ if(learned['Learned Fence Avoidance']>0)tbApply(h,s,event,'Learned Fence Avoidance',-1);
  tbCommit(h,s,event);return true;
 }
 function tbFinish(h,s){
@@ -149,7 +149,7 @@ function tbFinish(h,s){
  state.finished=true;
  if(!state.events.some(e=>e.type==='attempt'))return;
  const event=tbEvent(h,s,'finish','session',{flags:{sessionComplete:true}});if(!event)return;
- const experienced=['Advanced','Professional'].includes(rrSettings().level),serious=s.rrWelfareIncident||s.riderFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
+ const experienced=['Advanced','Professional'].includes(rrSettings().level),serious=s.rrWelfareIncident||s.riderFell||s.hadRiderFall||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
  const riderWork=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId&&['Advanced','Professional'].includes(e.riderLevel));
  if(experienced&&riderWork.some(e=>e.clean&&e.jumping)&&!serious&&!state.severeCommunication&&fenceAvoidanceSafeAids(h,s))tbApply(h,s,event,'Learned Fence Avoidance',-.5);
  if(experienced&&riderWork.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&!state.severeCommunication&&!serious)tbApply(h,s,event,'Rider Trust in Aids',3,'sessionTrustGain',3);
@@ -319,8 +319,8 @@ const TB_RENDER_TRAINING=renderTraining;renderTraining=function(){
 function tbQuickJumpRefusals(h,discipline,level,interaction={},jumpCount=12){
  if(!app.horses.some(horse=>horse.id===h.id))return 0;
  const b=rrHorse(h);b.quickRefusalPlans ||= {};const id=interaction?.behavior5RoundId||interaction?.poleRoundKey||'quick-round:'+(app.behaviorQuickRoundSequence=(app.behaviorQuickRoundSequence||0)+1);
- if(b.quickRefusalPlans[id])return b.quickRefusalPlans[id].refusals;
- const seed=HorseHealth.hash(h.id+'|'+id),limit=discipline==='eventing'?3:2,attempts=[];let refusals=0;
+ if(b.quickRefusalPlans[id])return Math.min(2,b.quickRefusalPlans[id].refusals);
+ const seed=HorseHealth.hash(h.id+'|'+id),limit=2,attempts=[];let refusals=0;
  for(let jump=0;jump<jumpCount&&refusals<limit;jump++){const profile=fenceAvoidanceProfile(h,{discipline:'jumping',level,tension:interaction?.tension||0}),roll=HorseHealth.roll(seed,'jump:'+jump)*100,refused=roll<profile.chance;attempts.push({id:id+'|jump:'+jump,jump,score:profile.score,chance:profile.chance,roll,refused});if(refused)refusals++;}
  b.quickRefusalPlans[id]={id,chance:attempts[0]?.chance??null,refusals,attempts};for(const key of Object.keys(b.quickRefusalPlans).slice(0,-100))delete b.quickRefusalPlans[key];return refusals;
 }

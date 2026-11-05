@@ -292,7 +292,7 @@
   function examine(state,h,type,day,eventId) {
     if (!exams[type]) return {ok:false,message:'Unknown examination.'};
     const prior=h.vetVisits.find(v=>v.id===eventId);if(prior)return {ok:true,report:prior};
-    const clinicalSignature=JSON.stringify(h.medicalConditions.map(c=>[c.id,c.resolved,c.residual,c.severity,c.recoveryProgress,c.symptomIntensity,c.discomfort,c.complications?.length,c.hospitalEpisode?.status]))+(h.trainingIncidentAssessment?.status==='pending'?'|incident:'+h.trainingIncidentAssessment.incidentId:'');
+    const clinicalSignature=JSON.stringify(h.medicalConditions.map(c=>[c.id,c.resolved,c.residual,c.severity,c.recoveryProgress,c.symptomIntensity,c.discomfort,c.complications?.length,c.hospitalEpisode?.status]))+(['pending','recorded'].includes(h.trainingIncidentAssessment?.status)?'|incident:'+h.trainingIncidentAssessment.incidentId:'');
     const sameDay=h.vetVisits.find(v=>v.day===day&&v.type===type&&v.clinicalSignature===clinicalSignature);if(sameDay)return {ok:true,report:sameDay,reused:true};
     const receipt=ledger(state,`exam:${h.id}:${eventId}`,exams[type][1],day,h,[{name:exams[type][0],quantity:1,unitPrice:exams[type][1]}]);
     if (!receipt)return {ok:false,message:'Insufficient funds.'};

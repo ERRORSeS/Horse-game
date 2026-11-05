@@ -17,7 +17,6 @@ tbApply=function(h,s,event,stat,delta,cap=null,limit=Infinity){
   return TB51_APPLY(h,s,event,stat,delta,cap,limit);
  }
  if(event.type==='recovery'){
-  if(stat==='Jump Confidence'&&delta>0&&['Beginner','Novice'].includes(event.riderLevel))return 0;
   const actual=TB51_APPLY(h,s,event,stat,delta);
   if(stat==='Learned Fence Avoidance'&&actual<0)s.behavior5.learningCaps.nonJumpingAvoidanceReduction+=-actual;
   return actual;
@@ -45,7 +44,7 @@ tbApply=function(h,s,event,stat,delta,cap=null,limit=Infinity){
 const TB51_FINISH=tbFinish;
 tbFinish=function(h,s){
  const state=tbSession(h,s),wasFinished=state.finished;TB51_FINISH(h,s);if(state.finished)delete state.pendingFinish;if(wasFinished||!state.finished||!rrEnabled())return;
- const work=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId),positive=work.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&fenceAvoidanceSafeAids(h,s),bad=state.severeCommunication||s.rrWelfareIncident||s.riderFell||s.horseFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
+ const work=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId),positive=work.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&fenceAvoidanceSafeAids(h,s),bad=state.severeCommunication||s.rrWelfareIncident||s.riderFell||s.hadRiderFall||s.horseFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
  if(positive&&!bad){
   const event=tbEvent(h,s,'trust-session-51','trust-session',{flags:{sessionComplete:true,clearCommunication:true}});
   if(event){const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[3,3],Professional:[3,3]},amount=tb51Value(h,s,'rider-trust-session',...ranges[rrSettings().level]);tbApply(h,s,event,'Rider Trust in Aids',amount);const abilities=rrSettings().abilities,compatibleLowStability=abilities['Leg Stability']<20&&!taEquippedAid(h,'spurs',s)||abilities['Hand Stability']<20&&eqSetup(h).bit!=='Pelham Bit';if(compatibleLowStability){event.flags.compatibleAids=true;tbApply(h,s,event,'Rider Trust in Aids',1);}tb51RiderAdjustment(h,s,tb51Value(h,s,'rider-specific-positive',.25,.5));event.riderAdjustment=rrHorse(h).riderTrustAdjustments[rrSettings().riderId];event.effectiveTrust=tb51EffectiveTrust(h);state.learningCaps.sessionTrustGain=event.changes['Rider Trust in Aids']?.delta||0;tbCommit(h,s,event);}
@@ -72,11 +71,7 @@ const TB51_WEATHER_MESSAGES=t2weatherMessages;t2weatherMessages=function(h,locat
  messages.push('Arena: '+location+' · Weather: '+weather.type+' · Footing: '+footing.description+' · Risk: '+footing.classification);return messages;
 };
 const TB51_START=t2start;t2start=function(h,draft,quick=false){
- tb51ClearAssessment(h);const pending=h?.trainingIncidentAssessment;
- if(pending?.status==='pending'){
-  if(!pending.requiresVeterinary&&typeof confirm==='function'&&confirm('A rider assessment is pending from the recorded fall. Confirm that the rider has been appropriately assessed before starting new work.'))tb51AcknowledgeRiderAssessment(h,pending.incidentId);
-  if(h.trainingIncidentAssessment.status==='pending')return {ok:false,message:'An incident assessment is pending. Review the rider and use the existing veterinary examination before returning to ordinary work.'};
- }
+ tb51RemoveClearance(h);
  const facility=t2facilities().find(f=>f.id===draft.facilityId),footing=tb51Footing({facilityId:draft.facilityId,location:facility?.location,weather:t2weather()}),key=[footing.weather,footing.classification,draft.facilityId,draft.discipline].join('|');
  if(footing.location==='Outdoor'&&(footing.index>=2||footing.wind>=25)&&draft.weatherAcknowledged!==key){
   const warning='Warning: Current weather may make the arena footing unsuitable for normal ridden work. Continuing may increase the risk of slipping or an interrupted session.\nWeather: '+footing.weather+'\nArena: '+footing.location+'\nFooting: '+footing.description+' ('+footing.classification+')\nActivity: '+draft.discipline+'\nContinue with the selected activity?';
@@ -111,10 +106,25 @@ function tb51HorseFallProfile(s,kind,extra={}){
 function tb51Temporary(s,focusLoss,tensionGain){const before=s.tension||0;s.tension=clamp(before+tensionGain,0,100);s.temporary ||= {};const previous=s.temporary.Focus||0;s.temporary.Focus=clamp(previous-focusLoss/10,-5,5);return {tension:{before,after:s.tension},focusLoss:(previous-s.temporary.Focus)*10};}
 function tb51Assessment(h,s,incident){
  const old=h.trainingIncidentAssessment;
- h.trainingIncidentAssessment={incidentId:incident.id,status:'pending',horseId:h.id,riderId:rrSettings().riderId,day:csDay(),requiresVeterinary:incident.horseFell,vetVisitCount:(h.vetVisits||[]).length,requiresRider:true,veterinaryReviewed:false,riderReviewed:false,rotational:incident.rotational,context:tbScope(s),kind:incident.kind,environmentRelated:incident.environmentRelated};
- s.assessmentRequired=true;if(!s.steps)s.rrConcern={kind:'incident assessment',context:s.discipline};else delete s.rrConcern;
- h.vetNotes ||= [];h.vetNotes.unshift({date:pastureDateLabel(pastureCalendarHour()),text:'Training incident '+incident.id+': '+(incident.rotational?'rotational horse-and-rider fall':incident.horseFell?'horse-and-rider fall':'rider fall')+'. Appropriate assessment is pending.'});
+ h.trainingIncidentAssessment={incidentId:incident.id,status:'recorded',clearanceRequired:false,horseId:h.id,riderId:rrSettings().riderId,day:csDay(),requiresVeterinary:incident.horseFell,vetVisitCount:(h.vetVisits||[]).length,requiresRider:false,veterinaryReviewed:false,riderReviewed:false,rotational:incident.rotational,context:tbScope(s),kind:incident.kind,environmentRelated:incident.environmentRelated};
+ s.assessmentRequired=false;delete s.rrConcern;
+ h.vetNotes ||= [];h.vetNotes.unshift({date:pastureDateLabel(pastureCalendarHour()),text:'Training incident '+incident.id+': '+(incident.rotational?'rotational horse-and-rider fall':incident.horseFell?'horse-and-rider fall':'rider fall')+'. The incident is recorded; no riding clearance is required.'});
  if(old?.status==='pending')h.trainingIncidentAssessment.previousIncidentId=old.incidentId;
+}
+function tb51RemoveClearance(h){
+ const p=h?.trainingIncidentAssessment;if(!p||p.status!=='pending'&&p.clearanceRequired===false&&p.requiresRider===false)return;
+ if(p.status==='pending')p.status='recorded';p.clearanceRequired=false;p.requiresRider=false;
+ if(typeof tb52SyncAssessment==='function')tb52SyncAssessment(h);
+}
+function tb51ResumeAfterFall(h,s){
+ if(!t2xAwaitingRemount(s)||!canRideUnderSaddle(h))return false;
+ const incident=(s.incidents||[]).findLast(i=>i.fell);if(!incident)return false;
+ tb51RemoveClearance(h);s.hadRiderFall=true;s.hadHorseFall ||= !!s.horseFell;
+ s.riderFell=false;s.horseFell=false;s.mountedStopped=false;s.recoveryRequired=false;s.controlLost=false;s.demandingStopped=false;s.assessmentRequired=false;
+ s.phase=s.fallResumePhase==='warmup'?'warmup':'main';delete s.safetyStop;delete s.rrConcern;
+ incident.continuedAfterFall=true;incident.sessionOutcome='Rider chose to continue training after fall';
+ s.log.push({kind:'Rider choice',text:'The rider chooses to get back on and continue training after the fall.',incidentId:incident.id,elapsed:s.elapsed});
+ return true;
 }
 function tb51AcknowledgeRiderAssessment(h,id){const pending=h.trainingIncidentAssessment;if(!pending||pending.incidentId!==id)return false;pending.riderReviewed=true;tb51ClearAssessment(h);return true;}
 function tb51ClearAssessment(h){const p=h.trainingIncidentAssessment;if(p?.riderReviewed&&(!p.requiresVeterinary||p.veterinaryReviewed)&&!tbMedical(h)){p.status='reviewed';p.reviewedDay=csDay();}return p?.status==='reviewed';}
@@ -142,18 +152,18 @@ t2xIncident=function(h,s,kind,record,extra={}){
   const profile=tb51BoltProfile(h,s);incident.escalationRolls=1;incident.boltProfile=profile;incident.escalationRoll=t2random(s)*100;
   if(incident.escalationRoll<profile.chance)incident.kind='bolt';
  }
- kind=incident.kind;const temporary=kind==='mildSpook'?[1,tbRange(h,s,incident.id+'|tension',1,2)]:kind==='moderateSpook'?[2,tbRange(h,s,incident.id+'|tension',3,5)]:kind==='severeSpook'?[tbRange(h,s,incident.id+'|focus',2,4),tbRange(h,s,incident.id+'|tension',3,5)]:kind==='bolt'?[4,tbRange(h,s,incident.id+'|tension',8,12)]:kind==='slip'?[1,tbRange(h,s,incident.id+'|tension',1,3)]:[0,0];
+ kind=incident.kind;const temporary=kind==='mildSpook'?[1,tbRange(h,s,incident.id+'|tension',1,2)]:kind==='moderateSpook'?[2,tbRange(h,s,incident.id+'|tension',3,5)]:kind==='severeSpook'?[tbRange(h,s,incident.id+'|focus',2,4),tbRange(h,s,incident.id+'|tension',3,5)]:kind==='bolt'?[4,tbRange(h,s,incident.id+'|tension',8,12)]:kind==='slip'?[1,tbRange(h,s,incident.id+'|tension',1,3)]:['refusal','abruptRefusal','runout'].includes(kind)?[0,5]:[0,0];
  incident.effects=tb51Temporary(s,...temporary);
  const horse=tb51HorseFallProfile(s,kind,{...extra,footing});incident.horseFallChance=mounted?horse.chance:0;incident.seriousJump=horse.seriousJump;incident.rotationalChance=horse.rotationalChance;
  if(incident.horseFallChance>0){incident.horseFallRolls=1;incident.horseFallRoll=t2random(s)*100;incident.horseFell=incident.horseFallRoll<incident.horseFallChance;}
  if(incident.horseFell){incident.fell=true;if(horse.seriousJump){incident.rotationalRolls=1;incident.rotational= t2random(s)*100<horse.rotationalChance;}}
  else if(mounted){const profile=tb51FallProfile(h,s,kind);incident.fallProfile=profile;incident.fallChance=profile.chance;if(profile.chance>0){incident.fallRolls=1;incident.fallRoll=t2random(s)*100;incident.fell=incident.fallRoll<profile.chance;}}
  incident.fell=!!incident.fell;incident.horseFell=!!incident.horseFell;incident.rotational=!!incident.rotational;if(typeof tb52PrepareIncident==='function')tb52PrepareIncident(h,s,incident);record.incident=incident;s.incidents ||= [];s.incidents.push(incident);
- if(incident.fell){s.riderFell=true;s.horseFell=incident.horseFell;s.mountedStopped=true;s.phase='cooldown';s.safetyStop=incident.rotational?'Rotational fall':incident.horseFell?'Horse-and-rider fall':'Rider fall';record.resultIndex=6;record.result='Safety stop';s.lastResult=6;tb51Assessment(h,s,incident);}
+ if(incident.fell){s.fallResumePhase=s.phase;s.riderFell=true;s.horseFell=incident.horseFell;s.mountedStopped=true;s.phase='cooldown';s.safetyStop=incident.rotational?'Rotational fall':incident.horseFell?'Horse-and-rider fall':'Rider fall';record.resultIndex=6;record.result='Safety stop';s.lastResult=6;tb51Assessment(h,s,incident);}
  else if(['bolt','severeSpook','strongBuck','repeatedBuck','briefRear','highRear'].includes(kind)){s.recoveryRequired=true;s.controlLost=kind==='bolt';}
  if(['briefRear','highRear'].includes(kind))s.mountedStopped=true;
- record.text=(record.text||'')+' '+(incident.fell&&typeof tb52FallDescription==='function'?tb52FallDescription(h,s,incident):incident.rotational?'A rotational fall occurred. Work has stopped; veterinary and rider assessments are required.':incident.horseFell?'The horse and rider fell. Work has stopped pending assessment.':incident.fell?'The rider fell. Mounted work has stopped pending assessment.':kind==='slip'?'The horse slipped and regained its footing.':kind==='bolt'?'A distinct bolt interrupted the exercise; the rider remained mounted.':kind==='mildSpook'?'A brief startle interrupted attention without a fall.':'The incident was resolved without a fall.');
- tb51ApplyIncident(h,s,incident,record);if(incident.rotational&&!s.steps)t2finish(h,s);return incident;
+ record.text=(record.text||'')+' '+(incident.fell&&typeof tb52FallDescription==='function'?tb52FallDescription(h,s,incident):incident.rotational?'A rotational fall occurred. Training is interrupted for the rider’s decision.':incident.horseFell?'The horse and rider fell. Training is interrupted for the rider’s decision.':incident.fell?'The rider fell. Choose whether to resume riding or end training.':kind==='slip'?'The horse slipped and regained its footing.':kind==='bolt'?'A distinct bolt interrupted the exercise; the rider remained mounted.':kind==='mildSpook'?'A brief startle interrupted attention without a fall.':'The incident was resolved without a fall.');
+ tb51ApplyIncident(h,s,incident,record);if(incident.rotational&&!s.steps&&!t2xAwaitingRemount(s))t2finish(h,s);return incident;
 };
 const TB51_OLD_MAJOR=t2xBehaviorProfiles;t2xBehaviorProfiles=function(h,s,e){const p=TB51_OLD_MAJOR(h,s,e);return rrEnabled()?{...p,bolt:0}:p;};
 function tb51InterruptedAttempt(h,s,e,kind,extra={}){
@@ -161,10 +171,10 @@ function tb51InterruptedAttempt(h,s,e,kind,extra={}){
  const record={exercise:e.name,exerciseId:e.id,result:'Partial execution',resultIndex:2,event:kind,text:'The movement was interrupted by a recorded '+(kind==='slip'?'footing slip':'environmental reaction')+'.',changes:{},elapsed:s.elapsed,setup:{...s.setup},probabilities:{}};
  s.log.push(record);t2xIncident(h,s,kind,record,extra);if(record.incident.kind==='bolt'){record.event='bolt';record.result='Exercise abandoned';record.resultIndex=6;}
  if(record.incident.kind==='severeSpook'){record.result='Exercise abandoned';record.resultIndex=6;}
- s.lastResult=record.resultIndex;s.lastExerciseId=e.id;if(s.riderFell&&!s.steps)t2finish(h,s);return record;
+ s.lastResult=record.resultIndex;s.lastExerciseId=e.id;if(s.riderFell&&!s.steps&&!t2xAwaitingRemount(s))t2finish(h,s);return record;
 }
 const TB51_BEFORE=t2xBeforeAttempt;t2xBeforeAttempt=function(h,s,e){
- if(rrEnabled()&&h.trainingIncidentAssessment?.status==='pending')return {blocked:true,message:'The recorded incident requires assessment before ordinary training can resume.'};
+ tb51RemoveClearance(h);
  const existing=TB51_BEFORE(h,s,e);if(existing||!rrEnabled())return existing;
  const state=tb51State(h,s),stimulus=tb51Stimulus(s);
  if(stimulus&&!state.stimuli[stimulus.id]){
@@ -176,22 +186,22 @@ const TB51_BEFORE=t2xBeforeAttempt;t2xBeforeAttempt=function(h,s,e){
  }
  return null;
 };
-// Unlimited recovery events, with no fixed learned-recovery cap or guaranteed gain from settled clicks.
+// Jumping walk/circle actions always recover live values; reassessment still requires a genuine concern.
 tbRecovery=function(h,s,action){
  if(!rrEnabled())return TB51_RECOVERY(h,s,action);
- const state=tb51State(h,s),last=tbSession(h,s).events.findLast(e=>e.type==='attempt'),before=s.tension||0;
- if(s.finished||s.mountedStopped||!s.attempts||!last)return null;
- const jumping=fenceAvoidanceJumpWorked(s,true),refusal=last.flags?.refusal;
+ const state=tb51State(h,s),last=tbSession(h,s).events.findLast(e=>e.type==='attempt'),before=s.tension||0,walking=s.phase==='main'&&tbJump(s)&&['break','circle-away'].includes(action);
+ if(s.finished||s.mountedStopped||(!walking&&(!s.attempts||!last)))return null;
+ const jumping=walking||fenceAvoidanceJumpWorked(s,true),refusal=last?.flags?.refusal;
  if(['assess','investigate'].includes(action)&&(!jumping||!refusal))return null;
  const unresolved=tb51Unresolved(h,s),newConcern=unresolved&&state.evaluatedConcernEpoch!==s.attempts,meaningful=before>0||newConcern,key='recovery51:'+(state.recoveryCount=(state.recoveryCount||0)+1);
  const event=tbEvent(h,s,key,'recovery',{action,flags:{selectedAction:true,break:['break','circle-away'].includes(action),reassessment:['assess','investigate'].includes(action)}});if(!event)return null;
  const roll=tbRandom(h,s,key+'|'+action),row=action==='assess'?(roll<.45?[2,3,5]:roll<.8?[1,1,3]:[0,0,1]):action==='investigate'?(roll<.4?[2,0,0]:roll<.8?[1,0,0]:[0,0,0]):action==='reorganize'?(roll<.3?[2,3,5]:roll<.75?[1,1,3]:[0,0,1]):(roll<.3?[2,4,6]:roll<.7?[1,2,4]:[0,1,2]);
  s.tension=Math.max(0,before-tbRange(h,s,key+'|tension',row[1],row[2]));event.tension={before,after:s.tension};
- const suitableRecovery=meaningful&&!tbMedical(h)&&(s.tension<before||newConcern||['assess','investigate'].includes(action));
+ const suitableRecovery=(meaningful||walking)&&!tbMedical(h)&&(walking||s.tension<before||newConcern||['assess','investigate'].includes(action));
  const recoveryPoints=['assess','investigate','break','circle-away'].includes(action)?Math.max(1,row[0]):row[0];
  if(jumping&&suitableRecovery)tbApply(h,s,event,'Learned Fence Avoidance',-recoveryPoints);
- if(['break','circle-away'].includes(action)&&suitableRecovery&&row[0]>0){
-  const confidence=last.jumping?'Jump Confidence':last.mounted?'Flatwork Confidence':'Handling Confidence';
+ if(['break','circle-away'].includes(action)&&suitableRecovery&&(walking||row[0]>0)){
+  const confidence=jumping?'Jump Confidence':last.mounted?'Flatwork Confidence':'Handling Confidence';
   tbApply(h,s,event,confidence,tb51Value(h,s,key+'|confidence',.5,1));
  }
  state.evaluatedConcernEpoch=s.attempts;event.recoveryWasMeaningful=meaningful;
@@ -201,7 +211,7 @@ tbRecovery=function(h,s,action){
  return tbCommit(h,s,event);
 };
 const TB51_BREAK=t2break;t2break=function(h,s,minutes=2){
- if(!rrEnabled()||s.phase!=='main'||!s.attempts)return TB51_BREAK(h,s,minutes);
+ if(!rrEnabled()||s.phase!=='main'||!s.attempts&&!tbJump(s))return TB51_BREAK(h,s,minutes);
  if(s.finished||s.mountedStopped||s.riderFell)return 0;
  const before=s.tension||0,event=tbRecovery(h,s,s.behavior5?.pendingAction==='circle-away'?'circle-away':'break');if(!event)return 0;
  s.elapsed+=clamp(Number(minutes)||2,2,10);s.gait='Walk';s.speedPressure=0;return before-(s.tension||0);
@@ -215,15 +225,14 @@ const TB51_FOLLOWUP=rrFollowup;rrFollowup=function(h,s,action){
 };
 const TB51_EXAM=HorseHealth.examine;HorseHealth.examine=function(state,h,type,day,eventId){
  const result=TB51_EXAM.apply(this,arguments),pending=h.trainingIncidentAssessment;
- if(result.ok&&!result.reused&&pending?.status==='pending'&&pending.requiresVeterinary&&['general','soundness','lameness','emergency','followup'].includes(type)&&result.report?.horseId===h.id&&(h.vetVisits||[]).length>(pending.vetVisitCount||0)){
+ if(result.ok&&!result.reused&&['pending','recorded'].includes(pending?.status)&&pending.requiresVeterinary&&['general','soundness','lameness','emergency','followup'].includes(type)&&result.report?.horseId===h.id&&(h.vetVisits||[]).length>(pending.vetVisitCount||0)){
   pending.veterinaryReviewed=true;pending.veterinaryReportId=result.report.id;if(typeof tb52RecordExamination==='function')tb52RecordExamination(h,pending,result.report);
-  if(!pending.riderReviewed&&typeof confirm==='function'&&confirm('The veterinary examination is recorded. Confirm only if the rider has also received an appropriate assessment after the incident.'))pending.riderReviewed=true;
   tb51ClearAssessment(h);
   const s={id:'assessment:'+pending.incidentId,discipline:pending.context==='jumping'?'jumping':'flatwork',createdHour:pastureCalendarHour()},event=tbEvent(h,s,'veterinary:'+result.report.id,'assessment',{flags:{vetExam:true,assessmentPending:pending.status==='pending'},assessment:{...pending}});if(event)tbCommit(h,s,event);
  }
  return result;
 };
-const TB51_RIDE=canRideUnderSaddle;canRideUnderSaddle=function(h){return h?.trainingIncidentAssessment?.status!=='pending'&&TB51_RIDE(h);};
+const TB51_RIDE=canRideUnderSaddle;canRideUnderSaddle=function(h){tb51RemoveClearance(h);return TB51_RIDE(h);};
 const TB51_PROBABILITY=t2probability;t2probability=function(h,event,base,c={},primary,secondary,s){
  const p=TB51_PROBABILITY(h,event,base,c,primary,secondary,s);if(!rrEnabled()||!s||!tbMounted(s)||!['technical','aid','cooperation'].includes(event))return p;
  const general=tbTier(rrHorse(h).learned['Rider Trust in Aids'],[6,4,2,0,-3]),effective=tbTier(tb51EffectiveTrust(h),[6,4,2,0,-3]);return {...p,chance:clamp(p.chance+effective-general,0,p.cap),effectiveTrust:tb51EffectiveTrust(h)};
@@ -231,15 +240,22 @@ const TB51_PROBABILITY=t2probability;t2probability=function(h,event,base,c={},pr
 const TB51_WEATHER_PP=t2weatherPP;t2weatherPP=function(w,location,h){const p=TB51_WEATHER_PP(w,location,h);return location==='Indoor'?{...p,wind:0}:p;};
 const TB51_REPORT=t2reportMarkup;t2reportMarkup=function(report){
  const html=TB51_REPORT(report);if(report.behavior?.version!=='5.1')return html;
- return html.replace(/Avoidance recovery from pauses and reorganization: [^<]+<\/p>/,'Avoidance recovery from genuine events: '+report.behavior.caps.nonJumpingAvoidanceReduction+' (no fixed session cap). Clean-jump confidence earned: '+report.behavior.caps.successfulJumpConfidenceGain+'/'+report.behavior.cleanJumpBudget+'. Effective Rider Trust: '+Number(report.behavior.effectiveTrust?.toFixed(2))+'/100.</p>')+(report.incidents?.length?'<section class="box"><h4>Incident assessment</h4><p>Horse falls: '+report.incidents.filter(i=>i.horseFell).length+' · Rotational falls: '+report.incidents.filter(i=>i.rotational).length+'. Recorded falls require appropriate assessment before returning to work.</p></section>':'');
+ return html.replace(/Avoidance recovery from pauses and reorganization: [^<]+<\/p>/,'Avoidance recovery from genuine events: '+report.behavior.caps.nonJumpingAvoidanceReduction+' (no fixed session cap). Clean-jump confidence earned: '+report.behavior.caps.successfulJumpConfidenceGain+'/'+report.behavior.cleanJumpBudget+'. Effective Rider Trust: '+Number(report.behavior.effectiveTrust?.toFixed(2))+'/100.</p>')+(report.incidents?.length?'<section class="box"><h4>Incident assessment</h4><p>Horse falls: '+report.incidents.filter(i=>i.horseFell).length+' · Rotational falls: '+report.incidents.filter(i=>i.rotational).length+'. Fall details remain recorded. No separate riding clearance is required.</p></section>':'');
 };
 const TB51_RENDER=renderTraining;renderTraining=function(){
- TB51_RENDER();if(!rrEnabled())return;const s=t2state().session,h=s&&t2findHorse(s.horseId),node=document.getElementById('training')?.querySelector('[data-behavior5-status]');
- if(h&&node)node.textContent+=' · Effective Trust for '+rrSettings().riderId+': '+tb51EffectiveTrust(h).toFixed(1)+' · Footing: '+tb51Footing(s).classification;
+ TB51_RENDER();const s=t2state().session,h=s&&t2findHorse(s.horseId),node=document.getElementById('training')?.querySelector('[data-behavior5-status]');
+ if(rrEnabled()&&h&&node)node.textContent+=' · Effective Trust for '+rrSettings().riderId+': '+tb51EffectiveTrust(h).toFixed(1)+' · Footing: '+tb51Footing(s).classification;
+ if(h&&t2xAwaitingRemount(s)){
+  const box=document.createElement('section');box.className='box';box.setAttribute('data-fall-choice','');
+  const text=document.createElement('p');text.textContent='The rider fell. Choose whether to get back on or use End Session.';box.appendChild(text);
+  const button=document.createElement('button');button.type='button';button.setAttribute('data-training-remount','');button.textContent='Get back on and continue riding';button.disabled=!canRideUnderSaddle(h);
+  button.onclick=()=>{if(tb51ResumeAfterFall(h,s)){saveGame(false);renderTraining();}};box.appendChild(button);document.getElementById('training').prepend(box);
+ }
+
 };
 const TB51_WARMUP=t2warmup;t2warmup=function(h,s,action,minutes=2){
  const result=TB51_WARMUP(h,s,action,minutes);if(!rrEnabled()||!result.ok||!tbMounted(s)||s.mountedStopped)return result;
- const footing=tb51Footing(s),roll=t2random(s)*100;if(roll<footing.slipChance){const count=(tb51State(h,s).warmupCount=(tb51State(h,s).warmupCount||0)+1),record={kind:'Warm-up incident',text:'A footing slip interrupted the warm-up.',changes:{}};s.log.push(record);t2xIncident(h,s,'slip',record,{footing,slipRoll:roll,incidentId:rrSessionId(s)+'|warmup-slip:'+count});if(s.riderFell)t2finish(h,s);}
+ const footing=tb51Footing(s),roll=t2random(s)*100;if(roll<footing.slipChance){const count=(tb51State(h,s).warmupCount=(tb51State(h,s).warmupCount||0)+1),record={kind:'Warm-up incident',text:'A footing slip interrupted the warm-up.',changes:{}};s.log.push(record);t2xIncident(h,s,'slip',record,{footing,slipRoll:roll,incidentId:rrSessionId(s)+'|warmup-slip:'+count});if(s.riderFell&&!t2xAwaitingRemount(s))t2finish(h,s);}
  return result;
 };
 function tb51ShowIncident(h,s,cause,actualEventText=''){
@@ -254,11 +270,12 @@ const TB51_FACTS=tbNarrativeFacts;tbNarrativeFacts=function(h,s,event){
  const spook=!!incident?.spookRelated,bolt=incident?.kind==='bolt',slip=incident?.kind==='slip',riderFall=!!incident?.fell,horseFall=!!incident?.horseFell,changes=event.changes||{},loss=stat=>(changes[stat]?.delta||0)<0;
  return {...facts,audibleStimulus:/noise|sound|bang|thunder/i.test(incident?.stimulus?.source||''),arenaMovement:/movement|traffic|horses/i.test(incident?.stimulus?.source||''),tensionIncrease:(incident?.effects?.tension?.after||0)>(incident?.effects?.tension?.before||0),completedCalmerExercise:event.type==='attempt'&&event.clean&&event.flags.tensionDecrease===true,spook,bolt,slip,riderFall,horseFall,rotational:!!incident?.rotational,environmentalEvent:!!incident?.stimulus,mildSpook:spook&&incident.severity===0,noticeableSpook:spook&&incident.severity===1,significantSpook:spook&&incident.severity===2,focusLoss:(incident?.effects?.focusLoss||0)>0,sustainedTension:(s.tension||0)>=50,recovery:event.type==='recovery'&&event.flags.tensionDecrease,focusRecovered:(event.temporaryFocusGain||0)>0,balancePassed:(incident?.fallRolls||0)>0&&!riderFall,balanceDifficult:riderFall||(incident?.fallProfile?.chance||0)>=30,contextMemory:!!incident?.stimulus&&tbSession(h,s).events.filter(e=>e.incident?.stimulus?.source===incident.stimulus.source).length>1,unusuallyIntense:spook&&rrHorse(h).temperamentIntensity<20&&incident.severity===2,highSpookiness:rrHorse(h).naturalSpookiness>=60,intenseTemperament:rrHorse(h).temperamentIntensity>=60,placidTemperament:rrHorse(h).temperamentIntensity<20,previousHighTension:(incident?.effects?.tension?.before||0)>=70,lowStability:(incident?.fallProfile?.stability??100)<40,lowStabilityModifier:(incident?.fallProfile?.multiplier||0)>1,expertRider:['Advanced','Professional'].includes(event.riderLevel),destabilization:!!incident&&(incident.fallChance||0)>0,stabilityError:riderFall||!!s.rrCurrentError,refusalLinked:['refusal','abruptRefusal','runout'].includes(incident?.sourceKind),interrupted:!!incident&&(riderFall||['bolt','severeSpook','slip'].includes(incident.kind)),horseStayedUpright:!!incident&&!horseFall,significantFooting:slip&&footing.index>=2,seriousJump:!!incident&&tbJump(s)&&(incident.seriousJump===true||incident.rotationalChance>0),footingContributed:!!incident&&(slip||incident.environmentRelated&&footing.index>=2),environmentRelated:!!incident?.environmentRelated,jumpConfidenceLoss:loss('Jump Confidence'),flatConfidenceLoss:loss('Flatwork Confidence'),arenaConfidenceLoss:loss('Arena Confidence'),avoidanceIncrease:(changes['Learned Fence Avoidance']?.delta||0)>0,sensitivityIncrease:(changes['Learned Spook Sensitivity']?.delta||0)>0,noLearnedChange:Object.keys(changes).length===0,assessmentPending:assessment?.status==='pending',restricted:assessment?.status==='pending',vetExam:event.flags.vetExam===true,incidentRecorded:!!incident||event.flags.incidentRecorded===true,technicalPreserved:!!incident&&!event.technicalChanged,outdoor:footing.location==='Outdoor',indoor:footing.location==='Indoor',heavyRain:/Heavy Rain/i.test(footing.weather),snow:/Snow/i.test(footing.weather),wetFooting:footing.index>=2,poorFooting:footing.index>=2,suitableFooting:footing.index<2,elevatedSlipRisk:footing.index>0,warningActive:footing.index>=2||footing.wind>=25,outdoorConfirmed:event.flags.outdoorConfirmed===true,selectedIndoor:event.type==='action'&&event.action==='select-indoor',weatherChanged:event.weatherChanged===true,arenaUsable:true,selectedResume:event.type==='action'&&event.flags.repeat===true,selectedBreak:event.type==='recovery'&&event.flags.break===true};
 };
+function tb51FootingComment(rule){return /^TB51-18-(0[1-4]|0[78]|1[56])$/.test(rule.id);}
 const TB51_NARRATE=tbNarrate;tbNarrate=function(h,s,event){
  if(event.narrated)return event.observation;
- const facts=tbNarrativeFacts(h,s,event),candidates=TB51_NARRATIVES.filter(rule=>(typeof tb52SilentStatText!=='function'||!tb52SilentStatText(rule.text))&&tbNarrativeEligible(rule,h,s,event,facts));
+ const facts=tbNarrativeFacts(h,s,event),candidates=TB51_NARRATIVES.filter(rule=>(!tb51FootingComment(rule)||!tb51State(h,s).footingCommentId)&&(typeof tb52SilentStatText!=='function'||!tb52SilentStatText(rule.text))&&tbNarrativeEligible(rule,h,s,event,facts));
  if(!candidates.length)return TB51_NARRATE(h,s,event);
- const rule=candidates[Math.floor(tbRandom(h,s,event.key+'|narrative51')*candidates.length)];event.observation=rule.text.replaceAll('[HORSE]',h.name);event.narrativeId=rule.id;event.narrated=true;s.rrNarrative=event.observation;s.log ||= [];s.log.push({kind:'Behavior observation',text:event.observation,eventId:event.key,elapsed:s.elapsed});return event.observation;
+ const rule=candidates[Math.floor(tbRandom(h,s,event.key+'|narrative51')*candidates.length)];event.observation=rule.text.replaceAll('[HORSE]',h.name);event.narrativeId=rule.id;if(tb51FootingComment(rule))tb51State(h,s).footingCommentId=rule.id;event.narrated=true;s.rrNarrative=event.observation;s.log ||= [];s.log.push({kind:'Behavior observation',text:event.observation,eventId:event.key,elapsed:s.elapsed});return event.observation;
 };
 
 const TB51_AID_LEARNED=taLearned;taLearned=function(h,context){return rrEnabled()&&context==='aid'?taConfidence(tb51EffectiveTrust(h),40,6):TB51_AID_LEARNED(h,context);};

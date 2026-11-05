@@ -59,7 +59,7 @@ function tb52PrepareIncident(h,s,incident){
 }
 function tb52IncidentFacts(h,s,incident,event={}){
  const assessment=event.assessment||incident?.assessment,kind=incident?.kind||'',fall=!!incident?.fell,balancePassed=!!incident&&incident.fallRolls===1&&!fall;
- return {refusal:/refusal/i.test(kind),runout:kind==='runout',spook:!!incident?.spookRelated||/spook/i.test(kind),bolt:kind==='bolt',buck:/buck/i.test(kind),slip:kind==='slip',riderFall:fall,horseFall:!!incident?.horseFell,rotational:!!incident?.rotational,jumpHorseFall:!!incident?.horseFell&&incident.context==='jumping',destabilized:fall||(incident?.fallChance||0)>=30,balancePassed,continuedAlertness:!!incident&&(s.tension||0)>0,settled:event.type==='recovery'&&event.flags?.tensionDecrease===true,unstable:balancePassed&&incident.remainingInstability===true,interrupted:fall||!!s.recoveryRequired||s.mountedStopped,sessionEnded:fall&&(s.mountedStopped||s.finished||s.eliminated),urgentAssessment:!!incident?.urgentAssessment,riderResponsiveObserved:assessment?.riderResponsiveObserved===true,riderAssessmentPending:assessment?.status==='pending'&&!assessment.riderReviewed,horseAssessmentInProgress:assessment?.horseAssessmentInProgress===true,veterinaryPending:!!assessment?.requiresVeterinary&&!assessment.veterinaryReviewed,medicalFinding:assessment?.medicalFinding===true,assessmentCompleteNoSignificantFinding:assessment?.status==='reviewed'&&assessment.veterinaryReviewed===true&&assessment.noSignificantFinding===true,restricted:assessment?.status==='pending'||!!tbMedical(h),incidentRecorded:!!incident?.id&&!!rrHorse(h).incidents52?.some(i=>i.id===incident.id)};
+ return {refusal:/refusal/i.test(kind),runout:kind==='runout',spook:!!incident?.spookRelated||/spook/i.test(kind),bolt:kind==='bolt',buck:/buck/i.test(kind),slip:kind==='slip',riderFall:fall,horseFall:!!incident?.horseFell,rotational:!!incident?.rotational,jumpHorseFall:!!incident?.horseFell&&incident.context==='jumping',destabilized:fall||(incident?.fallChance||0)>=30,balancePassed,continuedAlertness:!!incident&&(s.tension||0)>0,settled:event.type==='recovery'&&event.flags?.tensionDecrease===true,unstable:balancePassed&&incident.remainingInstability===true,interrupted:fall||!!s.recoveryRequired||s.mountedStopped,sessionEnded:fall&&(s.finished||s.eliminated),urgentAssessment:!!incident?.urgentAssessment,riderResponsiveObserved:assessment?.riderResponsiveObserved===true,riderAssessmentPending:assessment?.status==='pending'&&!assessment.riderReviewed,horseAssessmentInProgress:assessment?.horseAssessmentInProgress===true,veterinaryPending:!!assessment?.requiresVeterinary&&!assessment.veterinaryReviewed,medicalFinding:assessment?.medicalFinding===true,assessmentCompleteNoSignificantFinding:assessment?.status==='reviewed'&&assessment.veterinaryReviewed===true&&assessment.noSignificantFinding===true,restricted:assessment?.status==='pending'||!!tbMedical(h),incidentRecorded:!!incident?.id&&!!rrHorse(h).incidents52?.some(i=>i.id===incident.id)};
 }
 function tb52FallIntensity(incident){return incident?.fell&&['Minor','Moderate','Serious','Critical'].includes(incident.fallSeverity)?'Fall intensity: '+incident.fallSeverity:'';}
 function tb52FallDescription(h,s,incident){
@@ -67,7 +67,7 @@ function tb52FallDescription(h,s,incident){
  const facts=tb52IncidentFacts(h,s,incident),eligible=TB52_NARRATIVES.slice(0,24).filter(rule=>rule.requiredConditions.every(key=>facts[key]===true));
  const explicitFall=eligible.filter(rule=>rule.requiredConditions.some(key=>['riderFall','horseFall','jumpHorseFall','rotational'].includes(key))),pool=incident.fell&&explicitFall.length?explicitFall:eligible;
  const rule=pool[Math.floor(tbRandom(h,s,incident.id+'|fall-description52')*pool.length)];
- incident.description52=(rule?.text||((incident.horseFell?'The horse and rider fell':'The rider fell')+' after '+(incident.primaryCause||'the incident').toLowerCase()+'. Work stops pending assessment.')).replaceAll('[HORSE]',h.name);incident.narrativeId52=rule?.id||null;
+ incident.description52=(rule?.text||((incident.horseFell?'The horse and rider fell':'The rider fell')+' after '+(incident.primaryCause||'the incident').toLowerCase()+'. The rider chooses whether to continue training or end the session.')).replaceAll('[HORSE]',h.name);incident.narrativeId52=rule?.id||null;
  return incident.description52;
 }
 const TB52_ASSESSMENT=tb51Assessment;tb51Assessment=function(h,s,incident){
@@ -86,7 +86,7 @@ const TB52_INCIDENT=t2xIncident;t2xIncident=function(h,s,kind,record,extra={}){
   tb52PrepareIncident(h,s,incident);if(incident.fell){s.mountedStopped=true;tb51Assessment(h,s,incident);record.text=(record.text||'')+' '+tb52FallDescription(h,s,incident);}
  }
  const intensity=tb52FallIntensity(incident);if(intensity&&!record.text?.includes(intensity))record.text=(record.text||'')+' '+intensity+'.';
- tb52StoreIncident(h,s,incident);if(!existed&&incident.fell&&incident.fallSeverity!=='Minor'&&!s.steps&&!s.finished)t2finish(h,s);return incident;
+ tb52StoreIncident(h,s,incident);if(!existed&&incident.fell&&incident.fallSeverity!=='Minor'&&!s.steps&&!s.finished&&!t2xAwaitingRemount(s))t2finish(h,s);return incident;
 };
 function tb52SyncAssessment(h){
  const pending=h.trainingIncidentAssessment;if(!pending)return;
@@ -114,7 +114,7 @@ const TB52_NARRATE=tbNarrate;tbNarrate=function(h,s,event){
 };
 const TB52_FINISH=t2finish;t2finish=function(h,s){
  const report=TB52_FINISH(h,s);if(!report)return report;
- for(const incident of s.incidents||[]){tb52StoreIncident(h,s,incident);if(incident.fell&&s.finished)incident.sessionOutcome='Session ended after fall';}
+ for(const incident of s.incidents||[]){tb52StoreIncident(h,s,incident);if(incident.fell&&s.finished&&!incident.continuedAfterFall)incident.sessionOutcome='Session ended after fall';}
  report.incidents=HorseHealth.copy(s.incidents||[]);if(report.behavior)report.behavior.patchVersion='5.2';report.notes=tb52LogEntries((report.notes||[]).map(text=>({text}))).map(row=>row.text);
  // Old generic fall notes could name a refusal after a different primary incident.
  if(s.riderFell)report.notes=report.notes.filter(text=>!['PI10','RF14'].some(id=>text===t2xSay(h,id)));
