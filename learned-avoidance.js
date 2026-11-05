@@ -75,11 +75,23 @@ function tbRecord(h,s,kind,discipline,positive=false){
  const refusal=['refusal','runout','abandoned-approach'].includes(kind)||index===5,spook=/spook/i.test(kind),significant=index>=4||refusal||spook||kind==='welfare',prior=state.events.filter(e=>e.type==='attempt'&&e.failed&&e.exercise===event.exercise).length>1;
  if(refusal&&event.type==='attempt')state.refusals++;
  event.flags={success:event.clean,cleanJump:event.clean&&event.jumping,failed:event.failed,refusal,hesitation:index===4||refusal,technicalError:event.failed&&index===3,riderError:event.riderError,approachError:event.riderError&&event.jumping,timingError:event.riderError&&rrSettings().abilities.Timing<50,distanceError:event.riderError&&t2taskEvent(t2exercise(s.exerciseId)||{id:''})==='distance',balanceError:!!s.riderFell,balanceFailed:!!s.riderFell,overHeight:fenceAvoidanceOverLevel(s)>0,medicalConcern:tbMedical(h),repeatedErrors:state.errors>=2,repeatedRefusals:state.refusals>=2,venue:!!(s.facilityId||s.liveShowId),familiar:(t2horse(h).familiarity[s.lastAttemptKey]||0)>20};
+ const balance=tb51State(h,s);
+ if(event.type==='attempt'){
+  const previous=state.events.findLast(e=>e!==event&&e.type==='attempt');
+  event.cleanJumpStreak=event.clean&&event.jumping&&!fenceAvoidancePunishedAttempt(h,s,event.attempt)?(previous?.clean&&previous.jumping&&previous.riderId===event.riderId&&!previous.flags?.punished&&!fenceAvoidancePunishedAttempt(h,s,previous.attempt)?(previous.cleanJumpStreak||1)+1:1):0;
+ }
  if(kind==='welfare'){
+  s.rrWelfareIncident=true;
+  state.punishedAttempts ||= {};state.punishedAttempts[event.attempt]=true;
+  const attemptEvent=state.events.find(e=>e.type==='attempt'&&e.attempt===event.attempt);if(attemptEvent)attemptEvent.flags.punished=true;
+  const award=balance.cleanJumpAwards?.[event.attempt];
+  if(award&&!award.revoked){tbApply(h,s,event,'Jump Confidence',-award.gain);state.learningCaps.successfulJumpConfidenceGain=Math.max(0,state.learningCaps.successfulJumpConfidenceGain-award.gain);balance.cleanJumpBudget=Math.max(0,(balance.cleanJumpBudget||0)-award.planned);award.revoked=true;}
+  balance.cleanJumpAwarded=Object.values(balance.cleanJumpAwards||{}).some(a=>!a.revoked);
+  for(const reward of state.events.filter(e=>e.type==='reward'&&e.attempt===event.attempt&&!e.rewardRevoked)){tbApply(h,s,event,'Jump Confidence',-Math.max(0,reward.changes['Jump Confidence']?.delta||0));reward.rewardRevoked=true;}
   tbApply(h,s,event,'Rider Trust in Aids',-3);if(event.jumping)tbApply(h,s,event,'Jump Confidence',-2);
   if(event.jumping)tbApply(h,s,event,'Learned Fence Avoidance',2);state.severeCommunication=true;event.flags.misconduct=true;
  }else if(event.clean){
-  if(event.jumping){const roll=tbRandom(h,s,event.key+'|confidence'),gain=roll<.4?2:roll<.8?3:4;tbApply(h,s,event,'Jump Confidence',gain,'successfulJumpConfidenceGain',12);state.positiveJumps++;tbApply(h,s,event,'Learned Fence Avoidance',-1);}
+  if(event.jumping){const roll=tbRandom(h,s,event.key+'|confidence'),gain=roll<.4?2:roll<.8?3:4;tbApply(h,s,event,'Jump Confidence',gain);state.positiveJumps++;if(fenceAvoidanceSafeAids(h,s)&&!state.severeCommunication)tbApply(h,s,event,'Learned Fence Avoidance',-1);}
   else if(event.mounted)tbApply(h,s,event,'Flatwork Confidence',tbRange(h,s,event.key+'|flat',1,2));
   else tbApply(h,s,event,'Handling Confidence',1);
   if(collection)tbApply(h,s,event,'Collection Confidence',tbRange(h,s,event.key+'|collection',1,2));
@@ -88,10 +100,9 @@ function tbRecord(h,s,kind,discipline,positive=false){
   if(s.facilityId||s.liveShowId)tbApply(h,s,event,'Arena Confidence',tbRange(h,s,event.key+'|venue',1,2));
   if(!event.riderError&&/transition|walk-|downward/.test(s.exerciseId||''))tbApply(h,s,event,'Training Anticipation',-tbRange(h,s,event.key+'|timing',1,2));
   if(s.exerciseId==='desensitize'||s.rrRecovery&&state.events.some(e=>e.event==='spook'))tbApply(h,s,event,'Learned Spook Sensitivity',-tbRange(h,s,event.key+'|familiarize',1,2));
- }else if(significant||event.riderError){
+ }else if(significant||event.riderError||event.jumping){
   if(event.jumping){
-   if(event.riderError&&['Beginner','Novice'].includes(event.riderLevel))tbApply(h,s,event,'Jump Confidence',-tbRange(h,s,event.key+'|error',1,2));
-   else if(event.riderLevel==='Intermediate'&&significant&&event.riderError)tbApply(h,s,event,'Jump Confidence',-1);
+   tbApply(h,s,event,'Jump Confidence',-tbRange(h,s,event.key+'|error',1,2));
    if(refusal||kind==='welfare')tbApply(h,s,event,'Learned Fence Avoidance',prior?2:1);
   }else if(event.mounted)tbApply(h,s,event,'Flatwork Confidence',-tbRange(h,s,event.key+'|flat',prior?3:2,prior?5:3));
   else tbApply(h,s,event,'Handling Confidence',-tbRange(h,s,event.key+'|handling',2,4));
@@ -122,13 +133,14 @@ function tbRecovery(h,s,action){
 }
 function recordBehaviorRecovery(h,s,reason,stat,change){const e=tbEvent(h,s,reason,'recovery',{action:reason});if(!e)return 0;const delta=tbApply(h,s,e,stat,change);tbCommit(h,s,e);return delta;}
 function fenceAvoidanceRecover(h,s,reason,amount){return -recordBehaviorRecovery(h,s,reason,'Learned Fence Avoidance',-amount);}
+function fenceAvoidancePunishedAttempt(h,s,attempt){return !!s.behavior5?.punishedAttempts?.[attempt]||(rrHorse(h).processed||[]).includes(rrSessionId(s)+'|behavior5|welfare:'+attempt);}
 function fenceAvoidanceReward(h,s){
  if(!rrEnabled()||s.finished||s.phase!=='main'||!fenceAvoidanceJumpWorked(s,true)||![0,1].includes(s.lastResult))return false;
- const state=tbSession(h,s),latest=state.events.findLast(e=>e.type==='attempt');if(!latest?.clean||!latest.jumping)return false;
+ const state=tbSession(h,s),latest=state.events.findLast(e=>e.type==='attempt');if(!latest?.clean||!latest.jumping||latest.flags?.punished||fenceAvoidancePunishedAttempt(h,s,latest.attempt))return false;
  const event=tbEvent(h,s,'reward:'+s.attempts,'reward',{action:'reward',flags:{selectedAction:true}});if(!event)return false;
  const learned=rrHorse(h).learned;
- if(learned['Jump Confidence']<50)tbApply(h,s,event,'Jump Confidence',1);
- if(learned['Learned Fence Avoidance']>75)tbApply(h,s,event,'Learned Fence Avoidance',-1);
+ if(learned['Jump Confidence']<100)tbApply(h,s,event,'Jump Confidence',1);
+ if(learned['Learned Fence Avoidance']>30)tbApply(h,s,event,'Learned Fence Avoidance',-1);
  tbCommit(h,s,event);return true;
 }
 function tbFinish(h,s){
@@ -139,7 +151,7 @@ function tbFinish(h,s){
  const event=tbEvent(h,s,'finish','session',{flags:{sessionComplete:true}});if(!event)return;
  const experienced=['Advanced','Professional'].includes(rrSettings().level),serious=s.rrWelfareIncident||s.riderFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
  const riderWork=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId&&['Advanced','Professional'].includes(e.riderLevel));
- if(experienced&&riderWork.some(e=>e.clean&&e.jumping)&&!serious)tbApply(h,s,event,'Learned Fence Avoidance',-.5);
+ if(experienced&&riderWork.some(e=>e.clean&&e.jumping)&&!serious&&!state.severeCommunication&&fenceAvoidanceSafeAids(h,s))tbApply(h,s,event,'Learned Fence Avoidance',-.5);
  if(experienced&&riderWork.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&!state.severeCommunication&&!serious)tbApply(h,s,event,'Rider Trust in Aids',3,'sessionTrustGain',3);
  const abilities=rrSettings().abilities;
  if(state.positiveMounted>0&&state.clearCommunication>0&&!state.severeCommunication&&!serious&&fenceAvoidanceSafeAids(h,s)&&(abilities['Leg Stability']<20||abilities['Hand Stability']<20))tbApply(h,s,event,'Rider Trust in Aids',1);

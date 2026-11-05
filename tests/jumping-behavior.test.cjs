@@ -1,13 +1,13 @@
 const {check}=require('./behavior5-harness.cjs');
-check('clean jump learning uses the 40/40/20 table and a two-to-four-point session budget without changing technical skills',`{
+check('clean jump learning uses the 40/40/20 table and the initial session award and consecutive-clean streak gains without changing technical skills',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';const b=rrHorse(h).learned,original=tbRandom,skills=JSON.stringify(h.stats),potential=JSON.stringify(h.potential);b['Jump Confidence']=20;
- try{for(const [n,roll,gain]of [[1,.1,2],[2,.5,0],[3,.9,0],[4,.9,0],[5,.9,0]]){s.attempts=n;s.lastResult=0;s.log.push({exerciseId:'crossrail',resultIndex:0});tbRandom=()=>roll;const before=b['Jump Confidence'];tbRecord(h,s,'exercise','jumping',true);if(b['Jump Confidence']-before!==gain)throw Error('weighted/capped confidence');}}finally{tbRandom=original;}
- if(s.behavior5.learningCaps.successfulJumpConfidenceGain!==2||JSON.stringify(h.stats)!==skills||JSON.stringify(h.potential)!==potential)throw Error('cap or technical data');
+ try{for(const [n,roll,gain]of [[1,.1,2],[2,.5,3],[3,.9,4],[4,.9,4],[5,.9,4]]){s.attempts=n;s.lastResult=0;s.log.push({exerciseId:'crossrail',resultIndex:0});tbRandom=()=>roll;const before=b['Jump Confidence'];tbRecord(h,s,'exercise','jumping',true);if(b['Jump Confidence']-before!==gain)throw Error('weighted/capped confidence');}}finally{tbRandom=original;}
+ if(s.behavior5.learningCaps.successfulJumpConfidenceGain!==17||JSON.stringify(h.stats)!==skills||JSON.stringify(h.potential)!==potential)throw Error('cap or technical data');
 }`);
-check('a refusal without a genuine rider error does not lower confidence merely due to rider level',`{
+check('ordinary refusals lower confidence at every rider level',`{
  for(const level of ['Beginner','Novice','Intermediate','Advanced','Professional'])for(const error of [false,true]){
   resetGame();rrSettings().enabled=true;rrSettings().level=level;const h=app.horses[0],s=t2newSession(h,{exerciseId:'crossrail',discipline:'jumping'});s.phase='main';s.attempts=1;s.lastResult=5;s.rrCurrentError=error;s.log.push({exerciseId:'crossrail',resultIndex:5});const b=rrHorse(h).learned,before=b['Jump Confidence'];tbRecord(h,s,'refusal','jumping',false);const loss=before-b['Jump Confidence'];
-  if(error&&['Beginner','Novice'].includes(level)){if(loss<.5||loss>1.5)throw Error('inexperienced error');}else if(error&&level==='Intermediate'){if(loss<.5||loss>1.5)throw Error('intermediate error');}else if(loss!==0)throw Error('unearned decline '+level);
+  if(loss<.5||loss>1.5)throw Error('missing refusal decline '+level);
  }
 }`);
 check('explicit welfare incidents are adverse for every rank and cannot award a clean-jump benefit',`{

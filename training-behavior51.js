@@ -17,13 +17,20 @@ tbApply=function(h,s,event,stat,delta,cap=null,limit=Infinity){
   return TB51_APPLY(h,s,event,stat,delta,cap,limit);
  }
  if(event.type==='recovery'){
+  if(stat==='Jump Confidence'&&delta>0&&['Beginner','Novice'].includes(event.riderLevel))return 0;
   const actual=TB51_APPLY(h,s,event,stat,delta);
   if(stat==='Learned Fence Avoidance'&&actual<0)s.behavior5.learningCaps.nonJumpingAvoidanceReduction+=-actual;
   return actual;
  }
  if(['attempt','communication'].includes(event.type)){
-  if((s.incidents||[]).some(i=>i.attempt===event.attempt))return 0;
-  if(event.clean&&event.jumping&&stat==='Jump Confidence'&&delta>0){state.cleanJumpBudget ??=delta;return TB51_APPLY(h,s,event,stat,delta,'successfulJumpConfidenceGain',state.cleanJumpBudget);}
+  const incident=(s.incidents||[]).find(i=>i.attempt===event.attempt),owner=incident&&s.behavior5.events.find(e=>e.type==='incident'&&e.incident?.id===incident.id);
+  if(owner?.changes[stat])return 0;
+  if(event.clean&&event.jumping&&stat==='Jump Confidence'&&delta>0){
+   if(event.flags?.punished||fenceAvoidancePunishedAttempt(h,s,event.attempt))return 0;
+   state.cleanJumpAwards ||= {};
+   if(state.cleanJumpAwarded&&event.cleanJumpStreak<2)return 0;
+   const actual=TB51_APPLY(h,s,event,stat,delta);state.cleanJumpAwards[event.attempt]={gain:actual,planned:delta,riderId:event.riderId};state.cleanJumpAwarded=true;state.cleanJumpBudget=(state.cleanJumpBudget||0)+delta;s.behavior5.learningCaps.successfulJumpConfidenceGain+=actual;return actual;
+  }
   if(stat==='Rider Trust in Aids'&&delta>0)return 0;
   const good=/Avoidance|Sensitivity|Anticipation/.test(stat)?delta<0:delta>0,key=stat+':'+(good?'positive':'negative');
   if(state.ordinary[key])return 0;
@@ -38,10 +45,10 @@ tbApply=function(h,s,event,stat,delta,cap=null,limit=Infinity){
 const TB51_FINISH=tbFinish;
 tbFinish=function(h,s){
  const state=tbSession(h,s),wasFinished=state.finished;TB51_FINISH(h,s);if(state.finished)delete state.pendingFinish;if(wasFinished||!state.finished||!rrEnabled())return;
- const work=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId),positive=work.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication),bad=state.severeCommunication||s.rrWelfareIncident||s.riderFell||s.horseFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
+ const work=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId),positive=work.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&fenceAvoidanceSafeAids(h,s),bad=state.severeCommunication||s.rrWelfareIncident||s.riderFell||s.horseFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
  if(positive&&!bad){
   const event=tbEvent(h,s,'trust-session-51','trust-session',{flags:{sessionComplete:true,clearCommunication:true}});
-  if(event){const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[.75,1],Professional:[1,1.25]},amount=tb51Value(h,s,'rider-trust-session',...ranges[rrSettings().level]);tbApply(h,s,event,'Rider Trust in Aids',amount);tb51RiderAdjustment(h,s,tb51Value(h,s,'rider-specific-positive',.25,.5));event.riderAdjustment=rrHorse(h).riderTrustAdjustments[rrSettings().riderId];event.effectiveTrust=tb51EffectiveTrust(h);state.learningCaps.sessionTrustGain=event.changes['Rider Trust in Aids']?.delta||0;tbCommit(h,s,event);}
+  if(event){const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[3,3],Professional:[3,3]},amount=tb51Value(h,s,'rider-trust-session',...ranges[rrSettings().level]);tbApply(h,s,event,'Rider Trust in Aids',amount);const abilities=rrSettings().abilities,compatibleLowStability=abilities['Leg Stability']<20&&!taEquippedAid(h,'spurs',s)||abilities['Hand Stability']<20&&eqSetup(h).bit!=='Pelham Bit';if(compatibleLowStability){event.flags.compatibleAids=true;tbApply(h,s,event,'Rider Trust in Aids',1);}tb51RiderAdjustment(h,s,tb51Value(h,s,'rider-specific-positive',.25,.5));event.riderAdjustment=rrHorse(h).riderTrustAdjustments[rrSettings().riderId];event.effectiveTrust=tb51EffectiveTrust(h);state.learningCaps.sessionTrustGain=event.changes['Rider Trust in Aids']?.delta||0;tbCommit(h,s,event);}
  }
  if(s.report&&(s.report.behavior||state.events.length)){s.report.behavior ||= {initial:{...state.initialBehavior},final:{...rrHorse(h).learned},caps:{...state.learningCaps},eventIds:state.events.map(e=>e.key)};s.report.behavior.version='5.1';s.report.behavior.final={...rrHorse(h).learned};s.report.behavior.caps={...state.learningCaps};s.report.behavior.cleanJumpBudget=state.balance51?.cleanJumpBudget||0;s.report.behavior.effectiveTrust=tb51EffectiveTrust(h);s.report.behavior.riderId=rrSettings().riderId;}
 };
@@ -90,15 +97,16 @@ function tb51SpookProfile(h,s,stimulus){const b=rrHorse(h),base=tbTier(b.natural
 function tb51SpookSeverity(h){const adjustment=tbTier(rrHorse(h).temperamentIntensity,[-8,-4,0,5,10]);return [30/85*100-adjustment,30/85*100,25/85*100+adjustment];}
 function tb51BoltProfile(h,s){const b=rrHorse(h),t=s.tension||0,trust=tb51EffectiveTrust(h),base=tbTier(b.temperamentIntensity,[5,9,14,24,39]),tension=t<40?-2:t<70?0:t<85?3:6,sensitivity=b.learned['Learned Spook Sensitivity']<20?-1:b.learned['Learned Spook Sensitivity']<60?0:b.learned['Learned Spook Sensitivity']<80?2:4,trustModifier=trust<20?3:trust<40?2:trust<80?0:-2;return {base,tension,sensitivity,trust:trustModifier,chance:clamp(base+tension+sensitivity+trustModifier,0,30)};}
 function tb51Stability(){const a=rrSettings().abilities,value=.6*a['Seat Stability']+.4*a.Balance,multiplier=value<20?1.8:value<40?1.5:value<60?1.2:value<80?1:value<90?.75:.55;return {value,multiplier};}
+function tb51IsShow(s){return !!s.liveShowId||Array.isArray(s.steps)&&s.steps.length>0;}
 function tb51FallProfile(h,s,kind){
  const stability=tb51Stability(),base=({mildSpook:0,moderateSpook:3,severeSpook:13,bolt:13,refusal:15,abruptRefusal:15,runout:15,smallBuck:3,strongBuck:17,repeatedBuck:17,briefRear:17,highRear:22,stumble:3,landing:15,slip:3,majorDisruption:22})[kind]||0;
- return {base,stability:stability.value,multiplier:stability.multiplier,chance:Math.min(35,base*stability.multiplier)};
+ return {base,stability:stability.value,multiplier:stability.multiplier,chance:tb51IsShow(s)?showFallChance(base*stability.multiplier):Math.min(35,base*stability.multiplier)};
 }
 const TB51_OLD_FALL=t2xFallChance;t2xFallChance=function(h,s,kind){return rrEnabled()?tb51FallProfile(h,s,kind).chance:TB51_OLD_FALL(h,s,kind);};
 function tb51HorseFallProfile(s,kind,extra={}){
  const footing=extra.footing||tb51Footing(s),jumping=tbJump(s),seriousJump=jumping&&(extra.seriousJump||kind==='landing'||kind==='abruptRefusal'&&(s.tension||0)>=70),major=['bolt','severeSpook','strongBuck','repeatedBuck','highRear','majorDisruption'].includes(kind);
  const chance=footing.index===4&&(major||kind==='slip'||seriousJump)?6:seriousJump?5:major?4:kind==='slip'?3:0;
- const crossCountry=s.discipline==='eventing'&&(/cross|xc/i.test(s.steps?.[s.stepIndex]?.phase||s.exerciseId||''));return {chance,seriousJump,rotationalChance:seriousJump?(crossCountry?25:15):0,footing};
+ const crossCountry=s.discipline==='eventing'&&(/cross|xc/i.test(s.steps?.[s.stepIndex]?.phase||s.exerciseId||''));return {chance:tb51IsShow(s)?showFallChance(chance):chance,seriousJump,rotationalChance:seriousJump?(crossCountry?25:15):0,footing};
 }
 function tb51Temporary(s,focusLoss,tensionGain){const before=s.tension||0;s.tension=clamp(before+tensionGain,0,100);s.temporary ||= {};const previous=s.temporary.Focus||0;s.temporary.Focus=clamp(previous-focusLoss/10,-5,5);return {tension:{before,after:s.tension},focusLoss:(previous-s.temporary.Focus)*10};}
 function tb51Assessment(h,s,incident){
@@ -180,7 +188,8 @@ tbRecovery=function(h,s,action){
  const roll=tbRandom(h,s,key+'|'+action),row=action==='assess'?(roll<.45?[2,3,5]:roll<.8?[1,1,3]:[0,0,1]):action==='investigate'?(roll<.4?[2,0,0]:roll<.8?[1,0,0]:[0,0,0]):action==='reorganize'?(roll<.3?[2,3,5]:roll<.75?[1,1,3]:[0,0,1]):(roll<.3?[2,4,6]:roll<.7?[1,2,4]:[0,1,2]);
  s.tension=Math.max(0,before-tbRange(h,s,key+'|tension',row[1],row[2]));event.tension={before,after:s.tension};
  const suitableRecovery=meaningful&&!tbMedical(h)&&(s.tension<before||newConcern||['assess','investigate'].includes(action));
- if(jumping&&suitableRecovery)tbApply(h,s,event,'Learned Fence Avoidance',-row[0]);
+ const recoveryPoints=['assess','investigate','break','circle-away'].includes(action)?Math.max(1,row[0]):row[0];
+ if(jumping&&suitableRecovery)tbApply(h,s,event,'Learned Fence Avoidance',-recoveryPoints);
  if(['break','circle-away'].includes(action)&&suitableRecovery&&row[0]>0){
   const confidence=last.jumping?'Jump Confidence':last.mounted?'Flatwork Confidence':'Handling Confidence';
   tbApply(h,s,event,confidence,tb51Value(h,s,key+'|confidence',.5,1));

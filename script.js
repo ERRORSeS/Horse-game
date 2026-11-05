@@ -6117,7 +6117,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
     rails = rpgRoundStats ? (rpgRoundStats.rails || 0) : showjumpingRoundPlan(horse, level, interaction?.poleRoundKey, jumpCount).rails;
     const refusalChance = clamp(clamp(25 - Math.floor(jump.Confidence / 4) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 60) + equipmentModifiers(horse,discipline).refusal, 0, 100);
     refusals = typeof tbQuickJumpRefusals==='function'&&rrEnabled()&&!rpgRoundStats&&app.horses.some(owned=>owned.id===horse.id) ? tbQuickJumpRefusals(horse,discipline,level,interaction,jumpCount) : rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 35 ? 2 : 1) : 0;
-    const fall = Math.random()*100 < Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8))*(1-equipmentModifiers(horse,discipline).fallReduction/100);
+    const fall = Math.random()*100 < showFallChance(Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 8))*(1-equipmentModifiers(horse,discipline).fallReduction/100));
     const timeAllowed = Math.max(48, 70 - Math.floor(jump.Speed / 4) + Math.floor(jumpCount / 3));
     overSeconds = Math.max(0, rnd(0, 6) - Math.floor(jump.Speed / 20) + Math.max(0, weightBoost < 0 ? 1 : 0));
     if (rpgRoundStats) {
@@ -6172,7 +6172,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
     rails = clamp(rnd(0, 2 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias + tackPenaltyBias)) + (hotBloodedPenalty ? 2 : 0) + (excitablePenalty ? 1 : 0), 0, 6);
     const refusalChance = clamp(clamp(20 - Math.floor(jump.Confidence / 5) + temperament.refusalBias + bondMod.refusalBias + tackRefusalBias - Math.floor(interactionBoost / 3), 5, 55) + equipmentModifiers(horse,discipline).refusal, 0, 100);
     refusals = typeof tbQuickJumpRefusals==='function'&&rrEnabled()&&!rpgRoundStats&&app.horses.some(owned=>owned.id===horse.id) ? tbQuickJumpRefusals(horse,discipline,level,interaction,jumpCount) : rnd(1, 100) <= refusalChance ? (rnd(1, 100) <= 30 ? 2 : 1) : 0;
-    const fall = rnd(1, 100) <= Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10));
+    const fall = Math.random()*100 < showFallChance(Math.max(2, temperament.fallBias + bondMod.fallBias + Math.floor((minReq - skill) / 10)));
     const timeAllowed = Math.max(250, 320 - Math.floor((jump.Speed + jump.Confidence) / 2));
     overSeconds = Math.max(0, rnd(0, 20) - Math.floor(jump.Speed / 4));
     if (rpgRoundStats) {
@@ -6682,7 +6682,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         const incidentCause=/runout|run out/i.test(causeText)?'Runout':/spook/i.test(causeText)?'Spook':/buck/i.test(causeText)?'Buck':/rear/i.test(causeText)?'Rear':/distance/i.test(causeText)?'Wrong Distance':'Refusal';
         session.lastShowIncident={cause:incidentCause,reason:session.lastRefusalReason};
         const incident51=typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,incidentCause,variant.title||''):null;
-        if (incident51?incident51.fell:Math.random()*100 < 12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100)) {
+        if (incident51?incident51.fell:Math.random()*100 < showFallChance(12*(1-equipmentModifiers(horse,session.discipline).fallReduction/100))) {
           session.eliminated = true;
           rs.eliminated = true;
           rs.eliminationReason = 'fall';
@@ -6708,10 +6708,10 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
         rs.refusals += 1;
         rs.faults += 4;
         const incident51=typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,session.lastShowIncident?.cause||'Refusal',variant.title||''):null;
-        if (rs.refusals >= 2 || (incident51?incident51.fell:rnd(1, 100) <= 10)) {
+        if (rs.refusals >= 2 || (incident51?incident51.fell:Math.random()*100 < showFallChance(10))) {
           session.eliminated = true;
           rs.eliminated = true;
-          rs.eliminationReason = rs.refusals >= 2 ? 'multiple refusals' : 'fall';
+          rs.eliminationReason = incident51?.fell ? 'fall' : rs.refusals >= 2 ? 'multiple refusals' : 'fall';
           displayOutcome = rs.eliminationReason === 'fall' ? 'Elimination (fall after '+(session.lastShowIncident?.cause||'Refusal')+')' : 'Elimination (multiple refusals)';
         } else {
           displayOutcome = 'Refusal (4 faults)'+(session.lastRefusalReason?' — '+session.lastRefusalReason:'');
@@ -6772,7 +6772,7 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
             displayOutcome = 'Elimination (XC refusals)';
           }
           const incident51=!rs.eliminated&&typeof tb51ShowIncident==='function'&&rrEnabled()?tb51ShowIncident(horse,session,session.lastShowIncident?.cause||'Refusal',variant.title||''):null;
-          if (!rs.eliminated && (incident51?incident51.fell:Math.random()*100 < 10*(1-equipmentModifiers(horse,'eventing-cross-country').fallReduction/100))) {
+          if (!rs.eliminated && (incident51?incident51.fell:Math.random()*100 < showFallChance(10*(1-equipmentModifiers(horse,'eventing-cross-country').fallReduction/100)))) {
             session.eliminated = true;
             rs.eliminated = true;
             rs.eliminationReason = 'fall';

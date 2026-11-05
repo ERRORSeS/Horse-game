@@ -9,9 +9,9 @@ check('reassessment investigation breaks and reorganization share live state and
  if(recovered<=4||s.behavior5.learningCaps.nonJumpingAvoidanceReduction!==recovered)throw Error('recovery still capped');
  s.tension=60;const before=b['Learned Fence Avoidance'],t=s.tension;tbRecovery(h,s,'break');if(b['Learned Fence Avoidance']>before||s.tension>=t)throw Error('genuine recovery blocked');
 }`);
-check('weighted recovery tables include genuine no-improvement outcomes and never fabricate a clean jump',`{
+check('specified recovery actions remove one or two points and never fabricate a clean jump',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],original=tbRandom;
- try{for(const [action,roll,expected]of [['assess',.1,2],['assess',.6,1],['assess',.9,0],['investigate',.1,2],['investigate',.6,1],['investigate',.9,0],['break',.1,2],['break',.5,1],['break',.9,0],['reorganize',.1,2],['reorganize',.6,1],['reorganize',.9,0]]){
+ try{for(const [action,roll,expected]of [['assess',.1,2],['assess',.6,1],['assess',.9,1],['investigate',.1,2],['investigate',.6,1],['investigate',.9,1],['break',.1,2],['break',.5,1],['break',.9,1],['reorganize',.1,2],['reorganize',.6,1],['reorganize',.9,0]]){
   const s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.lastResult=5;s.tension=50;s.log.push({exerciseId:'crossrail',resultIndex:5});tbRecord(h,s,'refusal','jumping',false);const b=rrHorse(h).learned;b['Learned Fence Avoidance']=80;
   tbRandom=()=>roll;const event=tbRecovery(h,s,action);if(80-b['Learned Fence Avoidance']!==expected)throw Error(action+' '+roll);if(s.lastResult!==5||s.behavior5.positiveJumps)throw Error('invented clean jump');
  }}finally{tbRandom=original;}

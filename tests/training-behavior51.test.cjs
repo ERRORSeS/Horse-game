@@ -1,19 +1,19 @@
 const {check}=require('./behavior5-harness.cjs');
-check('5.1 rider trust grows slowly for every rank, persists by identity and cannot replay',`{
- const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[.75,1],Professional:[1,1.25]};
+check('rider trust uses the requested expert session bonus, persists by identity and cannot replay',`{
+ const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[3,3],Professional:[3,3]};
  for(const [level,[min,max]]of Object.entries(ranges)){
   resetGame();rrSettings().enabled=true;rrSettings().level=level;const h=app.horses[0];rrHorse(h).learned['Rider Trust in Aids']=30;
   for(let n=0;n<20;n++){const s=t2newSession(h,{discipline:'flatwork',exerciseId:'large-circle',hour:n*24});s.phase='main';s.elapsed=4;s.attempts=1;s.lastResult=0;s.log.push({exerciseId:s.exerciseId,resultIndex:0});tbRecord(h,s,'exercise','flatwork',true);const before=rrHorse(h).learned['Rider Trust in Aids'];t2finish(h,s);const gain=rrHorse(h).learned['Rider Trust in Aids']-before;if(gain<min-1e-8||gain>max+1e-8)throw Error(level+' '+gain);const snapshot=JSON.stringify(rrHorse(h));tbFinish(h,s);if(JSON.stringify(rrHorse(h))!==snapshot)throw Error('finish replay');}
-  if(rrHorse(h).learned['Rider Trust in Aids']>55.001)throw Error('instant trust');const general=rrHorse(h).learned['Rider Trust in Aids'],effective=tb51EffectiveTrust(h);rrSettings().riderId='new-novice';if(tb51EffectiveTrust(h)!==general||effective<=general)throw Error('identity transfer');
+  if(rrHorse(h).learned['Rider Trust in Aids']>Math.min(100,30+20*max)+.001)throw Error('instant trust');const general=rrHorse(h).learned['Rider Trust in Aids'],effective=tb51EffectiveTrust(h);rrSettings().riderId='new-novice';if(tb51EffectiveTrust(h)!==general||effective<=general)throw Error('identity transfer');
   hydrateFromSave(JSON.parse(serializeAppState()));rrSettings().riderId='player';if(tb51EffectiveTrust(app.horses[0])!==effective)throw Error('saved adjustment');
  }
 }`);
-check('ordinary gains are fractional session budgets and clean jump exception is only two to four per session',`{
+check('ordinary gains are fractional session budgets and clean jump learning applies the session award and active streak',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],b=rrHorse(h).learned;b['Flatwork Confidence']=20;
  const s=t2newSession(h,{discipline:'flatwork',exerciseId:'large-circle'});s.phase='main';
  for(let n=1;n<=20;n++){s.attempts=n;s.lastResult=0;s.log.push({exerciseId:s.exerciseId,resultIndex:0});tbRecord(h,s,'exercise','flatwork',true);}
  const gain=b['Flatwork Confidence']-20;if(gain<.5||gain>1||Number.isInteger(gain))throw Error('routine gain '+gain);
- const original=tbRandom;try{for(const [roll,expected]of [[.1,2],[.5,3],[.9,4]]){b['Jump Confidence']=20;const j=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});j.phase='main';tbRandom=()=>roll;for(let n=1;n<=5;n++){j.attempts=n;j.lastResult=0;j.log.push({exerciseId:j.exerciseId,resultIndex:0});tbRecord(h,j,'exercise','jumping',true);}if(b['Jump Confidence']!==20+expected)throw Error('clean session budget');}}finally{tbRandom=original;}
+ const original=tbRandom;try{for(const [roll,expected]of [[.1,2],[.5,3],[.9,4]]){b['Jump Confidence']=20;const j=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});j.phase='main';tbRandom=()=>roll;for(let n=1;n<=5;n++){j.attempts=n;j.lastResult=0;j.log.push({exerciseId:j.exerciseId,resultIndex:0});tbRecord(h,j,'exercise','jumping',true);}if(b['Jump Confidence']!==20+5*expected)throw Error('clean session budget');}}finally{tbRandom=original;}
 }`);
 check('genuine recovery exceeds four, shares live values and settled unchanged clicks do not farm learning',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0],s=t2newSession(h,{discipline:'jumping',exerciseId:'crossrail'});s.phase='main';s.attempts=1;s.lastResult=5;s.log.push({exerciseId:s.exerciseId,resultIndex:5});tbRecord(h,s,'refusal','jumping',false);rrHorse(h).learned['Learned Fence Avoidance']=80;s.tension=100;

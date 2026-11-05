@@ -1,4 +1,5 @@
-// The core game file and its Bond/QOL calculations remain byte-for-byte unchanged.
+// Show-specific fall balance, normalization and persistent result workflow.
+function showFallChance(chance){return clamp((Number(chance)||0)/3,0,12);}
 function normalizeCompetitionRpgSession(session) {
   if (!session || typeof session !== 'object') return null;
   const discipline = typeof session.discipline === 'string' && SHOW_LEVELS[session.discipline] ? session.discipline : 'jumping';

@@ -1,0 +1,40 @@
+{
+  "seed": "Deterministic t2random streams; actual conditional show incident resolution",
+  "rows": [
+    {
+      "name": "Show rider fall after refusal, stability 30",
+      "trials": 10000,
+      "expectedPercent": 7.5,
+      "observedPercent": 7.26,
+      "count": 726
+    },
+    {
+      "name": "Show rider fall after refusal, stability 60",
+      "trials": 10000,
+      "expectedPercent": 5,
+      "observedPercent": 5.29,
+      "count": 529
+    },
+    {
+      "name": "Show rider fall after refusal, stability 95",
+      "trials": 10000,
+      "expectedPercent": 2.75,
+      "observedPercent": 2.9899999999999998,
+      "count": 299
+    },
+    {
+      "name": "Show horse fall after actual slip",
+      "trials": 10000,
+      "expectedPercent": 1,
+      "observedPercent": 0.9900000000000001,
+      "count": 99
+    },
+    {
+      "name": "Show horse fall after serious jumping disruption",
+      "trials": 10000,
+      "expectedPercent": 1.6666666666666667,
+      "observedPercent": 1.6099999999999999,
+      "count": 161
+    }
+  ]
+}

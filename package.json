@@ -2,7 +2,7 @@
   "name": "oxer-to-oxer-stable-manager",
   "private": true,
   "scripts": {
-    "test": "node --test tests/recovery-rebuild.test.cjs tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs tests/performance.test.cjs tests/longevity.test.cjs tests/single-save.test.cjs && node tests/expansion.test.cjs && node tests/competition-repair.test.cjs && node tests/competition-completion.test.cjs && node tests/integration.test.cjs && node tests/longevity-integration.cjs && node tests/run-regressions.cjs && node tests/interactive-jumping.test.cjs && node --test tests/jumping-height-risk.test.cjs tests/lifespan.test.cjs tests/refusal-bands.test.cjs && node tests/auction-save3.test.cjs && node tests/save3-identities.test.cjs && node tests/rider-realism.test.cjs && node tests/tack-rider-aids.test.cjs && node tests/behavior-recovery.test.cjs && node tests/auto-behavior-rider.test.cjs && node tests/jumping-behavior.test.cjs && node tests/learned-avoidance.test.cjs && node tests/training-behavior5.test.cjs && node tests/training-behavior51.test.cjs && node tests/training-behavior52.test.cjs && node tests/fall-recovery-display.test.cjs",
+    "test": "node --test tests/recovery-rebuild.test.cjs tests/veterinary3.test.cjs tests/care-sales.test.cjs tests/medical-realism.test.cjs tests/critical-update.test.cjs tests/performance.test.cjs tests/longevity.test.cjs tests/single-save.test.cjs && node tests/expansion.test.cjs && node tests/competition-repair.test.cjs && node tests/competition-completion.test.cjs && node tests/integration.test.cjs && node tests/longevity-integration.cjs && node tests/run-regressions.cjs && node tests/interactive-jumping.test.cjs && node --test tests/jumping-height-risk.test.cjs tests/lifespan.test.cjs tests/refusal-bands.test.cjs && node tests/auction-save3.test.cjs && node tests/save3-identities.test.cjs && node tests/rider-realism.test.cjs && node tests/tack-rider-aids.test.cjs && node tests/behavior-recovery.test.cjs && node tests/auto-behavior-rider.test.cjs && node tests/jumping-behavior.test.cjs && node tests/learned-avoidance.test.cjs && node tests/training-behavior5.test.cjs && node tests/training-behavior51.test.cjs && node tests/training-behavior52.test.cjs && node tests/fall-recovery-display.test.cjs && node tests/show-learning-rules.test.cjs",
     "test:recovery-population": "node tests/simulate-recovery.cjs",
     "test:benchmark": "node tests/benchmark-save.cjs",
     "test:expansion": "node tests/expansion.test.cjs",
@@ -10,6 +10,7 @@
     "test:rider-realism": "node tests/rider-realism.test.cjs",
     "test:behavior5-simulation": "node tests/training-behavior5-simulation.cjs",
     "test:behavior51-simulation": "node tests/training-behavior51-simulation.cjs",
+    "test:show-learning-simulation": "node tests/show-learning-simulation.cjs",
     "test:behavior52-simulation": "node tests/training-behavior52-simulation.cjs"
   }
 }
