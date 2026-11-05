@@ -1,4 +1,13 @@
 /* Saved lesson-horse offers, barn-managed tack and player-selected lease terms. */
+function lessonMakeLeaseAvailable(h){
+ h.owner='Your Stable';h.isLessonHorse=false;h.isNPC=false;h.isPastureNPC=false;h.barnAvailable=true;return h;
+}
+function lessonNormalizeLeases(){for(const h of app.horses||[])if(h.isLeased)lessonMakeLeaseAvailable(h);}
+function lessonOpenTraining(h){
+ const horse=lessonActiveLease(h)||h;if(!horse.isLeased&&!horse.barnAvailable)return false;
+ app.trainingHorseScope='both';app.trainingSelection={...(app.trainingSelection||{}),horseId:horse.id};
+ t2repairHorseSelection();t2state().draft.horseId=horse.id;changeTab('training');renderTraining();return true;
+}
 function lessonActiveLease(h){return app.horses.find(row=>row.isLeased&&row.leaseSourceId===h.id);}
 function lessonMatchingTack(h,poor=false){
  const personality=mgPersonality(h),setup={},choices={bridle:['Snaffle Bridle','Plain Cavesson Bridle','Flash Bridle','Drop Noseband Bridle','Figure-8 Bridle','Anatomical Bridle'],bit:EQ_SNAFFLES.concat(['Straight Bar Bit','Pelham Bit']),saddle:['All-Purpose Saddle','Jumping Saddle','Dressage Saddle'],pad:['Basic Cotton Pad']};
@@ -62,7 +71,7 @@ function lessonStartLease(h,months,barn=app.currentBarn){
  const leased=HorseHealth.copy(h);leased.id=uid();leased.owner='Your Stable';leased.isLessonHorse=false;leased.isLeased=true;leased.leaseSourceId=h.id;leased.leaseLocked=true;leased.leaseMonthlyCost=terms.monthlyPrice;leased.leaseDurationMonths=months;leased.leaseMonthsRemaining=months;leased.leasePrepaidFirstMonth=true;
  for(const condition of leased.medicalConditions||[])condition.horseId=leased.id;
  for(const [slot,item]of Object.entries(leased.lessonEquipment||{})){item.id=mgId();item.assignedHorseId=leased.id;leased.equipmentRefs[slot]=item.id;}
- app.money-=terms.monthlyPrice;app.horses.push(leased);h.barnAvailable=false;
+ lessonMakeLeaseAvailable(leased);app.money-=terms.monthlyPrice;app.horses.push(leased);h.barnAvailable=false;
  pushReport('Leased '+h.name+' for '+months+' month(s) at '+money(terms.monthlyPrice)+'/month. The first month is paid; later months are billed monthly.');
  return {ok:true,horse:leased};
 }
@@ -72,7 +81,7 @@ function lessonBuyHorse(h,barn=app.currentBarn){
  if(app.money<offer.price)return {ok:false,message:'Not enough money for this buyout.'};
  const horse=lessonActiveLease(h)||h;app.money-=offer.price;offer.status='purchased';
  app.lessonHorsesByBarn[barn.id]=roster.filter(row=>row.id!==h.id);
- horse.lessonBuyout.status='purchased';horse.owner='Your Stable';horse.isLessonHorse=false;horse.isLeased=false;horse.leaseLocked=false;horse.barnAvailable=true;
+ horse.lessonBuyout.status='purchased';lessonMakeLeaseAvailable(horse);horse.isLeased=false;horse.leaseLocked=false;horse.barnAvailable=true;
  delete horse.leaseSourceId;delete horse.leaseMonthsRemaining;delete horse.leaseDurationMonths;delete horse.leaseMonthlyCost;delete horse.leasePrepaidFirstMonth;
  for(const item of Object.values(horse.lessonEquipment||{})){item.barnOwned=false;mgState().items.push(item);}
  delete horse.lessonManagedTack;delete horse.lessonEquipment;
@@ -103,8 +112,12 @@ const LESSON_PROFILE=horseProfileMarkup;horseProfileMarkup=function(h,...args){r
 const LESSON_RENDER=renderBarn;renderBarn=function(){
  LESSON_RENDER();const roster=currentBarnLessonHorses(),h=roster.find(row=>row.id===app.barnLessonSelectionId)||roster[0],box=document.getElementById('barn-lesson-profile');if(!h||!box)return;
  const terms=lessonEnsureTerms(h,app.currentBarn),active=lessonActiveLease(h),offer=h.lessonBuyout;
+ for(const button of document.querySelectorAll('[data-lesson-profile]')){const source=roster.find(row=>row.id===button.dataset.lessonProfile);if(source&&lessonActiveLease(source)){const label=button.previousSibling;if(label?.nodeType===3)label.textContent=label.textContent.replace('Not available','Leased by you; available to ride');}}
+ const train=document.getElementById('lesson-train-btn');if(train){train.disabled=!active&&!h.barnAvailable;train.onclick=()=>lessonOpenTraining(h);const note=train.parentElement.nextElementSibling;if(active&&note?.tagName==='P')note.textContent='Leased by you. Available to ride, train and enter shows through your active lease.';}
  box.insertAdjacentHTML('beforeend','<section data-lesson-lease><h4>Lease</h4><p>'+money(terms.monthlyPrice)+'/month · Available lease: 1–'+terms.maxMonths+' months. First month paid when signing.</p><label>Lease length (months)<select id="lesson-lease-months">'+Array.from({length:terms.maxMonths},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'</option>').join('')+'</select></label>'+(offer.status==='available'?'<p>Buyout: '+money(offer.price)+' · Offer ends in '+Math.max(0,offer.expiresMonth-currentMonthAbsolute())+' month(s).</p><button id="lesson-buyout-btn">Buy this lesson horse</button>':'<p>Buyout: '+mgEscape(offer.status)+'.</p>')+'</section>');
  let lease=document.getElementById('lesson-lease-btn');if(!lease){lease=document.createElement('button');lease.id='lesson-lease-btn';lease.textContent='Lease';box.querySelector('[data-lesson-lease]').appendChild(lease);}
  lease.disabled=!h.barnAvailable||!!active;lease.onclick=()=>{const result=lessonStartLease(h,Number(document.getElementById('lesson-lease-months').value));if(!result.ok){alert(result.message);return;}saveGame(false);render();};
  const buy=document.getElementById('lesson-buyout-btn');if(buy)buy.onclick=()=>{const result=lessonBuyHorse(h);if(!result.ok){alert(result.message);return;}saveGame(false);render();};
 };
+
+const LESSON_LEASE_HYDRATE=hydrateFromSave;hydrateFromSave=function(data,...args){const result=LESSON_LEASE_HYDRATE(data,...args);lessonNormalizeLeases();return result;};
