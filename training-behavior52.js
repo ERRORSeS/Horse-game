@@ -45,7 +45,7 @@ function tb52Cause(incident,s){
 }
 function tb52FallSeverity(h,s,incident){
  if(!incident.fell)return null;if(incident.rotational)return 'Critical';
- const seriousHorseFall=incident.horseFell&&(incident.seriousJump||incident.horseFallChance>=11||incident.footing?.index>=3),weights=seriousHorseFall?[10,45,35,10]:[65,27,7,1];
+ const seriousHorseFall=incident.horseFell&&(incident.seriousJump||['bolt','severeSpook','strongBuck','repeatedBuck','highRear','majorDisruption'].includes(incident.kind)||incident.footing?.index>=3),weights=seriousHorseFall?[10,45,35,10]:[65,27,7,1];
  let roll=tbRandom(h,s,incident.id+'|fall-severity52')*100;return ['Minor','Moderate','Serious','Critical'][Math.max(0,weights.findIndex(weight=>(roll-=weight)<0))];
 }
 function tb52PrepareIncident(h,s,incident){
@@ -61,6 +61,7 @@ function tb52IncidentFacts(h,s,incident,event={}){
  const assessment=event.assessment||incident?.assessment,kind=incident?.kind||'',fall=!!incident?.fell,balancePassed=!!incident&&incident.fallRolls===1&&!fall;
  return {refusal:/refusal/i.test(kind),runout:kind==='runout',spook:!!incident?.spookRelated||/spook/i.test(kind),bolt:kind==='bolt',buck:/buck/i.test(kind),slip:kind==='slip',riderFall:fall,horseFall:!!incident?.horseFell,rotational:!!incident?.rotational,jumpHorseFall:!!incident?.horseFell&&incident.context==='jumping',destabilized:fall||(incident?.fallChance||0)>=30,balancePassed,continuedAlertness:!!incident&&(s.tension||0)>0,settled:event.type==='recovery'&&event.flags?.tensionDecrease===true,unstable:balancePassed&&incident.remainingInstability===true,interrupted:fall||!!s.recoveryRequired||s.mountedStopped,sessionEnded:fall&&(s.mountedStopped||s.finished||s.eliminated),urgentAssessment:!!incident?.urgentAssessment,riderResponsiveObserved:assessment?.riderResponsiveObserved===true,riderAssessmentPending:assessment?.status==='pending'&&!assessment.riderReviewed,horseAssessmentInProgress:assessment?.horseAssessmentInProgress===true,veterinaryPending:!!assessment?.requiresVeterinary&&!assessment.veterinaryReviewed,medicalFinding:assessment?.medicalFinding===true,assessmentCompleteNoSignificantFinding:assessment?.status==='reviewed'&&assessment.veterinaryReviewed===true&&assessment.noSignificantFinding===true,restricted:assessment?.status==='pending'||!!tbMedical(h),incidentRecorded:!!incident?.id&&!!rrHorse(h).incidents52?.some(i=>i.id===incident.id)};
 }
+function tb52FallIntensity(incident){return incident?.fell&&['Minor','Moderate','Serious','Critical'].includes(incident.fallSeverity)?'Fall intensity: '+incident.fallSeverity:'';}
 function tb52FallDescription(h,s,incident){
  if(incident.description52)return incident.description52;
  const facts=tb52IncidentFacts(h,s,incident),eligible=TB52_NARRATIVES.slice(0,24).filter(rule=>rule.requiredConditions.every(key=>facts[key]===true));
@@ -84,6 +85,7 @@ const TB52_INCIDENT=t2xIncident;t2xIncident=function(h,s,kind,record,extra={}){
  if(!existed&&incident.behaviorVersion!=='5.2'){
   tb52PrepareIncident(h,s,incident);if(incident.fell){s.mountedStopped=true;tb51Assessment(h,s,incident);record.text=(record.text||'')+' '+tb52FallDescription(h,s,incident);}
  }
+ const intensity=tb52FallIntensity(incident);if(intensity&&!record.text?.includes(intensity))record.text=(record.text||'')+' '+intensity+'.';
  tb52StoreIncident(h,s,incident);if(!existed&&incident.fell&&incident.fallSeverity!=='Minor'&&!s.steps&&!s.finished)t2finish(h,s);return incident;
 };
 function tb52SyncAssessment(h){
@@ -121,9 +123,9 @@ const TB52_FINISH=t2finish;t2finish=function(h,s){
 const TB52_REPORT=t2reportMarkup;t2reportMarkup=function(report){
  const view={...report,notes:tb52LogEntries((report.notes||[]).map(text=>({text}))).map(row=>row.text),progress:Object.fromEntries(Object.entries(report.progress||{}).filter(([,delta])=>Math.abs(delta)>.00001))};
  const html=TB52_REPORT(view),falls=(report.incidents||[]).filter(i=>i.fell&&i.fallSeverity);
- return html+(falls.length?'<section class="box"><h4>Fall incident details</h4>'+falls.map(i=>'<p>'+mgEscape(i.primaryCause)+' · '+mgEscape(i.fallType)+' · '+mgEscape(i.fallSeverity)+' · '+mgEscape(i.assessment?.urgency||'Ordinary')+' assessment: '+mgEscape(i.assessmentStatus||'pending')+'</p><p>'+mgEscape(i.description52||'')+'</p>'+(tb52ChangeText(i.confidenceChanges)?'<p>'+mgEscape(tb52ChangeText(i.confidenceChanges))+'</p>':'')).join('')+'</section>':'');
+ return html+(falls.length?'<section class="box"><h4>Fall incident details</h4>'+falls.map(i=>'<p>'+mgEscape(i.primaryCause)+' · '+mgEscape(i.fallType)+' · '+mgEscape(tb52FallIntensity(i))+' · '+mgEscape(i.assessment?.urgency||'Ordinary')+' assessment: '+mgEscape(i.assessmentStatus||'pending')+'</p><p>'+mgEscape(i.description52||'')+'</p>'+(tb52ChangeText(i.confidenceChanges)?'<p>'+mgEscape(tb52ChangeText(i.confidenceChanges))+'</p>':'')).join('')+'</section>':'');
 };
 
-function tb52HistoryEntry(event){return {...event,observation:tb52CleanText(event.observation||event.kind),cause:tb52CleanText(event.cause),consequence:event.changes?tb52ChangeText(event.changes):tb52CleanText(event.consequence)};}
+function tb52HistoryEntry(event){return {...event,observation:[tb52CleanText(event.observation||event.kind),tb52FallIntensity(event.incident)].filter(Boolean).join(' '),cause:tb52CleanText(event.cause),consequence:event.changes?tb52ChangeText(event.changes):tb52CleanText(event.consequence)};}
 const TB52_HISTORY=rbHistoryMarkup;rbHistoryMarkup=function(h){return TB52_HISTORY(h).replace(/<p>(.*?)<\/p>/g,(html,text)=>tb52SilentStatText(text)?'':html);};
 rbDescribeChanges=function(h,s){return tb52ChangeText(rbEvidence(h,s).latest?.changes||{});};

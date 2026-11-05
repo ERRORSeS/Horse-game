@@ -25,44 +25,44 @@
     {
       "name": "Rider-only significant stop, stability 30",
       "trials": 10000,
-      "expectedPercent": 65,
-      "observedPercent": 65.16,
-      "count": 6516
+      "expectedPercent": 22.5,
+      "observedPercent": 22.43,
+      "count": 2243
     },
     {
       "name": "Rider-only significant stop, stability 95",
       "trials": 10000,
-      "expectedPercent": 24.750000000000004,
-      "observedPercent": 24.46,
-      "count": 2446
+      "expectedPercent": 8.25,
+      "observedPercent": 8.57,
+      "count": 857
     },
     {
       "name": "Horse fall after actual slip",
       "trials": 10000,
-      "expectedPercent": 8,
-      "observedPercent": 8.21,
-      "count": 821
+      "expectedPercent": 3,
+      "observedPercent": 3.09,
+      "count": 309
     },
     {
       "name": "Bolt escalation after significant spook",
       "trials": 10000,
       "expectedPercent": 30,
-      "observedPercent": 29.959999999999997,
-      "count": 2996
+      "observedPercent": 30.04,
+      "count": 3004
     },
     {
       "name": "Horse fall after serious jumping disruption",
       "trials": 10000,
-      "expectedPercent": 14,
-      "observedPercent": 14.19,
-      "count": 1419
+      "expectedPercent": 5,
+      "observedPercent": 5.19,
+      "count": 519
     },
     {
       "name": "Rotational subtype among serious jumping horse falls",
-      "trials": 1419,
+      "trials": 519,
       "expectedPercent": 15,
-      "observedPercent": 16.34954193093728,
-      "count": 232
+      "observedPercent": 18.11175337186898,
+      "count": 94
     }
   ]
 }

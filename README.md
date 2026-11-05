@@ -179,3 +179,15 @@ The 140 existing, 88 Engine 5.1 and 32 Engine 5.2 narrative rules describe recor
 Validation: `npm test`, `npm run test:behavior5-simulation` and `npm run test:behavior51-simulation`. See [the 5.1 implementation report](TRAINING-BEHAVIOR51-REPORT.md) and [conditional incident simulation results](outputs/training-behavior51-simulation.json). The [5.0 report](TRAINING-BEHAVIOR5-REPORT.md) records the historical rules superseded by this addendum.
 
 See [the 5.2 investigation and validation report](TRAINING-BEHAVIOR52-REPORT.md). Run `npm run test:behavior52-simulation` for the conditional severity distribution.
+
+### Fall balance, recovery and result displays
+
+The latest balance patch lowers incident-related fall probabilities. With Seat Stability and Balance both at 60, refusal/run-out falls use 15% (previously 45%), significant spook/bolt falls 13% (previously 40%), significant buck/rear falls 17% (previously 50%), and major disruptions 22% (previously 65%). Existing stability multipliers still apply, with a 35% cap. Conditional horse-fall chances are 3% after a slip, 4% after major imbalance, 5% after a serious jumping disruption and 6% with severe footing plus an incident. These supersede the historical 5.1 probability values. Severity distributions and the conditional rotational subtype remain in place; a fall still requires its existing assessment.
+
+Horse cards show a single **base refusal/run-out risk per jump**, with avoidance and percentage rounded to one decimal for display, for example `12.3/100` and `30.7% per jump`. Stored values and the actual rider-adjusted probability keep their precision. Every actual fall now displays **Fall intensity: Minor / Moderate / Serious / Critical** in the immediate outcome, report and history.
+
+A genuine walk-break or circle-away recovery lowers current tension and can lower jumping avoidance by 1–2 while adding 0.5–1 to the relevant confidence. Existing weighted zero-improvement outcomes remain. All actions share the live horse values; an unresolved refusal can improve once even at zero tension, but repeated settled clicks cannot farm learning. Medical restrictions still prevent permanent recovery awards.
+
+Show results and saved histories display **Eliminated — Fall** or **Eliminated — Refusal**, preserving the recorded reason through eventing phases and queued results. Fall eliminations include the recorded intensity. Unknown historical reasons remain unspecified. Scores, faults, refusal limits and prizes follow the existing rules.
+
+`npm test` includes seven additional integration groups in `tests/fall-recovery-display.test.cjs`. The refusal/course simulation preserves the existing refusal rates; the updated 80,000-trial incident simulation confirms the reduced fall rates. Chromium checks cover the actual card, walk-break control, intensity feedback, both elimination causes and cold save/reload.

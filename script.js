@@ -6097,6 +6097,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   let penaltiesText = '';
   let timeScoreText = '';
   let eliminated = false;
+  let eliminationReason = '';
   let rails = 0;
   let refusals = 0;
   let overSeconds = 0;
@@ -6124,6 +6125,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
       refusals = Math.max(0, rpgRoundStats.refusals || 0);
       faults = Math.max(0, rpgRoundStats.faults || 0);
       eliminated = rpgRoundStats.eliminated === true;
+      if (eliminated) eliminationReason = rpgRoundStats.eliminationReason || '';
       if (eliminated) {
         score = 0;
         penaltiesText = 'Eliminated';
@@ -6137,6 +6139,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
       }
     } else if (fall || refusals >= 2 || rnd(1, 100) <= bridleBitFailureRisk) {
       eliminated = true;
+      eliminationReason = fall ? 'fall' : refusals >= 2 ? '2 refusals' : 'Equipment';
       score = 0;
       penaltiesText = 'Eliminated';
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -6155,6 +6158,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
     score = pct;
     if (rpgRoundStats?.eliminated) {
       eliminated = true;
+      eliminationReason = rpgRoundStats.eliminationReason || '';
       score = 0;
       penaltiesText = 'Eliminated';
       timeScoreText = 'Eliminated';
@@ -6176,6 +6180,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
       refusals = Math.max(0, rpgRoundStats.refusals || 0);
       const penalties = Math.max(0, rpgRoundStats.faults || 0) + overSeconds * 0.4;
       eliminated = rpgRoundStats.eliminated === true;
+      if (eliminated) eliminationReason = rpgRoundStats.eliminationReason || '';
       if (eliminated) {
         score = 0;
         penaltiesText = 'Eliminated';
@@ -6189,6 +6194,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
       }
     } else if (fall || refusals >= 3 || rnd(1, 100) <= bridleBitFailureRisk) {
       eliminated = true;
+      eliminationReason = fall ? 'fall' : refusals >= 3 ? '3 refusals' : 'Equipment';
       score = 0;
       penaltiesText = 'Eliminated';
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -6203,6 +6209,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   } else if (discipline === 'hunter') {
     faults = rpgRoundStats ? Math.max(0, rpgRoundStats.faults || 0) : clamp(rnd(0, 5 + Math.max(0, temperament.penaltyBias + bondMod.penaltyBias)) - Math.floor((dress.Flowiness + dress.Balance + jump.Striding + jump.Structure) / 90) + (hotBloodedPenalty ? 3 : 0) + (excitablePenalty ? 1 : 0), 0, 12);
     eliminated = rpgRoundStats ? rpgRoundStats.eliminated === true : rnd(1, 100) <= bridleBitFailureRisk;
+    if (eliminated) eliminationReason = rpgRoundStats ? rpgRoundStats.eliminationReason || '' : 'Equipment';
     if (eliminated) {
       score = 0;
       penaltiesText = 'Eliminated';
@@ -6217,6 +6224,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
   }
 
   if(discipline==='dressage'&&!eliminated){pct=clamp(pct+equipmentModifiers(horse,'dressage').dressScore,0,100);score=pct;penaltiesText=`${pct.toFixed(2)}%${faults?'':' (Clear Test)'}`;timeScoreText=`${pct.toFixed(2)}%`;resultText=penaltiesText;}
+  if (eliminated && eliminationReason) resultText = 'Eliminated — '+(typeof showEliminationReason==='function'?showEliminationReason({eliminationReason}):eliminationReason);
   const placingBase = Math.ceil(((100 - score) / 100) * fieldSize);
   const placing = clamp(placingBase + rnd(0, 2), 1, fieldSize);
   const idx = levelIndex(discipline, level);
@@ -6235,6 +6243,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
 
   return {
     score,
+    ...(eliminated ? {eliminated:true,eliminationReason} : {}),
     placing: eliminated ? fieldSize : placing,
     prize: eliminated ? 0 : prize,
     resultText,
@@ -6802,7 +6811,9 @@ function resolveCompetitionRpgChoice(session, horse, choiceIndex) {
     eventText: `${cap(step.stage.replace('_', ' '))}: ${variant.title}`,
     chances: { success: successChance, partial: neutralChance, fail: failChance }
   });
-  session.feedback = `${variant.title}: ${displayOutcome}`;
+  const fallIncident=session.incidents?.find(i=>i.fell&&i.attempt===session.stepIndex);
+  const fallIntensity=typeof tb52FallIntensity==='function'?tb52FallIntensity(fallIncident):'';
+  session.feedback = `${variant.title}: ${displayOutcome}${fallIntensity?' · '+fallIntensity:''}`;
   session.awaitingAdvance = true;
 }
 
@@ -6918,6 +6929,7 @@ function resolvePendingCompetitions(horse) {
       placing: result.placing,
       prize: result.prize,
       resultText: result.resultText,
+      ...(result.eliminated ? {eliminated:true,eliminationReason:result.eliminationReason||''} : {}),
       status: result.status || null,
       eventId: entry.eventId, eventName: entry.eventName,
       disqualificationReason: result.disqualificationReason,
