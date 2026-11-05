@@ -21,11 +21,11 @@ check('walk breaks share live recovery with reassessment and improve confidence 
  while(s.tension>0)t2break(h,s);const settled=JSON.stringify(b);for(let n=0;n<8;n++)t2break(h,s);if(JSON.stringify(b)!==settled)throw Error('settled farming');
  }finally{tbRandom=original;}
 }`);
-check('walk recovery handles unresolved calm refusals once, flatwork context, zero outcomes and medical restrictions',`{
+check('walk recovery handles unresolved calm refusals once, flatwork context, minimum recovery and medical restrictions',`{
  ${ready} const make=(discipline,id)=>{const s=t2newSession(h,{discipline,exerciseId:id});s.phase='main';s.attempts=1;s.lastResult=5;s.tension=0;s.log.push({exerciseId:id,resultIndex:5});tbRecord(h,s,'refusal',discipline,false);return s;};const original=tbRandom,medical=tbMedical;
  try{tbRandom=()=>.1;const s=make('jumping','crossrail'),b=rrHorse(h).learned,avoid=b['Learned Fence Avoidance'];t2break(h,s);if(b['Learned Fence Avoidance']!==avoid-2)throw Error('calm unresolved refusal');const before=JSON.stringify(b);t2break(h,s);if(JSON.stringify(b)!==before)throw Error('same concern farmed');
  const flat=make('flatwork','large-circle');flat.tension=25;const jump=b['Jump Confidence'],fence=b['Learned Fence Avoidance'],confidence=b['Flatwork Confidence'];t2break(h,flat);if(b['Flatwork Confidence']<=confidence||b['Jump Confidence']!==jump||b['Learned Fence Avoidance']!==fence)throw Error('wrong recovery context');
- const zero=make('jumping','crossrail');zero.tension=25;tbRandom=()=>.9;const values=JSON.stringify(b);t2break(h,zero);if(zero.tension>=25||JSON.stringify(b)!==values)throw Error('zero outcome');
+ const zero=make('jumping','crossrail');zero.tension=25;tbRandom=()=>.9;const previousAvoidance=b['Learned Fence Avoidance'],previousConfidence=b['Jump Confidence'];t2break(h,zero);if(zero.tension>=25||b['Learned Fence Avoidance']!==previousAvoidance-1||b['Jump Confidence']!==previousConfidence)throw Error('minimum avoidance recovery');
  const restricted=make('jumping','crossrail');restricted.tension=25;tbRandom=()=>.1;tbMedical=()=>true;const restrictedValues=JSON.stringify(b);t2break(h,restricted);if(restricted.tension>=25||JSON.stringify(b)!==restrictedValues)throw Error('medical recovery');
  }finally{tbRandom=original;tbMedical=medical;}
 }`);
