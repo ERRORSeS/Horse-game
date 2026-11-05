@@ -244,7 +244,7 @@ const TB51_REPORT=t2reportMarkup;t2reportMarkup=function(report){
 };
 const TB51_RENDER=renderTraining;renderTraining=function(){
  TB51_RENDER();const s=t2state().session,h=s&&t2findHorse(s.horseId),node=document.getElementById('training')?.querySelector('[data-behavior5-status]');
- if(rrEnabled()&&h&&node)node.textContent+=' · Effective Trust for '+rrSettings().riderId+': '+tb51EffectiveTrust(h).toFixed(1)+' · Footing: '+tb51Footing(s).classification;
+ if(rrEnabled()&&h&&node)node.textContent+=' · Effective Trust for '+(typeof rrCurrentRiderName==='function'?rrCurrentRiderName():rrSettings().riderId)+': '+tb51EffectiveTrust(h).toFixed(1)+' · Footing: '+tb51Footing(s).classification;
  if(h&&t2xAwaitingRemount(s)){
   const box=document.createElement('section');box.className='box';box.setAttribute('data-fall-choice','');
   const text=document.createElement('p');text.textContent='The rider fell. Choose whether to get back on or use End Session.';box.appendChild(text);

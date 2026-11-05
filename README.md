@@ -211,3 +211,11 @@ See [training, show and lesson-horse validation](TRAINING-LEASE-UPDATE.md).
 The barn Train button opens the active leased copy, and older saved leases recover their player-owned availability flags. The source remains unavailable to the lesson program while leased.
 
 A qualifying completed session now totals +3–5 in its main technical skill and +1.5–2.0 in its relevant riding attribute, including exercise-led sessions. These amounts include progress already earned during the lesson. Actual relevant work is required; short, empty, unsuccessful or unrelated lessons do not receive a completion award. Genetic skill ceilings and the 10-point riding-attribute maximum still apply. Completion rewards do not alter Behavior & Temperament scores, and cannot be claimed again by finishing or viewing a report twice or reloading a save.
+
+### Saved riders and time skipping
+
+Settings → Rider Realism → Saved riders lets you create, name and select multiple riders. Each profile keeps its overall level, seven abilities and all four discipline experience levels. Save Rider Realism saves the current profile; switching or creating a rider also saves current form edits. New riders copy the current values so they can then be edited independently. Names can change while the rider’s underlying identity stays stable, preserving rider-specific trust and historical events. Existing rider settings migrate into the first profile, and profiles travel with normal saves and portable backups.
+
+Skip Day and Skip Month remain enabled during pending veterinary emergencies. The existing medical warnings stay visible and the calendar continues processing care, recovery and medical consequences, allowing treatment that requires time to progress.
+
+Veterinary warnings are shown for acute concerns, documented or observed medical problems, routine checkups, scheduled follow-ups and due vaccination reviews. Each warning links to the affected horse’s veterinary care and can be closed individually or with Close all warnings. Closing a warning does not treat the condition or stop the clock, and the dismissal is saved. New conditions, worsening concerns and new care dates can warn again; improvement alone does not reopen a closed warning. Unobserved non-emergency diagnoses are not revealed by these notices.

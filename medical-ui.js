@@ -18,7 +18,8 @@ const MEDICAL_TRAINING_START=t2start;
 t2start=function(h,draft,...args){if(h){const error=HorseHealth.allowed(csEnsure(h),'ridden',1);if(error)return {ok:false,message:error};HorseHealth.observe(h,'tack',csDay(),`pre:${csDay()}:${h.id}`);}const result=MEDICAL_TRAINING_START(h,draft,...args);if(result.ok&&h){for(const c of h.medicalConditions.filter(c=>c.resolved&&c.medicalClearance))c.returnedToWork=true;}return result;};
 
 const MEDICAL_RENDER=render;
-render=function(...args){const result=MEDICAL_RENDER(...args);medicalFeedback();const pending=medicalPendingEmergency();for(const id of ['skipMonthBtn','skipDayBtn']){const b=document.getElementById(id);if(b){b.disabled=pending;b.title=pending?'Emergency Veterinary Attention Required — review the current findings and treatment choices.':'';}}return result;};
+render=function(...args){const result=MEDICAL_RENDER(...args);medicalFeedback();medicalUpdateSkipControls();return result;};
+function medicalUpdateSkipControls(){const pending=medicalPendingEmergency();for(const id of ['skipMonthBtn','skipDayBtn']){const b=document.getElementById(id);if(b){b.disabled=false;b.title=pending?'Emergency veterinary attention is pending. Time will advance and medical conditions will continue to progress.':'';}}}
 
 function medicalPendingEmergency(){return app.horses.some(h=>!h.deceased&&HorseHealth.current(csEnsure(h)).some(c=>{const d=HorseHealth.definition(c);return d.emergency&&(!c.emergencyAssessed||['surgical-colic','critical-colic','tendon-rupture','unstable-fracture'].includes(c.diagnosis)&&!c.specialistCare&&c.criticalDecision!=='unavailable');}));}
 
