@@ -3,15 +3,25 @@
   'use strict';
   const H=root.HorseHealth;
   const sellers=[['Professional honest seller',30,.90,.97],['Private straightforward owner',30,.85,.97],['Busy professional',15,.87,.95],['Emotionally attached owner',15,.95,1.05],['Overoptimistic advertiser',8,.75,.92],['Deliberately misleading seller',2,.80,.97]];
-  const transports={Local:120,Regional:350,'Long distance':800};
+  const transports={Local:120,Regional:350,'Long distance':800,International:2000,Intercontinental:4500};
   function state(app){return app.sales2 ||= {version:1,sequence:0,listings:[],transactions:[],history:[]};}
+  function reasonForSale(h,direction='buy'){
+    if(typeof h.saleReason==='string'&&h.saleReason.trim())return {code:'owner-provided',text:h.saleReason.trim().slice(0,300)};
+    if(direction==='sell')return {code:'owner-listed',text:'The owner has listed this horse for sale; no further reason has been supplied.'};
+    if(h.retiredForever||h.retiredToBreeding)return {code:'retired',text:'The horse is retired from sport and the owner is seeking an appropriate long-term home.'};
+    if(h.unridable)return {code:'non-ridden-home',text:'The horse is recorded as unrideable and the seller is seeking a non-ridden home.'};
+    if((h.showResults||[]).filter(r=>r.eliminated&&/refusal/i.test(r.eliminationReason||r.resultText||'')).length>=2)return {code:'experienced-rider',text:'Following recorded refusal eliminations, the owner is seeking a more experienced jumping home.'};
+    const reasons=[['relocation','The owner is relocating and cannot take the horse.'],['work-commitments','The owner’s work commitments no longer leave enough time for regular riding.'],['reducing-numbers','The owner is reducing the number of horses they keep.'],['rider-retiring','The current rider is retiring from riding.'],['changed-plans','The owner has changed their competition plans and is selling this horse to a new riding home.']];
+    if(h.age<3||h.requiresBreakingIn)reasons.push(['education-time','The owner cannot commit the time this horse’s early education needs.']);
+    const row=reasons[Math.floor(H.roll(H.hash(h.id+'|sale-reason'),'reason')*reasons.length)];return {code:row[0],text:row[1]};
+  }
   function list(app,horse,ask,day,direction='buy'){
     const s=state(app),existing=s.listings.find(l=>l.horseId===horse.id&&['Listing Active','Reserved'].includes(l.status));if(existing)return existing;
     if(!Number.isSafeInteger(ask)||ask<=0)throw new Error('A positive whole-number asking price is required.');
     if(direction==='sell'&&!app.horses.some(h=>h.id===horse.id&&h.owner==='Your Stable'&&!h.isLeased))throw new Error('Only an owned horse can be listed.');
     H.ensure(horse,day);
     const id=`listing-${++s.sequence}`,seed=H.hash(horse.id+'|seller'),value=H.roll(seed,'type')*100;let cumulative=0;const row=sellers.find(r=>(cumulative+=r[1])>value)||sellers[0];
-    const listing={id,horseId:horse.id,horse,ask,reserve:Math.round(ask*(row[2]+H.roll(seed,'reserve')*(row[3]-row[2]))),sellerType:row[0],seller:direction==='sell'?'Your Stable':horse.owner||'Private owner',direction,status:'Listing Active',date:day,trialAvailable:horse.age>=3&&!horse.requiresBreakingIn,recordsAvailable:H.roll(seed,'records')>.2,location:'Local',claimedLevel:horse.showJumpingLevel||horse.jumpingLevel||'Schooling level unverified',disclosures:H.publicView(horse).confirmed,conversation:[]};
+    const listing={id,horseId:horse.id,horse,ask,reserve:Math.round(ask*(row[2]+H.roll(seed,'reserve')*(row[3]-row[2]))),sellerType:row[0],seller:direction==='sell'?'Your Stable':horse.owner||'Private owner',direction,status:'Listing Active',date:day,trialAvailable:horse.age>=3&&!horse.requiresBreakingIn,recordsAvailable:H.roll(seed,'records')>.2,location:'Local',saleReason:reasonForSale(horse,direction),claimedLevel:horse.showJumpingLevel||horse.jumpingLevel||'Schooling level unverified',disclosures:H.publicView(horse).confirmed,conversation:[]};
     s.listings.push(listing);return listing;
   }
   function inquiry(app,id,day){const s=state(app),l=s.listings.find(l=>l.id===id);if(!l||l.status!=='Listing Active')return null;let tx=s.transactions.find(t=>t.listingId===id&&!['Cancelled','Withdrawn','Complete','Declined'].includes(t.status));if(tx)return tx;
@@ -57,7 +67,7 @@
       case 'farrier':text=h.hoofHealth.history.length?`Last recorded service: ${h.hoofHealth.history.at(-1).service}.`:'The hoof-care history is incomplete.';break;
       case 'travel':text=travelReply(l);break;
       case 'tack':text=`The supplied tack record lists ${Object.values(h.tack||{}).filter(Boolean).join(', ')||'no verified equipment'}. Included equipment must be agreed separately.`;break;
-      case 'reason':text='The recorded reason for sale is a change in the owner’s available time.';break;
+      case 'reason':l.saleReason ||= reasonForSale(h,l.direction);text='Reason for sale: '+l.saleReason.text;break;
       case 'trot-up':case 'lunge-observation':{if(H.allowed(h,'ridden',1))return {ok:false,message:'Movement assessment requires veterinary clearance before further exercise.'};const found=H.observe(h,topic==='trot-up'?'trot':'circle',day,`${tx.id}:${topic}`);text=found.map(o=>o.text).join(' ')||'No new movement finding was observed; this does not establish soundness.';break;}
       case 'viewing':if(tx.contract)return {ok:false,message:'The contract is already prepared. Complete or cancel it before arranging another viewing.'};tx.viewed=true;tx.status='Viewing Completed';text='You watch the horse being handled. A personal trial and independent examination are optional.';H.observe(h,'stall',day,`${tx.id}:viewing-close`);H.observe(h,'walk',day,`${tx.id}:viewing`);break;
       default:return {ok:false,message:'Choose an available conversation topic.'};
@@ -69,9 +79,12 @@
     if(amount<Math.min(l.reserve,l.ask)){tx.status='Negotiation';return {ok:false,message:`The offer was declined. The counteroffer is $${Math.min(l.reserve,l.ask)}.`};}
     tx.offer=amount;tx.status='Offer Accepted';return {ok:true,message:'The price is agreed. Review the contract before signing.'};
   }
-  function contract(app,tx,day,transport='Local',expedited=false){if(!active(app,tx)||tx.offer===null||!transports[transport])return {ok:false,message:'Agree a price and valid transport arrangement first.'};
+  function contract(app,tx,day,transport=null,expedited=false){const source=listing(app,tx);transport ||= transports[source?.location]?source.location:'Local';if(!active(app,tx)||tx.offer===null||!Number.isFinite(transports[transport])||tx.direction==='buy'&&transports[transport]<(transports[source?.location]||transports.Local))return {ok:false,message:'Agree a price and valid transport arrangement first.'};
     if(tx.contract)return {ok:true,contract:tx.contract};
     const l=listing(app,tx);tx.contract={horseId:l.horseId,registeredName:l.horse.name,seller:l.seller,buyer:tx.direction==='buy'?'Your Stable':tx.buyerName||'NPC Buyer',price:tx.offer,deposit:0,balance:tx.offer,equipment:[],disclosedConditions:H.copy([...new Map([...l.disclosures,...H.publicView(l.horse).confirmed].map(d=>[d.conditionId,d])).values()]),ppe:tx.ppe?H.copy(tx.ppe):'Not requested; buyer accepts examination uncertainty',transferDate:day,transport,transportCost:tx.direction==='buy'?Math.round(transports[transport]*(expedited?1.25:1)):0,expedited,sellerSigned:tx.direction==='buy',buyerSigned:tx.direction==='sell'};tx.status='Contract Draft';return {ok:true,contract:tx.contract};
+  }
+  function validTransport(l,c){
+    const fee=transports[c.transport];return Number.isFinite(fee)&&c.transportCost===(l.direction==='buy'?Math.round(fee*(c.expedited?1.25:1)):0)&&(l.direction!=='buy'||fee>=(transports[l.location]||transports.Local));
   }
   function validEquipment(l,c){
     const equipment=c.equipment||[],ids=new Set();let total=0;
@@ -79,12 +92,12 @@
     return (c.equipmentCost||0)===total;
   }
   function sign(app,tx,confirmed){if(!active(app,tx)||tx.status!=='Contract Draft'||confirmed!==true)return {ok:false,message:'Review and explicitly confirm the contract signature.'};const l=listing(app,tx),c=tx.contract;
-    if(!validEquipment(l,c)||c.horseId!==l.horseId||c.registeredName!==l.horse.name||c.price!==tx.offer||c.balance+c.deposit!==c.price)return {ok:false,message:'Contract identity or price differs from the agreed listing. Recreate the contract.'};
+    if(!validEquipment(l,c)||!validTransport(l,c)||c.horseId!==l.horseId||c.registeredName!==l.horse.name||c.price!==tx.offer||c.balance+c.deposit!==c.price)return {ok:false,message:'Contract identity or price differs from the agreed listing. Recreate the contract.'};
     c.sellerSigned=true;c.buyerSigned=true;tx.status='Contract Signed';return {ok:true};
   }
   function pay(app,tx,day){if(tx.paid)return {ok:true,receipt:tx.receipt};const l=listing(app,tx),c=tx.contract;
     if(!active(app,tx)||tx.status!=='Contract Signed'||!c?.sellerSigned||!c?.buyerSigned)return {ok:false,message:'A current signed contract is required.'};
-    if(!validEquipment(l,c)||c.horseId!==l.horseId||c.price!==tx.offer||c.registeredName!==l.horse.name)return {ok:false,message:'Contract details have changed.'};
+    if(!validEquipment(l,c)||!validTransport(l,c)||c.horseId!==l.horseId||c.price!==tx.offer||c.registeredName!==l.horse.name)return {ok:false,message:'Contract details have changed.'};
     const isOwned=app.horses.some(h=>h.id===l.horseId);if((tx.direction==='buy'&&isOwned)||(tx.direction==='sell'&&!isOwned))return {ok:false,message:'Ownership no longer matches this transaction.'};
     const equipmentCost=c.equipmentCost||0;if(!Number.isSafeInteger(equipmentCost)||equipmentCost<0)return {ok:false,message:'Invalid equipment price.'};const total=c.price+c.transportCost+equipmentCost;if(tx.direction==='buy'&&app.money<total)return {ok:false,message:'Insufficient funds for the price and agreed transport.'};
     // Validate everything before the synchronous money mutation. Delivery is separate and idempotent.
@@ -187,5 +200,5 @@
     const previous=tx.deletedConversations?.pop();if(previous)tx.conversation=[...previous,...(tx.conversation||[])];
     tx.conversationDeleted=false;return {ok:true,message:'Conversation restored.'};
   }
-  root.HorseSales={advanceBuyers,respondOffer,editPrice,withdrawListing,completeSale,scheduleMarketExit,deleteConversation,restoreConversation,advanceMarket,sellers,transports,state,list,inquiry,listing,active,say,offer,contract,sign,pay,deliver,cancel,ppe};if(typeof module!=='undefined')module.exports=root.HorseSales;
+  root.HorseSales={reasonForSale,advanceBuyers,respondOffer,editPrice,withdrawListing,completeSale,scheduleMarketExit,deleteConversation,restoreConversation,advanceMarket,sellers,transports,state,list,inquiry,listing,active,say,offer,contract,sign,pay,deliver,cancel,ppe};if(typeof module!=='undefined')module.exports=root.HorseSales;
 })(globalThis);
