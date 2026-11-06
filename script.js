@@ -398,6 +398,7 @@ function createLessonHorse(barn) {
   horse.leaseLocked = true;
   horse.feedPlan = [];
   horse.turnoutAssignmentHours = 0;
+  applyBreedPotential(horse);
   stallPreferences(horse);
   mgSizing(horse);
   return horse;
@@ -2211,20 +2212,21 @@ const GENE_KEYS = ['extension', 'agouti', 'cream', 'dun', 'gray', 'champagne', '
 function randomAlleles(dominant, recessive, opts = {}) {
   const chanceDominant = opts.chanceDominant ?? 22;
   const chanceHomoDominant = opts.chanceHomoDominant ?? 4;
-  const roll = rnd(1, 100);
-  if (roll <= chanceHomoDominant) return `${dominant}/${dominant}`;
-  if (roll <= chanceDominant) return rnd(1, 100) <= 50 ? `${dominant}/${recessive}` : `${recessive}/${dominant}`;
+  const roll = Math.random() * 100;
+  if (roll < chanceHomoDominant) return `${dominant}/${dominant}`;
+  if (roll < chanceDominant) return rnd(1, 100) <= 50 ? `${dominant}/${recessive}` : `${recessive}/${dominant}`;
   return `${recessive}/${recessive}`;
 }
 
-function randomGenetics() {
-  return {
+function randomGenetics(breed = '') {
+  const warmblood = BREEDS.slice(0, 19).includes(breed);
+  const genetics = {
     extension: randomAlleles('E', 'e', { chanceDominant: 76, chanceHomoDominant: 24 }),
     agouti: randomAlleles('A', 'a', { chanceDominant: 68, chanceHomoDominant: 20 }),
-    cream: randomAlleles('Cr', 'n', { chanceDominant: 30, chanceHomoDominant: 5 }),
+    cream: randomAlleles('Cr', 'n', { chanceDominant: warmblood ? 8 : 30, chanceHomoDominant: warmblood ? 0.2 : 5 }),
     dun: randomAlleles('D', 'n', { chanceDominant: 18, chanceHomoDominant: 3 }),
     gray: randomAlleles('G', 'n', { chanceDominant: 16, chanceHomoDominant: 4 }),
-    champagne: randomAlleles('Ch', 'n', { chanceDominant: 12, chanceHomoDominant: 2 }),
+    champagne: randomAlleles('Ch', 'n', { chanceDominant: warmblood ? 1 : 12, chanceHomoDominant: warmblood ? 0.1 : 2 }),
     pearl: randomAlleles('Prl', 'n', { chanceDominant: 9, chanceHomoDominant: 2 }),
     roan: randomAlleles('Rn', 'n', { chanceDominant: 20, chanceHomoDominant: 4 }),
     appaloosa: randomAlleles('Lp', 'n', { chanceDominant: 18, chanceHomoDominant: 4 }),
@@ -2233,6 +2235,11 @@ function randomGenetics() {
     splash: randomAlleles('SW', 'n', { chanceDominant: 13, chanceHomoDominant: 2 }),
     sabino: randomAlleles('Sb', 'n', { chanceDominant: 16, chanceHomoDominant: 3 })
   };
+  if (breed === 'Friesian') {
+    genetics.extension = rnd(1, 100) <= 50 ? 'E/E' : 'E/e';
+    for (const gene of GENE_KEYS.filter(gene => !['extension', 'agouti'].includes(gene))) genetics[gene] = 'n/n';
+  }
+  return genetics;
 }
 
 function splitGenePair(pair, fallbackA, fallbackB) {
@@ -2365,6 +2372,10 @@ function resolveWhitePattern(genetics) {
 }
 
 function resolvePhenotypeFromGenetics(genetics, breed = '') {
+  if (breed === 'Friesian') {
+    const legs = Object.fromEntries(['FR', 'FL', 'BR', 'BL'].map(leg => [leg, 'None']));
+    return {coat: normalizeCoatShade(isPresent(genetics.agouti, 'A') ? 'Bay' : 'Black'), marking: 'None', marking2: 'None', faceMarking: 'None', legMarkings: legs, socks: socksFromLegMarkings(legs), modifiers: Object.fromEntries(Object.keys(randomModifierPack()).map(key => [key, 'None']))};
+  }
   const base = determineBaseCoat(genetics);
   let color = randomCoatShade(base);
   color = applyCream(base, genetics);
@@ -3409,11 +3420,12 @@ function hydrateFromSave(data) {
   ensureBarnState();
 
   app.horses.forEach((h) => {
-    h.genetics = h.genetics && typeof h.genetics === 'object' ? h.genetics : randomGenetics();
+    h.genetics = h.genetics && typeof h.genetics === 'object' ? h.genetics : randomGenetics(h.breed);
     GENE_KEYS.forEach((key) => {
-      if (!h.genetics[key]) h.genetics[key] = randomGenetics()[key];
+      if (!h.genetics[key]) h.genetics[key] = randomGenetics(h.breed)[key];
     });
     const phenotype = resolvePhenotypeFromGenetics(h.genetics, h.breed);
+    applyBreedPotential(h);
     ensureHorseSocial(h);
     h.coat = normalizeCoatShade(h.coat || phenotype.coat);
     h.socks = h.socks || phenotype.socks;
@@ -3591,6 +3603,7 @@ function hydrateFromSave(data) {
       Structure: j.Structure ?? j.Bascule ?? rnd(0, 20)
     };
     applyBreedTraits(h);
+    applyBreedPotential(h);
     h.lastFarrierMonth = Number.isFinite(h.lastFarrierMonth)
       ? h.lastFarrierMonth
       : (Number.isFinite(h.due?.farrierMonth) ? h.due.farrierMonth : app.year * 12 + app.month);
@@ -4196,17 +4209,54 @@ function heightFromBreed(breed) {
   return `${height.toFixed(1)} hh`;
 }
 
+// Individual breed ceilings are saved, and affect ability rather than assigning schooling.
+const BREED_POTENTIAL_LIMITS = {
+  Friesian: {jumping: '1.10', dressage: 'Level One'},
+  'Iberian Horse': {jumping: '1.20', dressage: 'Level Two'},
+  Thoroughbred: {jumping: '1.30', dressage: 'Prix St Georges'},
+  Arabian: {jumping: '1.30', dressage: 'Level Four'}
+};
+function breedPotentialRoll(horse, key) {
+  let hash = 2166136261;
+  for (const char of String(horse.id) + '|' + horse.breed + '|' + key) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return (hash >>> 0) / 4294967296;
+}
+function applyBreedAppearance(horse) {
+  if (horse?.breed !== 'Friesian') return;
+  if (!/^(?:(?:Light|Bluish|True|Dark|Blood|Seal) )?(?:Black|Bay)(?: \((?:light|medium|dark)\))?$/i.test(horse.coat || '')) horse.coat = isPresent(horse.genetics?.agouti, 'A') ? 'Bay (medium)' : 'Black (medium)';
+  horse.marking = horse.marking2 = horse.faceMarking = 'None';
+  horse.legMarkings = Object.fromEntries(['FR', 'FL', 'BR', 'BL'].map(leg => [leg, 'None']));
+  horse.socks = socksFromLegMarkings(horse.legMarkings);
+  horse.modifiers = Object.fromEntries(['sooty', 'brindle', 'rabicano', 'birdcatcher', 'pangare', 'dapples'].map(key => [key, 'None']));
+}
+function applyBreedPotential(horse) {
+  applyBreedAppearance(horse);
+  const limits = BREED_POTENTIAL_LIMITS[horse?.breed];
+  if (!limits || !horse.potential) return;
+  if (horse.breedPotentialProfile?.version !== 1 || horse.breedPotentialProfile.breed !== horse.breed || !horse.breedPotentialProfile.caps) {
+    const profile = {version: 1, breed: horse.breed, caps: {}, exceptions: {}};
+    for (const [discipline, maximum] of Object.entries(limits)) {
+      const levels = SHOW_LEVELS[discipline], normalIndex = levels.indexOf(maximum);
+      const exceptional = breedPotentialRoll(horse, discipline + ':exception') < .03;
+      const index = Math.min(levels.length - 1, normalIndex + (exceptional ? 1 : 0));
+      const upper = index + 1 < levels.length ? requiredSkillBand(discipline, levels[index + 1])[0] - .01 : 100;
+      // Exceptional horses reach one level beyond the usual ceiling; others vary below it.
+      const lower = exceptional ? requiredSkillBand(discipline, levels[index])[0] : 5;
+      profile.caps[discipline] = Math.round((lower + breedPotentialRoll(horse, discipline + ':cap') * (upper - lower)) * 100) / 100;
+      profile.exceptions[discipline] = exceptional;
+    }
+    horse.breedPotentialProfile = profile;
+  }
+  for (const [discipline, cap] of Object.entries(horse.breedPotentialProfile.caps)) horse.potential[discipline] = Math.min(horse.potential[discipline] ?? 100, cap);
+}
+
 function applyBreedTraits(horse) {
   if (!horse?.breed) return;
   if (horse.breedTraitsApplied === horse.breed) return;
   if (horse.breed === 'Friesian') {
     horse.marking = 'None';
     const roll = rnd(1, 100);
-    horse.coat = normalizeCoatShade(roll <= 5 ? 'Chestnut (Dark)' : rnd(1, 100) <= 70 ? 'Black' : 'Bay (Dark)');
-    horse.potential.dressage = Math.min(100, horse.potential.dressage + 12);
-    horse.potential.jumping = Math.max(0, horse.potential.jumping - 10);
-    horse.potential.eventing = Math.max(0, horse.potential.eventing - 10);
-    horse.potential.hunter = Math.max(0, horse.potential.hunter - 10);
+    horse.coat = normalizeCoatShade(roll <= 70 ? 'Black' : 'Bay (Dark)');
   }
   horse.breedTraitsApplied = horse.breed;
 }
@@ -4393,6 +4443,7 @@ function requiredSkillBand(discipline, level) {
 }
 
 function effectiveDisciplineSkill(horse, discipline) {
+  applyBreedPotential(horse);
   const raw = horseDisciplineAverage(horse, discipline);
   const talentBoost = horse.extraPotential ? 3 : 0;
   const activeImpact = (horse.illnesses || []).filter((i) => i.active).reduce((sum, i) => sum + (Number(i.impact) || 0), 0);
@@ -4657,7 +4708,7 @@ function baseHorse(type = 'trained', origin = 'player') {
   horse.height = heightFromBreed(horse.breed);
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
-  horse.genetics = randomGenetics();
+  horse.genetics = randomGenetics(horse.breed);
   const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
   horse.coat = normalizeCoatShade(phenotype.coat);
   horse.marking = phenotype.marking;
@@ -4678,6 +4729,7 @@ function baseHorse(type = 'trained', origin = 'player') {
       horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
     });
   }
+  applyBreedPotential(horse);
   stallPreferences(horse);
   mgSizing(horse);
   return horse;
@@ -4826,7 +4878,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     pushReport(`${mare.name}: Normal delivery.`);
   }
 
-  if (dramaticEvents.rareCoat) {
+  if (dramaticEvents.rareCoat && foal.breed !== 'Friesian') {
     foal.coat = normalizeCoatShade(pick(COATS.filter((c) => c !== mare.coat && c !== (sire?.coat || '')) || COATS));
     pushReport(`${mare.name}: ${rnd(1, 100) <= 50 ? WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatA : WATCH_MARE_RARE_EVENT_PROMPTS.rareCoatB}`);
   }
@@ -4870,6 +4922,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     sire.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
   }
 
+  applyBreedPotential(foal);
   newborns.push(foal);
   if (dramaticEvents.twinBirth) {
     const twin = baseHorse('untrained', 'player');
@@ -4906,6 +4959,7 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
       sire.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
     }
     pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.twins}`);
+    applyBreedPotential(twin);
     newborns.push(twin);
   }
   pushReport(`${mare.name} foaled ${foal.name} (${foal.gender}) by ${sireName}.`);
@@ -4924,7 +4978,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
 function seed() {
   app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
   app.saleBarn = [baseHorse('fully', 'npc'), baseHorse('trained', 'npc')].map((h) => {
-    seedShowHistory(h, rnd(1, 3), 10);
+    applySalesAgeSkillBand(h);
+    seedShowHistory(h, rnd(1, 3), highestAllowedLevelIndex(h, 'jumping'));
     h.marking = randomMarking(h.breed, { salesMarketBoost: true });
     return { ...h, owner: 'NPC Stable', price: Math.round(calculateHorsePrice(h, true) * rnd(95, 110) / 100) };
   });
@@ -4942,7 +4997,7 @@ function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
     const discipline = pick(disciplines);
     const levels = SHOW_LEVELS[discipline] || [];
     if (!levels.length) continue;
-    const levelCap = Math.min(levels.length - 1, Math.max(0, maxLevelIndex));
+    const levelCap = Math.min(levels.length - 1, Math.max(0, maxLevelIndex), highestAllowedLevelIndex(horse, discipline));
     const level = levels[rnd(0, levelCap)];
     const placing = rnd(1, 12);
     const score = rnd(58, 98);
@@ -4966,17 +5021,17 @@ function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
 
 
 function applySalesAgeSkillBand(horse) {
-  const age = horse.age || 3;
-  let maxSkill = 95;
-  if (age <= 4) maxSkill = 20;
-  else if (age <= 6) maxSkill = 40;
-  else if (age <= 8) maxSkill = 50;
-  Object.keys(horse.stats.dressage || {}).forEach((k) => {
-    horse.stats.dressage[k] = rnd(0, maxSkill);
-  });
-  Object.keys(horse.stats.jumping || {}).forEach((k) => {
-    horse.stats.jumping[k] = rnd(0, maxSkill);
-  });
+  applyBreedPotential(horse);
+  for (const discipline of ['dressage', 'jumping']) {
+    const maxSkill = Math.min(horse.potential[discipline], horse.age <= 4 && discipline === 'jumping' ? 49.99 - (horse.extraPotential ? 3 : 0) : 100);
+    const center = Math.random() * maxSkill;
+    for (const skill of Object.keys(horse.stats[discipline])) horse.stats[discipline][skill] = Math.max(0, Math.min(maxSkill, center + rnd(-4, 4)));
+  }
+  // Connection contributes 10% of the actual jumping score.
+  if (horse.age <= 4) {
+    const maximum = 49.99 - (horse.extraPotential ? 3 : 0), actual = horseDisciplineAverage(horse, 'jumping');
+    if (actual > maximum) for (const skill of Object.keys(horse.stats.jumping)) horse.stats.jumping[skill] *= Math.max(0, (maximum - horse.stats.dressage.Connection * .1) / Math.max(.01, actual - horse.stats.dressage.Connection * .1));
+  }
 }
 
 function refreshNpcAds() {
