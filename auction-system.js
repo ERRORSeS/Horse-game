@@ -1,15 +1,45 @@
 /* International auctions: bounded collections and persisted, calendar-driven events. */
 const AUCTION_THEMES=[['Mixed Sport Horse Collection',30],['Showjumping Prospects',20],['Dressage Selection',15],['Young Horse Collection',15],['Eventing Prospects',10],['Hunter & Amateur Sport Horses',5],['Experienced Competition Horses',5]];
 const AUCTION_COUNTRIES=[['USA','North America'],['Canada','North America'],['Germany','Europe'],['Netherlands','Europe'],['France','Europe'],['Belgium','Europe'],['Sweden','Europe'],['Denmark','Europe'],['United Kingdom','Europe'],['Australia','Oceania']];
-function auctionState(){const s=app.auctions3 ||= {version:1,sequence:0,collections:[],contracts:[],history:[],notices:[],watchlist:[],page:'Auction Home',nextAt:pastureCalendarHour()};if(!s.collections)s.collections=s.collection?[s.collection]:[];const descriptor=Object.getOwnPropertyDescriptor(s,'collection');if(!descriptor?.get){const initial=s.collection;if(initial&&!s.collections.some(c=>c.id===initial.id))s.collections.push(initial);delete s.collection;Object.defineProperty(s,'collection',{configurable:true,enumerable:false,get(){return this.collections.find(c=>c.id===this.selectedCollection)||this.collections[0]||null;},set(c){this.selectedCollection=c?.id||null;}});}return s;}
+function auctionState(){const s=app.auctions3 ||= {version:1,sequence:0,collections:[],contracts:[],history:[],notices:[],watchlist:[],page:'Auction Home',nextAt:pastureCalendarHour()};if(!s.collections)s.collections=s.collection?[s.collection]:[];const descriptor=Object.getOwnPropertyDescriptor(s,'collection');if(!descriptor?.get){const initial=s.collection;if(initial&&!s.collections.some(c=>c.id===initial.id))s.collections.push(initial);delete s.collection;Object.defineProperty(s,'collection',{configurable:true,enumerable:false,get(){return this.collections.find(c=>c.id===this.selectedCollection)||this.collections[0]||null;},set(c){this.selectedCollection=c?.id||null;}});}if(s.bidFundingVersion!==2){auctionReleaseLegacyHolds(s);s.bidFundingVersion=2;}return s;}
 function auctionAllLots(){return auctionState().collections.flatMap(c=>c.lots);}
 function auctionShipping(country){const home=app.currentBarn?.country||'USA',continent=AUCTION_COUNTRIES.find(c=>c[0]===country)?.[1],homeContinent=AUCTION_COUNTRIES.find(c=>c[0]===home)?.[1]||app.currentBarn?.continent,neighbors={USA:['Canada'],Canada:['USA'],Germany:['Netherlands','France','Belgium','Denmark'],Netherlands:['Germany','Belgium'],France:['Germany','Belgium'],Belgium:['France','Germany','Netherlands'],Sweden:['Denmark'],Denmark:['Germany','Sweden']};return country===home?'Same country':neighbors[home]?.includes(country)?'Neighboring country':continent===homeContinent?'Regional international':'Intercontinental';}
 function auctionRoll(key){return HorseHealth.roll(HorseHealth.hash((app.saveIdentity?.id||'stable')+'|auction'),key);}
 function auctionPick(rows,key){let n=auctionRoll(key)*rows.reduce((s,r)=>s+r[1],0);return rows.find(r=>(n-=r[1])<0)[0];}
 function auctionNotice(key,text){const s=auctionState();if(s.notices.some(n=>n.key===key))return;s.notices.push({key,text,hour:pastureCalendarHour()});s.notices=s.notices.slice(-20);}
 function auctionIncrement(n){return n<5000?250:n<15000?500:n<50000?1000:n<100000?2500:5000;}
-function auctionHeld(){return auctionAllLots().reduce((n,l)=>n+(l.hold||0),0)+auctionState().contracts.reduce((n,c)=>n+(c.held||0),0);}
-function auctionAvailable(except=null){const s=auctionState(),lot=auctionAllLots().find(l=>l.id===except),contract=s.contracts.find(c=>c.lotId===except);return app.money+(lot?.hold||0)+(contract?.held||0);}
+function auctionReleaseLegacyHolds(s){
+ const release=(record,key)=>{const amount=Number(record[key])||0;if(amount<=0)return;app.money+=amount;record[key]=0;s.cashMovements ||= [];s.cashMovements.push({lotId:record.lotId||record.id,kind:'Hold released',amount,reason:'Bids are paid only at purchase',at:pastureCalendarHour()});};
+ for(const l of (s.collections||[]).flatMap(c=>c.lots))release(l,'hold');
+ for(const c of s.contracts||[])if(!c.paid&&!c.delivered)release(c,'held');
+}
+function auctionHeld(){auctionState();return 0;}
+function auctionAvailable(){auctionState();return app.money;}
+function auctionWithdrawBid(lotId){
+ auctionAdvance(pastureCalendarHour());const s=auctionState(),l=auctionAllLots().find(l=>l.id===lotId);
+ if(!l)throw Error('Auction lot not found.');
+ if(l.playerBidWithdrawn)return l;
+ if(l.status!=='Open'||pastureCalendarHour()>=l.closeAt)throw Error('Bidding has ended. Use Don’t buy for an unpaid winning horse.');
+ if(!l.playerBid&&l.leader!=='player')return l;
+ if(l.leader==='player'){
+  const previous=l.history.filter(b=>b.bidder!=='player'&&b.kind!=='Bid withdrawn').sort((a,b)=>b.amount-a.amount)[0];
+  l.bid=previous?.amount||0;l.leader=previous?.bidder||null;
+ }
+ const amount=l.playerBid||0;l.playerBid=0;l.playerBidWithdrawn=true;
+ l.history.push({kind:'Bid withdrawn',amount,bidder:'player',at:pastureCalendarHour()});l.history=l.history.slice(-8);
+ auctionNotice(l.id+':withdrawn:'+l.bidCount,'Bid removed — '+l.horse.name+'.');return l;
+}
+function auctionDeclinePurchase(id){
+ const s=auctionState(),c=s.contracts.find(c=>c.id===id);
+ if(!c)throw Error('Contract not found.');
+ if(c.cancelled)return c;
+ if(c.paid||c.delivered)throw Error('This horse has already been purchased.');
+ c.cancelled=true;c.cancelledAt=pastureCalendarHour();c.status='Purchase Declined';
+ c.history.push({action:'decline',hour:c.cancelledAt});c.history=c.history.slice(-20);
+ const lot=auctionAllLots().find(l=>l.id===c.lotId);if(lot){lot.status='Declined';lot.leader=null;lot.playerBid=0;}
+ for(const collection of s.history){const row=collection.lots.find(l=>l.id===c.lotId);if(row)row.status='Declined';}
+ auctionNotice(c.id+':declined','Purchase declined — '+c.horse.name+'. No purchase payment was taken.');return c;
+}
 // Auction schooling bands affect current presentation only, never genetic potential.
 const AUCTION_SCHOOLING_BANDS={
  jumping:{low:3,medium:6},
@@ -70,9 +100,9 @@ function auctionGenerate(at,slot=0){const s=auctionState(),id='collection:'+ ++s
  }
  s.collections.push(collection);if(!s.collection)s.collection=collection;s.nextAt=at+1440;return collection;
 }
-function auctionBid(lotId,amount){auctionAdvance(pastureCalendarHour());const l=auctionAllLots().find(l=>l.id===lotId),now=pastureCalendarHour();if(!l||now<l.openAt||now>=l.closeAt||l.status!=='Open')throw Error('This lot is not open for bidding.');if(l.leader==='player')throw Error('Your bid is already leading.');const minimum=l.bid?l.bid+auctionIncrement(l.bid):l.startingPrice;if(!Number.isSafeInteger(amount)||amount<minimum)throw Error('Minimum next bid is '+money(minimum)+'.');if(amount>auctionAvailable(l.id))throw Error('Insufficient available funds after other commitments.');auctionRecordBid(l,amount,'player',now);auctionNotice(l.id+':accepted:'+l.bidCount,'Bid Accepted — Lot '+l.number+'.');return l;}
-function auctionRecordBid(l,amount,bidder,at){const outbid=l.leader==='player'&&bidder!=='player',oldHold=l.hold||0;if(l.hold){app.money+=l.hold;l.hold=0;}if(bidder==='player'){app.money-=amount;l.hold=amount;l.playerBid=amount;}const state=auctionState();state.cashMovements ||= [];if(bidder==='player'||outbid)state.cashMovements.push({lotId:l.id,kind:outbid?'Hold released':'Bid hold',amount:bidder==='player'?amount:oldHold,at});l.bid=amount;l.leader=bidder;l.bidCount++;l.history.push({amount,bidder,at});l.history=l.history.slice(-8);if(outbid)auctionNotice(l.id+':outbid:'+l.bidCount,'You Have Been Outbid — Lot '+l.number+'.');}
-function auctionClose(c){for(const l of c.lots){if(l.bid<l.reserve||!l.leader){l.status='Unsold';if(l.hold){app.money+=l.hold;l.hold=0;}continue;}l.status=l.leader==='player'?'Won':'Lost';if(l.status==='Won'){l.origin=auctionShipping(l.country);const costs=auctionCosts(l);auctionState().contracts.push({id:'import:'+l.id,lotId:l.id,collectionId:c.id,number:l.number,horse:l.horse,seller:l.seller,country:l.country,origin:l.origin,estimate:l.estimate,bid:l.bid,held:l.hold||0,costs,status:'Awaiting Contract',signed:false,paid:false,delivered:false,history:[],createdAt:c.closeAt});l.hold=0;auctionNotice(l.id+':won','Winning Bid Confirmed — '+l.horse.name+'. Contract Ready.');}}c.status='Closed';}
+function auctionBid(lotId,amount){auctionAdvance(pastureCalendarHour());const l=auctionAllLots().find(l=>l.id===lotId),now=pastureCalendarHour();if(!l||now<l.openAt||now>=l.closeAt||l.status!=='Open')throw Error('This lot is not open for bidding.');if(l.leader==='player')throw Error('Your bid is already leading.');const minimum=l.bid?l.bid+auctionIncrement(l.bid):l.startingPrice;if(!Number.isSafeInteger(amount)||amount<minimum)throw Error('Minimum next bid is '+money(minimum)+'.');auctionRecordBid(l,amount,'player',now);auctionNotice(l.id+':accepted:'+l.bidCount,'Bid Accepted — Lot '+l.number+'.');return l;}
+function auctionRecordBid(l,amount,bidder,at){const outbid=l.leader==='player'&&bidder!=='player',oldHold=l.hold||0;if(l.hold){app.money+=l.hold;l.hold=0;}if(bidder==='player'){l.playerBid=amount;l.playerBidWithdrawn=false;}const state=auctionState();state.cashMovements ||= [];if(oldHold)state.cashMovements.push({lotId:l.id,kind:'Hold released',amount:oldHold,at});l.bid=amount;l.leader=bidder;l.bidCount++;l.history.push({amount,bidder,at});l.history=l.history.slice(-8);if(outbid)auctionNotice(l.id+':outbid:'+l.bidCount,'You Have Been Outbid — Lot '+l.number+'.');}
+function auctionClose(c){if(c.status==='Closed')return;for(const l of c.lots){if(l.bid<l.reserve||!l.leader){l.status='Unsold';if(l.hold){app.money+=l.hold;l.hold=0;}continue;}l.status=l.leader==='player'?'Won':'Lost';if(l.status==='Won'){l.origin=auctionShipping(l.country);const costs=auctionCosts(l);auctionState().contracts.push({id:'import:'+l.id,lotId:l.id,collectionId:c.id,number:l.number,horseId:l.horse.id,horse:l.horse,seller:l.seller,country:l.country,origin:l.origin,estimate:l.estimate,bid:l.bid,held:l.hold||0,costs,status:'Awaiting Contract',signed:false,paid:false,delivered:false,history:[],createdAt:c.closeAt});l.hold=0;auctionNotice(l.id+':won','Winning Bid Confirmed — '+l.horse.name+'. Contract Ready.');}}c.status='Closed';}
 function auctionCosts(l){const index=['Same country','Neighboring country','Regional international','Intercontinental'].indexOf(l.origin),transport=[350,1000,2500,6000][Math.max(0,index)],premium=Math.round(l.bid*.05);return {bid:l.bid,premium,transport,administration:150,documentation:300,arrivalVet:180,total:l.bid+premium+transport+630};}
 // Normalize riding education without changing bids or medical truth.
 function auctionRepairRidingEducation(l){
@@ -94,15 +124,15 @@ function auctionUpgradeSchooling(l){
 }
 function auctionAdvance(target){const s=auctionState();if(s.processing)return;s.processing=true;try{
  for(const l of s.collections.flatMap(c=>c.lots)){applyBreedAppearance(l.horse);auctionRepairRidingEducation(l);auctionUpgradeSchooling(l);}
- for(const c of s.contracts)if(!c.delivered){restoreBasicRidingEducation(c.horse);syncRidability(c.horse);}
+ for(const c of s.contracts)if(!c.delivered&&!c.cancelled){restoreBasicRidingEducation(c.horse);syncRidability(c.horse);}
  for(const c of s.collections)if(!c.country){c.country=AUCTION_COUNTRIES[Math.floor(auctionRoll(c.id+'country')*AUCTION_COUNTRIES.length)][0];for(const l of c.lots){l.country=c.country;l.origin=auctionShipping(c.country);}}
  if(s.collections.length===1&&target<s.nextAt)auctionGenerate(s.collections[0].previewAt,1);
  while(target>=s.nextAt){for(const c of s.collections){for(const l of c.lots)auctionEstimatedLevels(l);auctionProcessCollection(c,target);}for(const c of s.collections){s.history.push({id:c.id,name:c.name,country:c.country,closeAt:c.closeAt,lots:c.lots.map(l=>({id:l.id,number:l.number,name:l.horse.name,bid:l.bid,status:l.status}))});}s.history=s.history.slice(-18);const at=s.nextAt;s.collections=[];s.collection=null;for(let i=0;i<2;i++)auctionGenerate(at,i);s.selectedCollection=s.collection.id;}
  for(const c of s.collections){for(const l of c.lots)auctionEstimatedLevels(l);auctionProcessCollection(c,target);}
- for(const c of s.contracts)if(c.paid&&!c.delivered&&c.departAt!=null){const elapsed=target-c.departAt;c.status=target>=c.arrivalAt?'Arriving':elapsed<24?'Awaiting Departure':target>=c.arrivalAt-24?'Scheduled Rest/Transit Checkpoint':'In Transit';if(target>=c.arrivalAt)auctionNotice(c.id+':arrived','Horse Arriving — '+c.horse.name+'. Complete the arrival process in Incoming Horses.');}
+ for(const c of s.contracts)if(c.paid&&!c.delivered&&!c.cancelled&&c.departAt!=null){const elapsed=target-c.departAt;c.status=target>=c.arrivalAt?'Arriving':elapsed<24?'Awaiting Departure':target>=c.arrivalAt-24?'Scheduled Rest/Transit Checkpoint':'In Transit';if(target>=c.arrivalAt)auctionNotice(c.id+':arrived','Horse Arriving — '+c.horse.name+'. Complete the arrival process in Incoming Horses.');}
  }finally{delete s.processing;}}
 function auctionProcessCollection(c,target){if(c.status==='Closed')return;if(target>=c.openAt&&target<c.closeAt)c.status='Open';for(const l of c.lots){if(target>=l.openAt&&l.status==='Preview')l.status='Open';while(l.cursor<l.schedule.length&&l.schedule[l.cursor].at<=Math.min(target,l.closeAt)){const e=l.schedule[l.cursor++],minimum=l.bid?l.bid+auctionIncrement(l.bid):l.startingPrice;if(e.bidder!==l.leader&&minimum<=e.max)auctionRecordBid(l,minimum,e.bidder,e.at);}}if(target>=c.closeAt)auctionClose(c);}
-function auctionContract(id,action,values={}){const s=auctionState(),c=s.contracts.find(c=>c.id===id);if(!c)throw Error('Contract not found.');if(action==='sign'){if(!values.accept)throw Error('Review the costs and agreement, then confirm the checkbox.');c.signed=true;if(!c.paid)c.status='Signed — Awaiting Payment';}
+function auctionContract(id,action,values={}){const s=auctionState(),c=s.contracts.find(c=>c.id===id);if(!c)throw Error('Contract not found.');if(action==='decline')return auctionDeclinePurchase(id);if(c.cancelled)throw Error('This purchase was declined.');if(action==='sign'){if(!values.accept)throw Error('Review the costs and agreement, then confirm the checkbox.');c.signed=true;if(!c.paid)c.status='Signed — Awaiting Payment';}
  else if(action==='pay'){if(!c.signed)throw Error('Sign the contract first.');if(c.paid)return c;if(c.costs.total>auctionAvailable(c.lotId))throw Error('Insufficient available funds for the itemized total.');const receipt=HorseHealth.ledger(app,c.id+':payment',c.costs.total-(c.held||0),csDay(),c.horse,[{name:'Auction purchase and itemized import costs',quantity:1,unitPrice:c.costs.total-(c.held||0)}]);if(!receipt)throw Error('Payment failed.');c.paid=true;c.held=0;c.receipt=receipt.number;c.status='Preparing Documents';}
  else if(action==='documents'){if(!c.paid)throw Error('Complete payment first.');c.documentsComplete=true;c.status='Ready for Import Booking';}
  else if(action==='book'){if(!c.documentsComplete)throw Error('Complete the administrative checks first.');if(c.departAt!=null)return c;const index=['Same country','Neighboring country','Regional international','Intercontinental'].indexOf(c.origin),ranges=[[1,3],[3,6],[5,10],[10,18]],r=ranges[Math.max(0,index)],days=r[0]+Math.floor(auctionRoll(c.id+'duration')*(r[1]-r[0]+1));c.departAt=pastureCalendarHour();c.arrivalAt=c.departAt+days*24;c.transportProfile=HorseHealth.copy(transportProfile(c.horse));c.status='Awaiting Departure';auctionNotice(c.id+':book','Import Scheduled — '+c.horse.name+'.');}
@@ -111,7 +141,7 @@ function auctionContract(id,action,values={}){const s=auctionState(),c=s.contrac
  else throw Error('Unknown import action.');c.history.push({action,hour:pastureCalendarHour()});c.history=c.history.slice(-20);return c;}
 const AUCTION_HOUR=advanceOneHour,AUCTION_DAY=advanceOneDay,AUCTION_MONTH=monthlyProgress;
 advanceOneHour=function(...a){const r=AUCTION_HOUR(...a);auctionAdvance(pastureCalendarHour());return r;};advanceOneDay=function(...a){const r=AUCTION_DAY(...a);auctionAdvance(pastureCalendarHour());return r;};monthlyProgress=function(...a){const r=AUCTION_MONTH(...a);auctionAdvance(pastureCalendarHour());return r;};
-const AUCTION_HYDRATE=hydrateFromSave;hydrateFromSave=function(data){const r=AUCTION_HYDRATE(data);app.auctions3=data.auctions3?HorseHealth.copy(data.auctions3):null;if(app.auctions3){for(const l of (app.auctions3.collections||[app.auctions3.collection].filter(Boolean)).flatMap(c=>c.lots))auctionRepairRidingEducation(l);for(const c of app.auctions3.contracts)if(!c.delivered){restoreBasicRidingEducation(c.horse);syncRidability(c.horse);}}if(app.auctions3)for(const c of app.auctions3.contracts)if(c.delivered){const h=app.horses.find(h=>h.id===c.horse.id);if(h)c.horse=h;}return r;};
+const AUCTION_HYDRATE=hydrateFromSave;hydrateFromSave=function(data){const r=AUCTION_HYDRATE(data);app.auctions3=data.auctions3?HorseHealth.copy(data.auctions3):null;if(app.auctions3){auctionState();for(const l of (app.auctions3.collections||[app.auctions3.collection].filter(Boolean)).flatMap(c=>c.lots))auctionRepairRidingEducation(l);for(const c of app.auctions3.contracts)if(!c.delivered&&!c.cancelled){restoreBasicRidingEducation(c.horse);syncRidability(c.horse);}}if(app.auctions3)for(const c of app.auctions3.contracts)if(c.delivered){const h=app.horses.find(h=>h.id===c.horse.id);if(h)c.horse=h;}return r;};
 // Delivered horses serialize once in the owned roster; contracts retain their identity reference.
 const AUCTION_SERIALIZE=serializeAppState;
 serializeAppState=function(){const restored=[];for(const c of app.auctions3?.contracts||[])if(c.delivered&&app.horses.some(h=>h.id===c.horse.id)){restored.push([c,c.horse]);c.horse={id:c.horse.id};}try{return AUCTION_SERIALIZE();}finally{for(const [c,h]of restored)c.horse=h;}};
