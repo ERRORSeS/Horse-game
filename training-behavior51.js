@@ -59,7 +59,7 @@ function tb51Footing(s={}){
  if(typeof explicit==='string'){const value=explicit.toLowerCase();index=/ice|severe|frozen/.test(value)?4:/snow|very wet|high|poor/.test(value)?3:/soft|wet|moderate/.test(value)?2:/damp|low/.test(value)?1:0;}
  else if(explicit&&typeof explicit==='object'&&Number.isFinite(explicit.riskLevel))index=clamp(Math.floor(explicit.riskLevel),0,4);
  else if(location==='Outdoor'){const text=weather.type||'';index=/Ice|Frost|Freezing/i.test(text)?4:/Heavy Rain|Heavy Snow|Storm|Snow/i.test(text)?3:/Rain/i.test(text)?2:weather.precipitation?1:0;}
- return {location,weather:weather.type||'Unknown',wind:location==='Outdoor'?(weather.wind||0):0,index,classification:names[index],description:descriptions[index],slipChance:[4,6,8,13,21][index],explicit:!!explicit};
+ return {location,weather:weather.type||'Unknown',wind:location==='Outdoor'?(weather.wind||0):0,index,classification:names[index],description:descriptions[index],slipChance:[.5,6,8,13,21][index],explicit:!!explicit};
 }
 const TB51_WEATHER_RESTRICTION=t2weatherRestriction;t2weatherRestriction=function(){return '';};
 const TB51_WEATHER_MESSAGES=t2weatherMessages;t2weatherMessages=function(h,location,weather){

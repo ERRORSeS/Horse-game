@@ -42,7 +42,7 @@ check('horse and rotational falls require eligible context, pause for a rider ch
 }`);
 check('weather risk is actual arena footing, all weather remains selectable and player warnings precede work',`{
  resetGame();rrSettings().enabled=true;const h=app.horses[0];h.age=10;h.behavior=800;h.requiresBreakingIn=false;h.medicalConditions=[];h.illnesses=[];app.settings.tackOwnership=false;h.tack={bridle:'Snaffle Bridle',bit:'Loose Ring Snaffle',saddle:'Jumping Saddle',pad:'Basic Cotton Pad'};
- for(const [type,slip]of [['Clear',4],['Rain',8],['Heavy Rain',13],['Snow',13],['Ice',21]]){if(tb51Footing({location:'Outdoor',weather:{type,wind:0}}).slipChance!==slip)throw Error('footing '+type);if(t2weatherRestriction(t2exercise('vertical'),'Outdoor',{type}))throw Error('hard weather block');if(tb51Footing({location:'Indoor',weather:{type,wind:50}}).slipChance!==4)throw Error('indoor exposure');}
+ for(const [type,slip]of [['Clear',.5],['Rain',8],['Heavy Rain',13],['Snow',13],['Ice',21]]){if(tb51Footing({location:'Outdoor',weather:{type,wind:0}}).slipChance!==slip)throw Error('footing '+type);if(t2weatherRestriction(t2exercise('vertical'),'Outdoor',{type}))throw Error('hard weather block');if(tb51Footing({location:'Indoor',weather:{type,wind:50}}).slipChance!==.5)throw Error('indoor exposure');}
  if(tb51Footing({location:'Indoor',footingCondition:'very wet',weather:{type:'Clear'}}).slipChance!==13)throw Error('indoor footing ignored');
  const original=t2weather;try{t2weather=()=>({type:'Heavy Rain',temperature:10,wind:10});const draft={discipline:'jumping',facilityId:'outdoor',lesson:['crossrail'],length:30};let prompts=0;globalThis.confirm=message=>{prompts++;if(!message.includes('Footing:')||!message.includes('Activity:'))throw Error('missing warning context');return false;};const cancelled=t2start(h,draft,true);if(cancelled.ok||t2state().session||prompts!==1)throw Error('quick training bypassed warning');globalThis.confirm=()=>true;const accepted=t2start(h,draft);if(!accepted.ok||!accepted.session.weatherAcknowledged)throw Error('outdoor choice blocked');}finally{t2weather=original;delete globalThis.confirm;}
 }`);
@@ -64,4 +64,20 @@ check('competition jumping incidents use one assessment-aware resolution while p
   if(!s.eliminated||s.roundStats.eliminationReason!=='fall'||s.incidents.length!==1||!h.trainingIncidentAssessment||!s.mountedStopped)throw Error('show fall assessment '+discipline);
   const before=s.incidents.length;tb51ShowIncident(h,s,'Refusal');if(s.incidents.length!==before)throw Error('show replay');
  }
+}`);
+
+check('dry maintained footing has rare slips while damp, wet, snow and ice keep their own rates',`{
+ resetGame();const dry=tb51Footing({location:'Outdoor',weather:{type:'Clear',wind:0}}),indoor=tb51Footing({location:'Indoor',weather:{type:'Rain',wind:0}}),explicit=tb51Footing({location:'Outdoor',footingCondition:'Dry and maintained',weather:{type:'Rain',wind:0}});
+ for(const footing of [dry,indoor,explicit])if(footing.description!=='Dry and maintained'||footing.slipChance!==.5)throw Error('dry footing rate');
+ for(const [condition,chance]of [['Slightly damp',6],['Wet or soft',8],['Very wet',13],['Ice',21]])if(tb51Footing({location:'Indoor',footingCondition:condition,weather:{type:'Clear'}}).slipChance!==chance)throw Error('other footing changed');
+ const original=t2random;let draws=0;try{t2random=()=>{draws++;return .5;};tb51Footing({location:'Indoor',weather:{type:'Clear'}});if(draws)throw Error('viewing footing rolled an incident');}finally{t2random=original;}
+}`);
+check('warm-up and actual exercise checks use the reduced dry-footing risk and still allow rare or wet-footing slips',`{
+ resetGame();rrSettings().enabled=true;app.settings.tackOwnership=false;const h=app.horses[0];h.age=10;h.behavior=800;h.requiresBreakingIn=false;h.medicalConditions=[];h.illnesses=[];h.retiredForever=false;h.retiredToBreeding=false;
+ const original=t2random,e=t2exercise('large-circle');
+ try{for(const warmup of [false,true])for(const [condition,roll,expected]of [['Dry and maintained',.01,false],['Dry and maintained',.0025,true],['Wet or soft',.01,true]]){
+  t2random=original;const s=t2newSession(h,{discipline:'flatwork',exerciseId:e.id,location:'Indoor',length:60});s.phase=warmup?'warmup':'main';s.warmup=15;s.occupancy='Quiet';s.weather={type:'Clear',wind:0,temperature:20};s.footingCondition=condition;const draws=[.99,roll];t2random=()=>draws.shift()??.99;
+  if(warmup){const result=t2warmup(h,s,'walk');if(!result.ok)throw Error('warm-up fixture blocked '+result.message);}else t2xBeforeAttempt(h,s,e);
+  if(Boolean(s.incidents?.some(incident=>incident.kind==='slip'))!==expected)throw Error('wrong actual slip outcome '+condition+' '+warmup+' '+roll);
+ }}finally{t2random=original;}
 }`);
