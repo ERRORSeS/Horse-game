@@ -18,33 +18,53 @@ const AUCTION_SCHOOLING_BANDS={
  hunter:{low:2,medium:5}
 };
 function auctionSchoolingBand(d,level){const i=SHOW_LEVELS[d].indexOf(level),b=AUCTION_SCHOOLING_BANDS[d];return i<=b.low?'low':i<=b.medium?'medium':'high';}
-function auctionSchoolingLimit(h,d){const b=AUCTION_SCHOOLING_BANDS[d];return h.age<5?b.low:h.age<7?b.medium:SHOW_LEVELS[d].length-1;}
-function auctionLevel(h,d,potential=false){if(potential)return SHOW_LEVELS[d][auctionPotentialIndex(h,d)];return SHOW_LEVELS[d][Math.max(0,Math.min(auctionSchoolingLimit(h,d),highestAllowedLevelIndex(h,d),Math.floor(effectiveDisciplineSkill(h,d)/100*(SHOW_LEVELS[d].length-1))))];}
+function auctionSchoolingLimit(h,d){const b=AUCTION_SCHOOLING_BANDS[d];return h.age<5||h.auctionSchoolingBand==='low'?b.low:h.age<7||h.auctionSchoolingBand==='medium'?b.medium:SHOW_LEVELS[d].length-1;}
+function auctionLevel(h,d,potential=false){if(potential)return SHOW_LEVELS[d][auctionPotentialIndex(h,d)];if(h.age<=3||h.requiresBreakingIn)return 'Unstarted';return SHOW_LEVELS[d][Math.max(0,Math.min(auctionSchoolingLimit(h,d),highestAllowedLevelIndex(h,d)))];}
 function auctionLimitTraining(h){
- if(h.age>=7)return;
- let factor=1;
+ if(h.age>=7&&!['low','medium'].includes(h.auctionSchoolingBand))return;
+ let ceiling=100;
  for(const d of Object.keys(AUCTION_SCHOOLING_BANDS)){
   const next=SHOW_LEVELS[d][auctionSchoolingLimit(h,d)+1];
-  const cap=requiredSkillBand(d,next)[0]-(h.extraPotential?3:0)-0.01;
-  factor=Math.min(factor,cap/Math.max(1,horseDisciplineAverage(h,d)));
+  if(next)ceiling=Math.min(ceiling,requiredSkillBand(d,next)[0]-(h.extraPotential?3:0)-.01);
  }
- if(factor<1)for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]*=Math.max(0,factor);
+ // Clamp individual skills; scaling the whole horse would erase already suitable work.
+ for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]=Math.min(group[skill],Math.max(0,ceiling));
 }
 function auctionSchoolingPrice(d,level,key){const [min,max]={low:[15000,25000],medium:[30000,45000],high:[50000,85000]}[auctionSchoolingBand(d,level)];return min+Math.floor(auctionRoll(key+':schooling-price')*((max-min)/250+1))*250;}
-function auctionPotentialIndex(h,d){let index=0;const score=d==='eventing'?Math.min(h.potential.eventing,(h.potential.dressage+h.potential.jumping)/2):h.potential[d];SHOW_LEVELS[d].forEach((level,i)=>{if(score>=requiredSkillBand(d,level)[0])index=i;});return index;}
+function auctionPotentialIndex(h,d){applyBreedPotential(h);let index=0;const score=d==='eventing'?Math.min(h.potential.eventing,(h.potential.dressage+h.potential.jumping)/2):h.potential[d];SHOW_LEVELS[d].forEach((level,i)=>{if(score>=requiredSkillBand(d,level)[0])index=i;});return index;}
 function auctionHorse(key,type,quality){let counter=0;const original=Math.random,rank={Ordinary:[0,60],Promising:[60,70],'Strong prospect':[70,78],'Exceptional prospect':[78,86],'Rare elite':[86,101]}[quality];Math.random=()=>auctionRoll(key+':horse-random:'+counter++);try{let best=null,distance=Infinity;for(let attempt=0;attempt<32;attempt++){const h=baseHorse(type,'npc'),score=Object.values(h.potential).reduce((a,b)=>a+b,0)/4,delta=score<rank[0]?rank[0]-score:score>=rank[1]?score-rank[1]+.01:0;if(delta<distance){best=h;distance=delta;}if(!delta)break;}return best;}finally{Math.random=original;}}
 function auctionDisciplineName(d){return {jumping:'Showjumping',dressage:'Dressage',eventing:'Eventing',hunter:'Hunters'}[d]||d;}
 function auctionFormatLevel(d,level){return auctionDisciplineName(d)+' — '+level+(d==='jumping'&&level!=='Unstarted'?' m':'');}
 function auctionEstimatedLevels(l){if(l.estimates)return l.estimates;const estimates={};for(const d of ['jumping','dressage','eventing','hunter']){if(d===l.discipline){estimates[d]=l.estimate;continue;}const accuracy=auctionPick([['close',60],['optimistic',20],['conservative',15],['inaccurate',5]],l.id+':estimate:'+d),offset=accuracy==='close'?0:accuracy==='optimistic'?1:accuracy==='conservative'?-1:auctionRoll(l.id+':direction:'+d)<.5?-1:1;estimates[d]=SHOW_LEVELS[d][Math.max(0,Math.min(SHOW_LEVELS[d].length-1,auctionPotentialIndex(l.horse,d)+offset))];}l.estimates=estimates;return estimates;}
-function auctionGenerate(at,slot=0){const s=auctionState(),id='collection:'+ ++s.sequence,theme=auctionPick(AUCTION_THEMES,id),country=AUCTION_COUNTRIES[Math.floor(auctionRoll(id+'country')*AUCTION_COUNTRIES.length)][0],size=8+Math.floor(auctionRoll(id+'size')*28),collection={id,theme,country,name:theme,previewAt:at,openAt:at+72,closeAt:at+192+slot*6,status:'Preview',lots:[]};
+// A collection tier selects current schooling, separately from future potential.
+function auctionSchoolHorse(h,key,tier='Normal'){
+ h.auctionTier=tier;
+ if(h.age<=3){h.requiresBreakingIn=true;h.auctionSchoolingBand='unstarted';for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]=Math.min(group[skill],10);return;}
+ const bands=h.age<5?['low']:h.age<7?['low','medium']:tier==='Elite'?['medium','high']:['low','medium','high'];
+ const available=bands.filter(band=>Object.keys(AUCTION_SCHOOLING_BANDS).every(d=>auctionPotentialIndex(h,d)>=(band==='low'?0:band==='medium'?d==='dressage'?4:AUCTION_SCHOOLING_BANDS[d].low+1:AUCTION_SCHOOLING_BANDS[d].medium+1)));
+ if(!available.length)return false;
+ const band=available[Math.min(available.length-1,Math.floor(auctionRoll(key+':schooling-band')*available.length))];
+ h.auctionSchoolingBand=band;
+ const ranges={low:[5,39],medium:[40,69],high:[70,100]},[min,max]=ranges[band];
+ const score=min+auctionRoll(key+':schooling-score')*(max-min);
+ for(const [d,group]of Object.entries(h.stats))for(const skill of Object.keys(group))group[skill]=Math.min(h.potential[d],score);
+ restoreBasicRidingEducation(h);syncRidability(h);auctionLimitTraining(h);
+ return true;
+}
+function auctionGenerate(at,slot=0){const s=auctionState(),id='collection:'+ ++s.sequence,theme=auctionPick(AUCTION_THEMES,id),country=AUCTION_COUNTRIES[Math.floor(auctionRoll(id+'country')*AUCTION_COUNTRIES.length)][0],size=8+Math.floor(auctionRoll(id+'size')*28),collection={id,theme,country,tier:slot%2?'Elite':'Normal',name:(slot%2?'Elite':'Normal')+' · '+theme,previewAt:at,openAt:at+72,closeAt:at+192+slot*6,status:'Preview',lots:[]};
  for(let n=1;n<=size;n++){
-  const key=id+':lot:'+n,ageBand=auctionPick([[0,10],[1,30],[2,30],[3,25],[4,5]],key+'age'),ranges=[[2,3],[4,5],[6,8],[9,12],[13,16]],range=ranges[ageBand],age=range[0]+Math.floor(auctionRoll(key+'years')*(range[1]-range[0]+1)),experience=auctionPick([['Unstarted/young prospect',15],['Green but started',25],['Developing sport horse',30],['Established competition horse',25],['Highly experienced horse',5]],key+'experience'),quality=auctionPick([['Ordinary',25],['Promising',35],['Strong prospect',25],['Exceptional prospect',12],['Rare elite',3]],key+'quality');
-  const h=auctionHorse(key,age<4||experience.startsWith('Unstarted')?'untrained':experience==='Highly experienced horse'?'elite':'trained',quality);h.id=key+':horse';h.age=age;h.owner='International breeder';h.isAuctionHorse=true;h.showResults=[];h.competitionResults=[];if(experience.startsWith('Unstarted'))h.requiresBreakingIn=true;if(age<3){h.requiresBreakingIn=true;for(const group of Object.values(h.stats))for(const skill of Object.keys(group))group[skill]=Math.min(group[skill],10);}
-  restoreBasicRidingEducation(h);syncRidability(h);
-  auctionLimitTraining(h);
+  const key=id+':lot:'+n,ageBand=auctionPick([[0,10],[1,30],[2,30],[3,25],[4,5]],key+'age'),ranges=[[1,3],[4,5],[6,8],[9,12],[13,16]],range=ranges[ageBand],age=range[0]+Math.floor(auctionRoll(key+'years')*(range[1]-range[0]+1)),experience=auctionPick([['Unstarted/young prospect',15],['Green but started',25],['Developing sport horse',30],['Established competition horse',25],['Highly experienced horse',5]],key+'experience'),quality=auctionPick([['Ordinary',25],['Promising',35],['Strong prospect',25],['Exceptional prospect',12],['Rare elite',3]],key+'quality');
+  let h;
+  // Older elite horses must actually have enough potential for medium schooling.
+  for(let attempt=0;attempt<64;attempt++){
+   h=auctionHorse(key+':candidate:'+attempt,age<=3?'untrained':experience==='Highly experienced horse'?'elite':'trained',quality);
+   h.id=key+':candidate:'+attempt+':horse';h.age=age;
+   if(auctionSchoolHorse(h,key,collection.tier)!==false)break;
+  }
+  h.owner='International breeder';h.isAuctionHorse=true;h.showResults=[];h.competitionResults=[];
   HorseHealth.seedSaleHealth(h,Math.floor(at/24));
-  const disciplines=['jumping','dressage','eventing','hunter'],d=theme==='Showjumping Prospects'?'jumping':theme==='Dressage Selection'?'dressage':theme==='Eventing Prospects'?'eventing':theme==='Hunter & Amateur Sport Horses'?'hunter':disciplines.slice().sort((a,b)=>h.potential[b]-h.potential[a])[0],levels=SHOW_LEVELS[d],ceiling=auctionPotentialIndex(h,d),accuracy=auctionPick([['close',60],['optimistic',20],['conservative',15],['inaccurate',5]],key+'estimate'),offset=accuracy==='close'?0:accuracy==='optimistic'?1:accuracy==='conservative'?-1:auctionRoll(key+'direction')<.5?-1:1,estimated=levels[Math.max(0,Math.min(levels.length-1,ceiling+offset))],current=age<3||h.requiresBreakingIn?'Unstarted':auctionLevel(h,d),origin=auctionShipping(country),price=auctionSchoolingPrice(d,current,key),start=price;
-  const lot={schoolingPricingVersion:1,ridingEducationVersion:1,id:key,number:n,collectionId:id,horseId:h.id,horse:h,quality,experience:age<3?'Unstarted/young prospect':experience.startsWith('Unstarted')?'Green but started':experience,discipline:d,current,estimate:estimated,accuracy,origin,country,seller:country+' Sport Breeder '+n,startingPrice:start,reserve:price,bid:0,leader:null,bidCount:0,history:[],status:'Preview',openAt:collection.openAt,closeAt:collection.closeAt,schedule:[],cursor:0};
+  const disciplines=['jumping','dressage','eventing','hunter'],d=theme==='Showjumping Prospects'?'jumping':theme==='Dressage Selection'?'dressage':theme==='Eventing Prospects'?'eventing':theme==='Hunter & Amateur Sport Horses'?'hunter':disciplines.slice().sort((a,b)=>h.potential[b]-h.potential[a])[0],levels=SHOW_LEVELS[d],ceiling=auctionPotentialIndex(h,d),accuracy=auctionPick([['close',60],['optimistic',20],['conservative',15],['inaccurate',5]],key+'estimate'),offset=accuracy==='close'?0:accuracy==='optimistic'?1:accuracy==='conservative'?-1:auctionRoll(key+'direction')<.5?-1:1,estimated=levels[Math.max(0,Math.min(levels.length-1,ceiling+offset))],current=auctionLevel(h,d),origin=auctionShipping(country),price=auctionSchoolingPrice(d,current,key),start=price;
+  const lot={schoolingPricingVersion:2,ridingEducationVersion:2,tier:collection.tier,id:key,number:n,collectionId:id,horseId:h.id,horse:h,quality,experience:age<=3?'Unstarted/young prospect':h.auctionSchoolingBand==='low'?'Green but started':h.auctionSchoolingBand==='high'?'Highly experienced horse':'Developing sport horse',discipline:d,current,estimate:estimated,accuracy,origin,country,seller:country+' Sport Breeder '+n,startingPrice:start,reserve:price,bid:0,leader:null,bidCount:0,history:[],status:'Preview',openAt:collection.openAt,closeAt:collection.closeAt,schedule:[],cursor:0};
   const count=1+Math.floor(auctionRoll(key+'buyers')*3),buyers=Array.from({length:count},(_,i)=>({id:'Buyer '+(i+1),max:Math.round(price*(.7+auctionRoll(key+'budget'+i)*.65)/250)*250}));
   const interest={Ordinary:.25,Promising:.4,'Strong prospect':.55,'Exceptional prospect':.7,'Rare elite':.7}[quality];for(let i=0;i<5&&buyers.length;i++)if(auctionRoll(key+'opportunity'+i)<interest){const buyer=buyers[Math.floor(auctionRoll(key+'bidder'+i)*buyers.length)];lot.schedule.push({at:collection.openAt+1+Math.floor(auctionRoll(key+'time'+i)*119),bidder:buyer.id,max:buyer.max});}lot.schedule.sort((a,b)=>a.at-b.at);lot.bidderCount=count;auctionEstimatedLevels(lot);collection.lots.push(lot);
  }
@@ -56,22 +76,24 @@ function auctionClose(c){for(const l of c.lots){if(l.bid<l.reserve||!l.leader){l
 function auctionCosts(l){const index=['Same country','Neighboring country','Regional international','Intercontinental'].indexOf(l.origin),transport=[350,1000,2500,6000][Math.max(0,index)],premium=Math.round(l.bid*.05);return {bid:l.bid,premium,transport,administration:150,documentation:300,arrivalVet:180,total:l.bid+premium+transport+630};}
 // Normalize riding education without changing bids or medical truth.
 function auctionRepairRidingEducation(l){
- if(l.ridingEducationVersion===1)return;
+ if(l.ridingEducationVersion===2)return;
+ if(l.horse.age<=3){l.horse.auctionTier ||= l.tier||'Normal';l.horse.requiresBreakingIn=true;l.current='Unstarted';l.experience='Unstarted/young prospect';l.ridingEducationVersion=2;return;}
  restoreBasicRidingEducation(l.horse);syncRidability(l.horse);
  if(l.horse.age>=3){l.current=auctionLevel(l.horse,l.discipline);if(l.experience.startsWith('Unstarted'))l.experience='Green but started';}
- l.ridingEducationVersion=1;
+ l.ridingEducationVersion=2;
 }
 // Reprice only untouched listings; never change a bid or purchase already committed.
 function auctionUpgradeSchooling(l){
- if(l.schoolingPricingVersion===1||l.bid>0||!['Preview','Open'].includes(l.status))return;
+ if(l.schoolingPricingVersion===2||l.bid>0||!['Preview','Open'].includes(l.status))return;
+ // Do not invent extra education for an existing lot or change genetic potential.
  auctionLimitTraining(l.horse);
  l.current=l.horse.age<3||l.horse.requiresBreakingIn?'Unstarted':auctionLevel(l.horse,l.discipline);
  const old=l.startingPrice,newPrice=auctionSchoolingPrice(l.discipline,l.current,l.id);
- l.startingPrice=newPrice;l.reserve=newPrice;l.schoolingPricingVersion=1;
+ l.startingPrice=newPrice;l.reserve=newPrice;l.schoolingPricingVersion=2;
  for(const event of l.schedule)event.max=Math.round(event.max*newPrice/Math.max(1,old)/250)*250;
 }
 function auctionAdvance(target){const s=auctionState();if(s.processing)return;s.processing=true;try{
- for(const l of s.collections.flatMap(c=>c.lots)){auctionRepairRidingEducation(l);auctionUpgradeSchooling(l);}
+ for(const l of s.collections.flatMap(c=>c.lots)){applyBreedAppearance(l.horse);auctionRepairRidingEducation(l);auctionUpgradeSchooling(l);}
  for(const c of s.contracts)if(!c.delivered){restoreBasicRidingEducation(c.horse);syncRidability(c.horse);}
  for(const c of s.collections)if(!c.country){c.country=AUCTION_COUNTRIES[Math.floor(auctionRoll(c.id+'country')*AUCTION_COUNTRIES.length)][0];for(const l of c.lots){l.country=c.country;l.origin=auctionShipping(c.country);}}
  if(s.collections.length===1&&target<s.nextAt)auctionGenerate(s.collections[0].previewAt,1);

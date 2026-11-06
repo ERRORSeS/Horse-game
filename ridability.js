@@ -1,14 +1,14 @@
 /* Permanent ridability is independent of age and sporting longevity estimates. */
 function kissingSpines(h){return (h.medicalConditions||[]).find(c=>c.diagnosis==='kissing-spines'||/kissing spines/i.test(c.legacyName||c.name||''));}
 function restoreBasicRidingEducation(h){
- if(!h||h.deceased||h.age<3)return h;
+ if(!h||h.deceased||h.age<3||h.auctionTier&&h.age<=3)return h;
  h.requiresBreakingIn=false;
  h.behavior=Math.max(500,Number(h.behavior)||0);
  return h;
 }
 function syncRidability(h){
  if(!h)return h;
- if(h.isAuctionHorse||h.auctionPurchase)restoreBasicRidingEducation(h);
+ if((h.isAuctionHorse||h.auctionPurchase)&&!(h.age<=3&&h.auctionTier))restoreBasicRidingEducation(h);
  let c=kissingSpines(h);
  const legacy=[...(h.legacyMedicalRecords||[]),...(h.illnesses||[])].find(c=>/kissing spines/i.test(c.name||''));
  if(!c&&legacy){c=HorseHealth.add(h,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true,cause:'Recorded rescue or historical diagnosis'});}
