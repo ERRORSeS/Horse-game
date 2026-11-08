@@ -7,12 +7,13 @@ const refusal=jumpCount>0&&H.roll(seed,'round-refusal')<risk.chance;
 const refusalIndices=learned?Array.from({length:jumpCount},(_,i)=>i).filter(i=>H.roll(seed,'learned-refusal:'+i)<risk.chance):(refusal?[Math.floor(H.roll(seed,'refusal-fence')*jumpCount)]:[]);
 for(const fence of refusalIndices)if(indices.includes(fence)){const at=indices.indexOf(fence),spare=Array.from({length:jumpCount},(_,i)=>i).find(i=>!indices.includes(i)&&!refusalIndices.includes(i));if(spare==null)indices.splice(at,1);else indices[at]=spare;}
 if(unlucky&&!refusalIndices.length&&indices.length===0)indices.push(Math.floor(H.roll(seed,'unlucky-pole')*jumpCount));
-return {version:2,refusalIndices,refusalReason:refusalIndices.length?reason:null,timeFactor:1-((a.balance+a.sensitivity)/20-.5)*(.15+H.roll(seed,'time-weight')*.05),id,jumpCount,chance:clamp(p.chance*riskMultiplier,0,.99),luck,rails:indices.length,indices,applied:[]};}
+return {version:2,refusalIndices,refusalReason:refusalIndices.length?reason:null,timeFactor:timeFactor(h,id),id,jumpCount,chance:clamp(p.chance*riskMultiplier,0,.99),luck,rails:indices.length,indices,applied:[]};}
 function attributes(h){const a=h.training2?.attributes||{};const get=k=>clamp(Number.isFinite(a[k])?a[k]:5,0,10);return {confidence:get('Confidence'),willingness:get('Willingness'),balance:get('Balance'),focus:get('Focus'),sensitivity:get('Sensitivity to Aids')};}
+function timeFactor(h,id){const a=attributes(h),seed=H.hash(h.id+'|'+id);return 1-((a.balance+a.sensitivity)/20-.5)*(.15+H.roll(seed,'time-weight')*.05);}
 function refusalRisk(h,id='round',session={}){
 if(typeof root.fenceAvoidanceProfile==='function'&&typeof root.rrEnabled==='function'&&root.rrEnabled()&&(!root.tbUsesPlayerRider||root.tbUsesPlayerRider(h))){const p=root.fenceAvoidanceProfile(h,session);return {base:p.chance/100,chance:p.chance/100,reason:p.label,learnedAvoidance:p,luck:0};}
 const a=attributes(h),v=(a.confidence+a.willingness)/2,base=v<=3.3?.45:v<=4.5?.35:v<=6.7?.30:v<=7.8?.25:v<=8.8?.21:v<=9.5?.17:.15;
 const mood=h.medicalMood||h.mood,bad=['Distress','Distressed','Uncomfortable','Grumpy','Uncontrollable'].includes(mood)?1:['Happy','Motivated','Focused','Try-Hard'].includes(mood)?-1:0,luck=H.roll(H.hash(h.id+'|'+id),'refusal-luck')*2-1;
 return {base,chance:clamp(base*(1+.05*bad+.05*luck),0,1),reason:a.confidence<a.willingness?'Low confidence':'Low willingness',luck};}
-root.ShowjumpingRound={profile,plan,attributes,refusal:refusalRisk};if(typeof module==='object')module.exports=root.ShowjumpingRound;
+root.ShowjumpingRound={profile,plan,attributes,timeFactor,refusal:refusalRisk};if(typeof module==='object')module.exports=root.ShowjumpingRound;
 })(typeof globalThis==='object'?globalThis:this);
