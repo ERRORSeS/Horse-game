@@ -4,6 +4,8 @@ Follow-up: competition choices show one-decimal Success (clear), Partial (pole),
 
 Loading follow-up: failed loading attempts keep the booked itinerary and remain available for retry or staff assistance. Only explicit abandonment returns to planning. Rebooking preserves the attempt sequence, preventing the same deterministic failure from repeating; bookings, payments, and loading progress survive reload.
 
+Riding-style timing follow-up: standard competition efforts again use the earlier 40 m baseline (80 m for cross-country), intent-based route adjustments, original execution allowance and horse timing factor. Conservative/Balanced/Competitive/Aggressive retain ×1.12/×1.00/×0.92/×0.84. Explicit course distances and the Careful but Slow trait remain supported, and time penalties stay removed. Previously cached default course distances migrate for future attempts without rewriting completed effort records.
+
 ## 1. Files and existing handlers
 
 `individuality6.js` supplies the shared refusal profile, negative learning filter, Fence Resilience, inheritance, and environmental recovery. `traits6.js` connects the existing 55 canonical Training 2.0 traits to contextual calculations and resolved consequences. `competition7.js` wraps the existing interactive choice, advancement, score, NPC, jump-off, preparation, and rendering handlers. `index.html` loads these after the existing behavior layers.
@@ -151,6 +153,7 @@ The four supplied simple-jump/pole lines and the five displayable spook-recovery
 - `node tests/individuality6-simulation.cjs`: 40,000 samples per tested refusal score and per round baseline/course-length combination.
 - Automated Chromium checks: startup, existing roleplay editor, original competition choice controls, compact status, one resolution per click, cold IndexedDB reload, and the original training attempt button.
 - `node tests/competition-chances-time.test.cjs`: six follow-up checks cover accurate outcome probabilities, one-decimal display, actual branch resolution, zero time penalties for player/Quick/NPC phases, and slow clear-round qualification.
+- `node tests/competition-style-timing.test.cjs`: seven timing checks cover the four original styles, jump-offs, rails/refusals, route intents, horse timing adjustments, Quick Compete, custom distances, and saved default-course migration.
 - `git diff --check` and JavaScript syntax checks.
 
 Existing assertions were updated for the requested calibration and behavior changes: new table values, new rail baselines, slow expert trust, exact trait magnitudes, sheltered indoor wind, and the separate owned refusal/incident draws. Ordinary learning tests explicitly use neutral traits/resilience so random individual learning multipliers do not invalidate baseline expectations. The equipment-matrix and Puissance tie fixtures explicitly select warmbloods so a randomly generated breed ceiling cannot prevent an otherwise valid advanced tack check.

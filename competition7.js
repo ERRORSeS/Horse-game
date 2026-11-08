@@ -7,12 +7,12 @@ function c7Phase(s,step){return s.jumpOff?'jump-off':s.discipline==='eventing'?s
 function c7Random(seed,key){let n=HorseHealth.hash(seed+'|'+key);n^=n>>>16;n=Math.imul(n,0x7feb352d);n^=n>>>15;n=Math.imul(n,0x846ca68b);n^=n>>>16;return (n>>>0)/4294967296;}
 function c7Roll(s,key){const state=c7State(s);state.seed ??= HorseHealth.hash(rrSessionId(s)+'|competition7');return c7Random(state.seed,key);}
 function c7Plan(s,step,index=s.stepIndex){
- if(step.plan7)return step.plan7;
+ if(step.plan7){const configured=Number(step.routeDistance??step.distance),oldDefault=step.plan7.phase==='cross-country'?80:step.plan7.jump?32+(index%4)*4:35;if(step.stage==='main_round'&&!(configured>0)&&step.plan7.distance===oldDefault)step.plan7.distance=step.plan7.phase==='cross-country'?80:40;return step.plan7;}
  const current=s.stepIndex;s.stepIndex=index;const p=C7_PROMPT(s)||{};s.stepIndex=current;
  const phase=c7Phase(s,step),title=String(p.title||step.jumpType||''),source=String(step.jumpType||''),text=title+' '+source,main=step.stage==='main_round',dressage=phase==='dressage',jump=!dressage&&(main||/fence|jump|cross.?rail|combination/i.test(title));
  const movement=step.movement||(dressage?c7Movement(s,step,index):{}),rein=movement.rein||(/left/i.test(text)?'Left':/right/i.test(text)?'Right':index%2?'Right':'Left'),transition=movement.transition??/transition|halt|gait|canter lead/i.test(text),gait=movement.gait||(/canter/i.test(text)?'Canter':/walk|halt/i.test(text)?'Walk':'Trot');
  const related=/related|distance|combination|line|stride/i.test(text),water=jump&&/water|liverpool/i.test(text),filler=jump&&/filler|wall|plank/i.test(text);
- const distance=Number(step.routeDistance??step.distance)|| (phase==='cross-country'?80:jump?32+(index%4)*4:35),weight=Number(step.railWeight)||1+(related?.2:0)+(/oxer|triple|combination/i.test(text)?.15:0);
+ const distance=Number(step.routeDistance??step.distance)|| (phase==='cross-country'?80:main?40:jump?32+(index%4)*4:35),weight=Number(step.railWeight)||1+(related?.2:0)+(/oxer|triple|combination/i.test(text)?.15:0);
  step.plan7={phase,title:movement.name||C7_PLAN_LABELS[title]||title,promptTitle:title,main,jump,dressage,water,hasFiller:filler,filler,related,rein,gait,transition,downward:movement.downward??(transition&&/halt|downward|walk|slowing/i.test(text)),circle:movement.circle??/circle|volte/i.test(text),collected:movement.collected??/collect|piaffe|passage|half.?pass/i.test(text),distance,weight,height:Number.isFinite(Number(step.height??s.setup?.height??parseFloat(s.level)))?Number(step.height??s.setup?.height??parseFloat(s.level)):null,coefficient:Number(movement.coefficient)||1};return step.plan7;
 }
 const C7_BUILD=buildCompetitionRpgSession;
@@ -73,13 +73,17 @@ function c7Resolve(h,s,index,{npc=false}={}){
      if(record.error==='balance'&&w.energy<25)c7Incident(h,s,'Landing',record,npc);
     }else record.outcome=record.error?'Movement completed with '+record.error+' error':'Accurate movement';
     if(plan.dressage){const skill=effectiveDisciplineSkill(h,'dressage'),base=clamp(5+skill*.035+clamp((w.timing+w.focus+w.confidence-150)/300,-.5,.5),0,10),deduction=record.error?(record.error==='lead'||record.error==='aid'||record.error==='anticipation'?.75:record.error==='balance'?.5:.2):0,bonus=record.quality>=.8?.2:0;record.mark=Math.round(clamp(base-deduction+bonus,0,10)*10)/10;record.markDeduction=deduction;record.coefficient=plan.coefficient;record.outcome=`${plan.title}: ${record.mark.toFixed(1)}/10`;}
+    if(main)c7EffortTiming(h,s,plan,option,record);
+    else{
     const style=SHOW_RIDING_STYLES[showRidingStyle(s)]?.time||1,route=/inside|tight|direct/i.test(option.label)?.94:/wide|steady|balance|extra/i.test(option.label)?1.06:1,slow=plan.jump&&i6Traits(h).includes('Careful but Slow')?1.05:1,speed=plan.phase==='cross-country'?10:plan.dressage?3:5+effectiveDisciplineSkill(h,s.discipline)/100;
     record.routeDistance=plan.distance*route;record.time=record.routeDistance/speed*style*slow+(record.events6.includes('hesitation')?1.5:0)+(record.error?.startsWith('drift')?.5:0);record.slowerPace6=slow>1?record.time-record.time/slow:0;
+    }
     if(skip){record.completed=false;record.quality=0;record.faults=4;s.roundStats.faults+=4;record.represent=true;record.outcome='Cross-country question skipped; not completed';}
     const exertion=warmup?2:plan.phase==='cross-country'?3:1;i6StateChange(s,'energy',-exertion);if(w.energy<25)c7Readiness(s,-5,'Actual exertion');
    }
   }
  }
+ if(main&&record.refusal?.refused)c7EffortTiming(h,s,plan,option,record);
  record.resultIndex=record.refusal?.refused?5:record.quality>=.8?0:record.quality>=.5?2:3;
  const facts=i6ResolveTraitEffects(h,s,record,c);if(plan.phase==='hunter'&&['rushing','rhythm'].some(e=>record.events6.includes(e)))record.hunterPaceDeduction=2;record.facts={...facts,opening:main&&s.steps.filter((x,i)=>i<s.stepIndex&&x.stage==='main_round'&&c7Phase(s,x)===plan.phase).length===0,finalFence:main&&!s.steps.slice(s.stepIndex+1).some(x=>x.stage==='main_round'&&c7Phase(s,x)===plan.phase),cleanClearance:plan.jump&&record.completed&&!record.railCause,refusal:record.event==='refusal',runout:record.event==='runout',timingError:!!record.error&&['distance','aid','rhythm'].includes(record.error),correctTransition:plan.dressage&&plan.transition&&record.completed&&!['lead','anticipation','aid'].includes(record.error),correctRightLead:plan.dressage&&c.rightCanter&&record.completed&&record.error!=='lead',wrongLeftLead:plan.dressage&&c.leftCanter&&record.error==='lead',straightness:plan.dressage&&record.completed&&record.error!=='straightness',rhythmSuccess:record.completed&&record.error!=='rhythm',advanced:['Advanced','Professional'].includes(i6Rider(s).level),inexperienced:['Beginner','Novice'].includes(i6Rider(s).level),balancePassed:!!record.balancePassed,refusalFall:record.fell&&!!record.refusal?.refused,recovered:prior?.quality<.8&&record.quality>=.8,relatedSuccess:plan.related&&record.completed&&!record.events6.includes('distance'),selectedPreparation:!!record.prepared,slower:record.slowerPace6>0,tensionIncrease:w.tension>before.tension,tensionDecrease:w.tension<before.tension,timingIncrease:w.timing>before.timing,readinessLow:state.readiness<45,warmupPositive:warmup&&record.completed&&record.quality>=.8,focusSuccess:!!c.realDistraction&&record.completed&&!record.events6.includes('distraction'),confidentApproach:plan.jump&&record.completed&&w.confidence>=65&&!facts.hesitation,excessExertion:before.energy-w.energy>=4,patient:c.repeated&&record.completed&&!facts.frustration};
  if(main||warmup){state.repetitions[plan.title]=(state.repetitions[plan.title]||0)+1;if(c.newArrival)state.arrivalChecked=true;}
@@ -447,4 +451,11 @@ function competitionChanceMarkup(entry){
  if(total)for(let remaining=1000-tenths.reduce((a,b)=>a+b,0),i=0;i<remaining;i++)tenths[order[i%3].i]++;
  const labels=entry.jumpOutcomeChances?['Success (clear)','Partial (pole)','Fail (refusal)']:['Success','Partial','Fail'];
  return '<p class="small" data-comp-chances>'+labels.map((label,i)=>label+': '+(tenths[i]/10).toFixed(1)+'%').join(' / ')+'</p>';
+}
+
+function c7EffortTiming(h,s,plan,choice,record){
+ const state=c7State(s);let factor=1;
+ if(s.discipline==='jumping'){s.poleRoundId ||= s.liveShowId||rrSessionId(s);state.ridingTimeFactor ??= s.polePlan?.timeFactor??ShowjumpingRound.timeFactor(h,s.poleRoundId);factor=state.ridingTimeFactor;}
+ const quality=plan.jump?(record.completed&&!record.railCause?1:0):record.quality>=.8?1:record.quality>=.5?.6:0,timing=showEffortTiming(h,s,plan.phase,choice,quality,plan.distance,factor),slow=plan.jump&&record.completed&&i6Traits(h).includes('Careful but Slow')?1.05:1;
+ record.routeDistance=timing.routeDistance;record.time=timing.time*slow;record.slowerPace6=timing.time*(slow-1);
 }

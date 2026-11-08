@@ -201,6 +201,10 @@ function showBeginJumpOff(show,strategy='Balanced'){
 }
 const SHOW_RIDING_STYLES=Object.freeze({Conservative:{risk:.80,time:1.12},Balanced:{risk:1,time:1},Competitive:{risk:1.15,time:.92},Aggressive:{risk:1.35,time:.84}});
 function showRidingStyle(session){return session?.ridingStyle||session?.strategy||'Balanced';}
+function showEffortTiming(h,session,phase,choice,quality,baseDistance=null,timeFactor=1){
+ const pace=SHOW_RIDING_STYLES[showRidingStyle(session)]?.time||1,intent=String(choice?.intent||choice?.label||''),route=/inside|tight|direct|cut/i.test(intent)?.94:/wide|conservative|steady|balance|extra/i.test(intent)?1.06:1,distance=(Number.isFinite(baseDistance)&&baseDistance>0?baseDistance:phase==='cross-country'?80:40)*route,speed=phase==='cross-country'?10:5+effectiveDisciplineSkill(h,session.discipline)/100;
+ return {routeDistance:distance,time:(distance/speed+(1-quality)*1.1)*pace*timeFactor};
+}
 const LIVE_CHANCES=competitionOptionFinalChances;
 competitionOptionFinalChances=function(session,h,step,options){const rows=LIVE_CHANCES(session,h,step,options);if(step?.stage!=='main_round')return rows;const risk=SHOW_RIDING_STYLES[showRidingStyle(session)]?.risk||1;return rows.map(row=>{const fail=Math.max(0,100-row.successChance-row.computed.neutralChance),next=Math.min(95,(session.discipline==='jumping'?100*(1-Math.pow(1-ShowjumpingRound.refusal(h,session.poleRoundId||session.liveShowId||session.id).chance,1/Math.max(1,session.steps.filter(s=>s.stage==='main_round').length)))*(fail/25):fail)*risk),scale=(100-next)/Math.max(1,100-fail);return {...row,successChance:row.successChance*scale,computed:{...row.computed,neutralChance:row.computed.neutralChance*scale,failChance:next}};});};
 const LIVE_RESOLVE=resolveCompetitionRpgChoice;
@@ -208,9 +212,9 @@ resolveCompetitionRpgChoice=function(session,h,index){
   if(session.awaitingAdvance||session._resolving)return;const step=session.steps[session.stepIndex];if(!step)return;session._resolving=true;
   try{const before=session.roundStats?.faults||0;LIVE_RESOLVE(session,h,index);if(!session.awaitingAdvance)return;
     if(step.stage==='main_round'){
-      const text=session.outcomes.at(-1)?.outcome||'',quality=/Clear|Accurate/.test(text)?1:/Minor|Style|Penalty/.test(text)?.6:0,phase=session.jumpOff?'jump-off':session.discipline==='eventing'?showPhaseName(step):session.discipline==='jumping'?'showjumping':session.discipline,pace=SHOW_RIDING_STYLES[showRidingStyle(session)]?.time||1;
-      const choice=competitionPromptForStep(session)?.options[index],intent=String(choice?.intent||choice?.label||''),route=/inside|tight|direct|cut/i.test(intent)?.94:/wide|conservative|steady|balance|extra/i.test(intent)?1.06:1,distance=(phase==='cross-country'?80:40)*route,speed=phase==='cross-country'?10:5+effectiveDisciplineSkill(h,session.discipline)/100;
-      session.choiceRecords ||= [];session.choiceRecords.push({choice:choice?.label,intent,routeDistance:distance,step:session.stepIndex,ridingStyle:showRidingStyle(session),phase,quality,title:competitionPromptForStep(session)?.title,faults:Math.max(0,(session.roundStats?.faults||0)-before),time:(distance/speed+(1-quality)*1.1)*pace*(session.discipline==='jumping'?(session.polePlan?.timeFactor||1):1)});if(app.activeShow&&app.activeShow.id===session.liveShowId){app.activeShow.clock=Math.max(app.activeShow.clock,app.activeShow.classTime)+session.choiceRecords.at(-1).time/3600;}
+      const text=session.outcomes.at(-1)?.outcome||'',quality=/Clear|Accurate/.test(text)?1:/Minor|Style|Penalty/.test(text)?.6:0,phase=session.jumpOff?'jump-off':session.discipline==='eventing'?showPhaseName(step):session.discipline==='jumping'?'showjumping':session.discipline;
+      const choice=competitionPromptForStep(session)?.options[index],intent=String(choice?.intent||choice?.label||''),timing=showEffortTiming(h,session,phase,choice,quality,null,session.discipline==='jumping'?(session.polePlan?.timeFactor||1):1);
+      session.choiceRecords ||= [];session.choiceRecords.push({choice:choice?.label,intent,routeDistance:timing.routeDistance,step:session.stepIndex,ridingStyle:showRidingStyle(session),phase,quality,title:competitionPromptForStep(session)?.title,faults:Math.max(0,(session.roundStats?.faults||0)-before),time:timing.time});if(app.activeShow&&app.activeShow.id===session.liveShowId){app.activeShow.clock=Math.max(app.activeShow.clock,app.activeShow.classTime)+session.choiceRecords.at(-1).time/3600;}
     }else if(app.activeShow&&app.activeShow.id===session.liveShowId){app.activeShow.clock+=(step.stage==='warm_up'?3:2)/60;}
   }finally{delete session._resolving;}
   saveGame(false);showScheduleAdvance(session);
