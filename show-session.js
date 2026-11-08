@@ -142,7 +142,7 @@ function showScore(show,entry,phase,records,stats={}){
     const criteria=['Rhythm','Smoothness','Jumping form','Distances','Straightness','Flow','Rider quietness','Presentation'].map((name,i)=>({name,score:Math.round(clamp(45+skill*.35+(records[i%records.length]?.quality||0)*20-difficulty,0,100)*10)/10})),score=criteria.reduce((n,c)=>n+c.score,0)/criteria.length;
     return {phase,score:Math.round(score*100)/100,criteria,comments:criteria.map(c=>c.name+': '+(c.score>=75?'Positive impression.':'Needs greater consistency.')),eliminated,...status};
   }
-  const allowed=phase==='cross-country'?65:phase==='jump-off'?38:75,timePenalties=phase==='cross-country'?Math.max(0,Math.round((time-allowed)*.4*10)/10):Math.max(0,Math.ceil(time-allowed));
+  const timePenalties=0;
   return {phase,faults,time:Math.round(time*100)/100,timePenalties,penalties:faults+timePenalties,eliminated,...status};
 }
 function showPhase(show){return show.discipline==='eventing'?['dressage','cross-country','showjumping'][show.round]:show.round===1?'jump-off':show.discipline==='jumping'?'showjumping':show.discipline;}
@@ -182,7 +182,7 @@ function showPersistResults(show){
   if(show.eventId){const event=calendarFindEvent(show.eventId);if(event){event.results ||= {};event.results[show.id]={...record,horseId:h.id};event.status='Completed';}}
 }
 function showEliminationReason(result){const reason=result?.eliminationReason||'';return /fall/i.test(reason)?'Fall':/refus|run.?out/i.test(reason)?'Refusal':reason;}
-function showResultText(r){if(r.eliminated){const reason=showEliminationReason(r);return 'Eliminated'+(reason?' — '+reason:'')+(r.fallSeverity?' · Fall intensity: '+r.fallSeverity:'');}return r.movements?`${r.percentage.toFixed(2)}%`:r.criteria?`Hunter score ${r.score.toFixed(2)}`:`${r.faults} jumping faults · ${r.timePenalties} time penalties · ${r.time.toFixed(2)} seconds`;}
+function showResultText(r){if(r.eliminated){const reason=showEliminationReason(r);return 'Eliminated'+(reason?' — '+reason:'')+(r.fallSeverity?' · Fall intensity: '+r.fallSeverity:'');}return r.movements?`${r.percentage.toFixed(2)}%`:r.criteria?`Hunter score ${r.score.toFixed(2)}`:`${r.faults} jumping faults · ${r.time.toFixed(2)} seconds`;}
 function showAward(show){
   if(show.awarded)return;const h=showHorse(show),player=show.finalStandings.find(e=>e.player),rank=player?.rank,prize=rank&&rank<=6?Math.round((show.eventSnapshot?.prizeMoney||600)/rank):0;
   const economy=app.careEconomy ||= {receipts:[],inventory:[],operations:{}},transactionKey=show.id+':award';if(economy.operations[transactionKey]){show.awarded=true;show.award=economy.operations[transactionKey].award;return;}

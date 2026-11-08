@@ -48,7 +48,7 @@ function c7Incident(h,s,cause,record,npc=false){
 function c7Resolve(h,s,index,{npc=false}={}){
  const state=c7State(s),step=s.steps[s.stepIndex],prompt=competitionPromptForStep(s),option=prompt?.options?.[index];if(!step||!option||s.awaitingAdvance||s.eliminated)return null;
  const key=s.stepIndex+':'+(state.representations[s.stepIndex]||0);if(state.ledger[key])return state.ledger[key].outcome?state.ledger[key]:(s.choiceRecords||[]).find(r=>r.id===state.ledger[key].id)||null;state.started=true;
- const plan=c7Plan(s,step),execution=c7Execution(h,s,plan,option),c=execution.context,main=step.stage==='main_round',warmup=step.stage==='warm_up',w=s.warmupState,before={...w},prior=s.choiceRecords?.at(-1),record={id:rrSessionId(s)+':'+key,step:s.stepIndex,attempt:state.representations[s.stepIndex]||0,phase:plan.phase,title:plan.title,choice:option.label,intent:option.intent,interactive7:true,events6:[],completed:false,quality:1,faults:0,time:0,routeDistance:0,ridingStyle:showRidingStyle(s),before,readinessBefore:state.readiness};
+ const plan=c7Plan(s,step),execution=c7Execution(h,s,plan,option),poleProfile=c7PoleRisk(h,s,step,plan,execution),c=execution.context,main=step.stage==='main_round',warmup=step.stage==='warm_up',w=s.warmupState,before={...w},prior=s.choiceRecords?.at(-1),record={id:rrSessionId(s)+':'+key,step:s.stepIndex,attempt:state.representations[s.stepIndex]||0,phase:plan.phase,title:plan.title,choice:option.label,intent:option.intent,interactive7:true,events6:[],completed:false,quality:1,faults:0,time:0,routeDistance:0,ridingStyle:showRidingStyle(s),before,readinessBefore:state.readiness};
  state.ledger[key]={id:record.id,pending:true};delete s.rrConcern;s.rrCurrentError=null;s.tension=w.tension;s.temporary ||= {};s.log ||= [];s.roundStats ||= {faults:0,refusals:0,clearJumps:0,rails:0,majorFaults:0};
  const selectedReset=step.stage!=='course_walk'&&plan.jump&&/circle|re.?approach|represent|abort/i.test(option.label),skip=plan.phase==='cross-country'&&/skip/i.test(option.label);
  if(selectedReset&&!skip){record.outcome='Reorganized the approach';record.represent=true;record.quality=.6;record.time=8;record.settled6=w.tension>0;i6StateChange(s,'tension',-3);i6StateChange(s,'confidence',1);c7Readiness(s,2,'Selected settling action');}
@@ -65,7 +65,7 @@ function c7Resolve(h,s,index,{npc=false}={}){
     else{record.prepared=execution.prepared;if(warmup){i6StateChange(s,'tension',-4);i6StateChange(s,'confidence',3);record.settled6=before.tension>w.tension;}i6StateChange(s,'timing',1);i6StateChange(s,'focus',1);if(warmup)c7Readiness(s,prior?.quality>=.8?6:4,'Completed suitable preparation');}
     const positive=i6Check(h,'engagement',c).reduce((n,x)=>n+x.value,0);record.engaged6=record.quality>=.8&&positive>0&&c7Roll(s,key+':engagement')*100<50+positive;
     if(plan.jump){
-     const pole=c7PoleRisk(h,s,step,plan,execution);record.pole=pole;
+     const pole=poleProfile;record.pole=pole;
      if(c7Roll(s,key+':pole')<pole.chance){record.railCause=c7Roll(s,key+':rail-cause')<pole.front/Math.max(.0001,pole.front+pole.hind)?'front':'hind';record.faults=main?4:0;record.quality=Math.min(record.quality,.6);if(main){s.roundStats.faults+=4;s.roundStats.rails=(s.roundStats.rails||0)+1;}}
      else if(i6Traits(h).includes('Overjumps')&&c7Roll(s,key+':clearance')<.12)record.events6.push('overjump');
      if(main&&!record.faults)s.roundStats.clearJumps++;
@@ -90,7 +90,7 @@ function c7Resolve(h,s,index,{npc=false}={}){
  return record;
 }
 const C7_CHANCES=competitionOptionFinalChances;
-competitionOptionFinalChances=function(s,h,step,options){if(c7Quick(s))return C7_CHANCES(s,h,step,options);const plan=c7Plan(s,step),refusal=plan.jump?fenceAvoidanceProfile(h,{...s,refusalContext:'competition',setup:{height:plan.height}}).chance:0;return options.map((option,index)=>{const p=c7Execution(h,s,plan,option),fail=plan.jump?refusal:p.chance,partial=(100-fail)*p.chance/100;return {index,option,successChance:100-fail-partial,computed:{neutralChance:partial,failChance:fail},refusalChance:refusal,executionChance:p.chance};});};
+competitionOptionFinalChances=function(s,h,step,options){if(c7Quick(s))return C7_CHANCES(s,h,step,options);const plan=c7Plan(s,step),refusal=plan.jump?fenceAvoidanceProfile(h,{...s,refusalContext:'competition',setup:{height:plan.height}}).chance:0;return options.map((option,index)=>{const p=c7Execution(h,s,plan,option),fail=plan.jump?refusal:p.chance,pole=plan.jump?c7PoleRisk(h,s,step,plan,p).chance*100:null,partial=(100-fail)*(pole??p.chance)/100,actionOnly=step.stage!=='course_walk'&&plan.jump&&/circle|re.?approach|represent|abort/i.test(option.label);return {index,option,successChance:100-fail-partial,computed:{neutralChance:partial,failChance:fail},refusalChance:refusal,executionChance:p.chance,poleChance:pole,jumpOutcomeChances:plan.jump&&!actionOnly,actionOnly};});};
 const C7_RESOLVE=resolveCompetitionRpgChoice;
 resolveCompetitionRpgChoice=function(s,h,index){if(c7Quick(s))return C7_RESOLVE(s,h,index);if(s._resolving||s.awaitingAdvance)return;try{s._resolving=true;c7Resolve(h,s,index);}finally{delete s._resolving;}saveGame(false);showScheduleAdvance(s);};
 const C7_ADVANCE=showAdvanceRpg;
@@ -400,7 +400,7 @@ function c7ScoreRecords(show,entry,phase,records,stats={}){
   const criteria=['Rhythm','Smoothness','Jumping form','Distances','Straightness','Flow','Rider quietness','Presentation'].map((name,index)=>{const deductions=records.reduce((n,r)=>n+(r.event?8:r.railCause?4:index===0&&['rhythm','rushing'].some(e=>r.events6?.includes(e))?2:index===3&&r.error==='distance'?3:index===4&&r.error?.startsWith('drift')?3:index===6&&r.riderError?2:r.error?1:0),0),score=clamp(65+(entry.skills.discipline||50)*.25-deductions,0,100);return {name,score:Math.round(score*10)/10};}),score=Math.round(criteria.reduce((n,c)=>n+c.score,0)/criteria.length*100)/100;
   return {phase,score,criteria,comments:criteria.map(c=>`${c.name}: ${c.score.toFixed(1)}`),eliminated,...status};
  }
- const allowed=show.eventSnapshot?.timeAllowed?.[phase]??(phase==='cross-country'?65:phase==='jump-off'?38:75),timePenalties=phase==='cross-country'?Math.max(0,Math.round((time-allowed)*.4*10)/10):Math.max(0,Math.ceil(time-allowed));return {phase,faults,rails:records.filter(r=>r.railCause).length,time:Math.round(time*100)/100,timePenalties,penalties:faults+timePenalties,eliminated,...status};
+ const timePenalties=0;return {phase,faults,rails:records.filter(r=>r.railCause).length,time:Math.round(time*100)/100,timePenalties,penalties:faults+timePenalties,eliminated,...status};
 }
 function c7NpcRound(show,entry,phase){
  entry.rounds7 ||= {};if(entry.rounds7[phase])return entry.rounds7[phase];
@@ -439,3 +439,12 @@ const C7_PLAN_LABELS={
 };
 const C7_RECOVERY=showRoundRecovery;
 showRoundRecovery=function(show,...args){const prior=show.roundRecovery,result=C7_RECOVERY(show,...args);if(!prior&&show.roundRecovery&&show.rpg?.interactive7?.started&&!show.quickRunning)c7Readiness(show.rpg,2,'Completed between-round recovery');return result;};
+
+// Round only the displayed percentages; resolution keeps full precision.
+function competitionChanceMarkup(entry){
+ if(entry.actionOnly)return '<p class="small">Reorganize the approach; no jump attempted.</p>';
+ const values=[entry.successChance,entry.computed.neutralChance,entry.computed.failChance].map(n=>clamp(Number(n)||0,0,100)),total=values.reduce((a,b)=>a+b,0),scaled=values.map(n=>total?n/total*1000:0),tenths=scaled.map(Math.floor),order=scaled.map((n,i)=>({i,remainder:n-tenths[i]})).sort((a,b)=>b.remainder-a.remainder||a.i-b.i);
+ if(total)for(let remaining=1000-tenths.reduce((a,b)=>a+b,0),i=0;i<remaining;i++)tenths[order[i%3].i]++;
+ const labels=entry.jumpOutcomeChances?['Success (clear)','Partial (pole)','Fail (refusal)']:['Success','Partial','Fail'];
+ return '<p class="small" data-comp-chances>'+labels.map((label,i)=>label+': '+(tenths[i]/10).toFixed(1)+'%').join(' / ')+'</p>';
+}

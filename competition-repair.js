@@ -62,4 +62,4 @@ function showRoundRecovery(show,kind){
 }
 
 const REPAIR_RESULT_TEXT=showResultText;
-showResultText=function(score){if(score?.eliminated)return REPAIR_RESULT_TEXT(score);return score&&Number.isFinite(score.rails)?'Rails '+score.rails+' · Jumping penalties '+score.faults+' · Time penalties '+score.timePenalties+' · Total '+score.penalties+' · '+score.time+' seconds':REPAIR_RESULT_TEXT(score);};
+showResultText=function(score){if(score?.eliminated)return REPAIR_RESULT_TEXT(score);return score&&Number.isFinite(score.rails)?'Rails '+score.rails+' · Jumping penalties '+score.faults+' · Total '+score.penalties+' · '+score.time+' seconds':REPAIR_RESULT_TEXT(score);};
