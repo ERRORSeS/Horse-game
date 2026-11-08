@@ -1,10 +1,12 @@
 # Individuality 6 and Interactive Competition 7 implementation report
 
+Follow-up: competition choices show one-decimal Success (clear), Partial (pole), and Fail (refusal) chances. Partial uses the conditional pole probability, including the chance of reaching the jump without a refusal. Displayed percentages total 100.0; outcome resolution retains full precision. Reorganization choices identify that no jump is attempted. Time penalties are removed from interactive, Quick, NPC, jump-off, and legacy eventing scoring; elapsed time is still recorded and used to rank equal-fault rounds. Existing saved historical results remain intact.
+
 ## 1. Files and existing handlers
 
 `individuality6.js` supplies the shared refusal profile, negative learning filter, Fence Resilience, inheritance, and environmental recovery. `traits6.js` connects the existing 55 canonical Training 2.0 traits to contextual calculations and resolved consequences. `competition7.js` wraps the existing interactive choice, advancement, score, NPC, jump-off, preparation, and rendering handlers. `index.html` loads these after the existing behavior layers.
 
-Small integration edits are in `training2.js` (attribute defaults, pole eligibility, named hesitation, and existing outcome facts), `learned-avoidance.js` (the authoritative delta hook), `training-behavior51.js` (slow expert trust, stimulus evidence, and incident ownership), and `training-behavior52.js` (the existing single-jump audit with representation IDs). `script.js` keeps the existing choice controls while hiding internal success/partial breakdowns during interactive competition. `showjumping-round.js` uses the attachment's explicit rail baselines. Existing grooming and farrier checks consume contextual trait modifiers in `grooming-expansion.js`, `competition-completion.js`, and `health-engine.js`.
+Small integration edits are in `training2.js` (attribute defaults, pole eligibility, named hesitation, and existing outcome facts), `learned-avoidance.js` (the authoritative delta hook), `training-behavior51.js` (slow expert trust, stimulus evidence, and incident ownership), and `training-behavior52.js` (the existing single-jump audit with representation IDs). `script.js` keeps the existing choice controls while displaying the one-decimal clear/pole/refusal breakdown during interactive competition. `showjumping-round.js` uses the attachment's explicit rail baselines. Existing grooming and farrier checks consume contextual trait modifiers in `grooming-expansion.js`, `competition-completion.js`, and `health-engine.js`.
 
 ## 2. Preserved mechanics
 
@@ -18,7 +20,7 @@ Existing jumping class eligibility, entries, travel workflow, prizes, result ide
 
 ## 4. Interactive decisions and actual outcomes
 
-The existing option labels and ordering are reused. Their intent and risk affect the coherent execution check, contact consistency, preparation, route distance, pace, and recovery. Actual selected rider abilities contribute a bounded adjustment; discipline experience and current horse skill also contribute. An execution mistake can still clear a jump. It does not automatically become a refusal or a rail.
+The existing options and ordering are reused; two outdated circle labels no longer promise time penalties. Their intent and risk affect the coherent execution check, contact consistency, preparation, route distance, pace, and recovery. Actual selected rider abilities contribute a bounded adjustment; discipline experience and current horse skill also contribute. An execution mistake can still clear a jump. It does not automatically become a refusal or a rail.
 
 Only a selected circle/re-approach action reorganizes the approach. A refusal or interrupted jumping question remains available for representation. Advancement displays the next decision; it never selects a riding action. Ledger IDs include the actual representation count. A resolved event, saved result, or reopened screen cannot roll again.
 
@@ -126,7 +128,7 @@ The existing eight criteria remain: Rhythm, Smoothness, Jumping form, Distances,
 
 ## 11. Eventing phases
 
-Dressage, cross-country, and stadium use the existing phase lifecycle and cumulative official scores. Dressage uses movement marks, cross-country uses its recorded route and existing time rule, and stadium uses jumping faults and rails. Current RPG state and readiness carry between phases. An eliminated entry retains its reason through unstarted phases. NPC entries simulate actual question-by-question rounds before their score is posted; their completed records and scores remain fixed.
+Dressage, cross-country, and stadium use the existing phase lifecycle and cumulative official scores. Dressage uses movement marks, cross-country uses its recorded route and elapsed time without time penalties, and stadium uses jumping faults and rails. Current RPG state and readiness carry between phases. An eliminated entry retains its reason through unstarted phases. NPC entries simulate actual question-by-question rounds before their score is posted; their completed records and scores remain fixed.
 
 ## 12. First rounds, jump-offs, saves, and awards
 
@@ -146,6 +148,7 @@ The four supplied simple-jump/pole lines and the five displayable spook-recovery
 - `node tests/individuality6-competition7.test.cjs`: 20 substantive scenarios plus the unchanged training-button fixture, covering tables, modifiers, migration, learning, recovery milestones, all trait contexts, actual consequences, local hazards, representation, marks, saves, NPCs, Quick Compete, inheritance, complete eventing, and truthful scene labels.
 - `node tests/individuality6-simulation.cjs`: 40,000 samples per tested refusal score and per round baseline/course-length combination.
 - Automated Chromium checks: startup, existing roleplay editor, original competition choice controls, compact status, one resolution per click, cold IndexedDB reload, and the original training attempt button.
+- `node tests/competition-chances-time.test.cjs`: six follow-up checks cover accurate outcome probabilities, one-decimal display, actual branch resolution, zero time penalties for player/Quick/NPC phases, and slow clear-round qualification.
 - `git diff --check` and JavaScript syntax checks.
 
 Existing assertions were updated for the requested calibration and behavior changes: new table values, new rail baselines, slow expert trust, exact trait magnitudes, sheltered indoor wind, and the separate owned refusal/incident draws. Ordinary learning tests explicitly use neutral traits/resilience so random individual learning multipliers do not invalidate baseline expectations. The equipment-matrix and Puissance tie fixtures explicitly select warmbloods so a randomly generated breed ceiling cannot prevent an otherwise valid advanced tack check.
@@ -154,4 +157,4 @@ Existing assertions were updated for the requested calibration and behavior chan
 
 The calibration run measured 3.98% at a 4% refusal target, 70.01% at a 70.1111% target, and 98.01% at a 98% target. Across four- and twelve-fence courses, measured rail-round rates were 29.81–30.01%, 39.98–40.10%, and 44.70–44.77% for the 30%, 40%, and 45% neutral targets.
 
-`npm test` completed successfully (exit 0), including the integration and calibration suites. The nested regression runner also completed outside the sandbox with captured child-process output. Browser validation passed without uncaught page exceptions. Existing saves and controls are covered by the regression suite. Full detailed outcomes exist only for the scheduled questions actually resolved; this does not add arbitrary procedural course design or invent external weather/traffic. The existing show-course length and official timing rules are retained. Named hunter/eventing classes without a recorded numerical fence height display the class level and retain the existing 0.70 m default rail baseline; supplied course heights override that fallback. Height-experience gaps for those named classes use the actual discipline level indices. Monte Carlo checks validate the specified fictional balance; they do not claim real-world equestrian probabilities.
+`npm test` completed successfully (exit 0), including the integration and calibration suites. The nested regression runner also completed outside the sandbox with captured child-process output. Browser validation passed without uncaught page exceptions. Existing saves and controls are covered by the regression suite. Full detailed outcomes exist only for the scheduled questions actually resolved; this does not add arbitrary procedural course design or invent external weather/traffic. The existing show-course length and elapsed-time recording are retained. Named hunter/eventing classes without a recorded numerical fence height display the class level and retain the existing 0.70 m default rail baseline; supplied course heights override that fallback. Height-experience gaps for those named classes use the actual discipline level indices. Monte Carlo checks validate the specified fictional balance; they do not claim real-world equestrian probabilities.

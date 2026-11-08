@@ -900,7 +900,7 @@ const COMPETITION_RPG_VARIANTS = {
       { label: 'Keep same rhythm and straightness.', success: 80, neutral: 15, fail: 5, intent: 'consistency' },
       { label: 'Push slightly forward to finish.', success: 70, neutral: 20, fail: 10, intent: 'commitment' },
       { label: 'Overthink and adjust late.', success: 55, neutral: 25, fail: 20, intent: 'late_adjustment' },
-      { label: 'Circle and reset with time penalty.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
+      { label: 'Circle and reset.', success: 85, neutral: 10, fail: 5, intent: 'safety' }
     ]},
     { title: 'Rare Perfect Round Energy', scene: 'Everything feels easy, connected, and in sync.', options: [
       { label: 'Maintain exact same ride.', success: 95, neutral: 5, fail: 0, intent: 'flow_state' },
@@ -1086,7 +1086,7 @@ const COMPETITION_RPG_VARIANTS = {
       { label: 'Keep current rhythm.', success: 80, neutral: 15, fail: 5, intent: 'consistency' },
       { label: 'Push forward for time.', success: 65, neutral: 20, fail: 15, intent: 'risk' },
       { label: 'Slow for clean jump.', success: 75, neutral: 15, fail: 10, intent: 'safety' },
-      { label: 'Circle (time penalty).', success: 85, neutral: 10, fail: 5, intent: 'reset' }
+      { label: 'Circle.', success: 85, neutral: 10, fail: 5, intent: 'reset' }
     ]},
     { title: 'Perfect XC Flow', scene: 'Everything aligns across terrain and questions.', options: [
       { label: 'Maintain rhythm to finish.', success: 95, neutral: 5, fail: 0, intent: 'flow_state' },
@@ -6233,7 +6233,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
     if (rpgRoundStats) {
       rails = Math.max(0, Math.round((rpgRoundStats.faults || 0) / 4));
       refusals = Math.max(0, rpgRoundStats.refusals || 0);
-      const penalties = Math.max(0, rpgRoundStats.faults || 0) + overSeconds * 0.4;
+      const penalties = Math.max(0, rpgRoundStats.faults || 0);
       eliminated = rpgRoundStats.eliminated === true;
       if (eliminated) eliminationReason = rpgRoundStats.eliminationReason || '';
       if (eliminated) {
@@ -6255,7 +6255,7 @@ function calculateCompetitionResultLegacy(horse, discipline, level, interaction 
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
       resultText = penaltiesText;
     } else {
-      const penalties = rails * 4 + refusals * 4 + overSeconds * 0.4;
+      const penalties = rails * 4 + refusals * 4;
       score = clamp(baseScore - penalties * 0.6, 0, 100);
       penaltiesText = penalties <= 0.01 ? 'Clear Round' : `${penalties.toFixed(1)} penalties`;
       timeScoreText = `${timeAllowed + overSeconds}s / ${timeAllowed}s`;
@@ -7154,7 +7154,7 @@ function renderShows() {
       box.className = 'box';
       box.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        ${typeof c7Quick==='function'&&!c7Quick(activeSession)?`<p class='small'>${entry.refusalChance?`Refusal/run-out risk per jump: ${entry.refusalChance.toFixed(1)}%`:''}</p>`:`<p class='small'>Final chance: success ${finalSuccess}% / partial ${computed.neutralChance}% / fail ${finalFail}%</p><p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>`}
+        ${typeof competitionChanceMarkup==='function'?competitionChanceMarkup(entry):`<p class='small'>Success: ${finalSuccess.toFixed(1)}% / Partial: ${computed.neutralChance.toFixed(1)}% / Fail: ${finalFail.toFixed(1)}%</p>`}
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
       wrap.append(box);
