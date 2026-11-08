@@ -15,7 +15,7 @@ function tb52CleanText(text=''){
 function tb52LogEntries(rows=[]){return rows.map(row=>({...row,text:tb52CleanText(row.text)})).filter(row=>row.text);}
 const TB52_OBSERVATIONS=t2visibleObservations;t2visibleObservations=function(s){return tb52LogEntries(TB52_OBSERVATIONS(s));};
 
-function tb52JumpKey(s,show=false){return rrSessionId(s)+'|jump:'+(show?'show:'+s.stepIndex:(s.attempts||0)+1);}
+function tb52JumpKey(s,show=false){return rrSessionId(s)+'|jump:'+(show?'show:'+s.stepIndex+(s.interactive7?.representations?.[s.stepIndex]?':retry:'+s.interactive7.representations[s.stepIndex]:''):(s.attempts||0)+1);}
 function tb52JumpAlreadyResolved(h,s){return rrEnabled()&&tbJump(s)&&!!rrHorse(h).jumpAttempts52?.[tb52JumpKey(s)];}
 function tb52SaveJump(h,s,profile,roll,show=false){
  const b=rrHorse(h),id=tb52JumpKey(s,show);b.jumpAttempts52 ||= {};
@@ -26,7 +26,7 @@ function tb52SaveJump(h,s,profile,roll,show=false){
 function tb52JumpDecision(h,s,profile){const prior=rrHorse(h).jumpAttempts52?.[tb52JumpKey(s)];if(prior)return prior;return tb52SaveJump(h,s,profile,t2random(s)*100);}
 function tb52ShowJumpDecision(h,s,step,chance){
  if(!rrEnabled()||step?.stage!=='main_round'||!tbJump(s))return null;
- const prior=rrHorse(h).jumpAttempts52?.[tb52JumpKey(s,true)];if(prior)return prior;return tb52SaveJump(h,s,{...fenceAvoidanceProfile(h,s),chance},Math.random()*100,true);
+ const prior=rrHorse(h).jumpAttempts52?.[tb52JumpKey(s,true)];if(prior)return prior;return tb52SaveJump(h,s,{...fenceAvoidanceProfile(h,s),chance},s.interactive7?.started&&typeof c7Roll==='function'?c7Roll(s,s.stepIndex+':'+(s.interactive7.representations[s.stepIndex]||0)+':refusal')*100:Math.random()*100,true);
 }
 const TB52_ATTEMPT=t2attempt;t2attempt=function(h,s){
  const record=TB52_ATTEMPT(h,s);

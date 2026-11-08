@@ -11,7 +11,7 @@ function game() {
   return context;
 }
 const fixture=`
-function eligibleHorse(id='entrant'){const h=baseHorse();h.id=id;h.name='Entrant '+id;h.age=8;h.gender='Gelding';h.behavior=500;h.requiresBreakingIn=false;h.retiredForever=false;h.retiredToBreeding=false;h.unridable=false;h.illnesses=[];h.soundnessYears=5;h.fatigue=0;h.bond=90;h.controlability=90;h.personality='Bomb-Proof';h.feedPlan=[{type:'Basic Feed',grams:h.preferredFeedGrams}];for(const group of Object.values(h.stats))for(const key of Object.keys(group))group[key]=100;h.potential={jumping:100,dressage:100,eventing:100,hunter:100};h.tack={bridle:'Snaffle Bridle',bit:'Loose Ring Snaffle',saddle:'Jumping Saddle',pad:'Basic Cotton Pad'};return h;}
+function eligibleHorse(id='entrant'){const h=baseHorse();h.breed='Dutch Warmblood';h.id=id;h.name='Entrant '+id;h.age=8;h.gender='Gelding';h.behavior=500;h.requiresBreakingIn=false;h.retiredForever=false;h.retiredToBreeding=false;h.unridable=false;h.illnesses=[];h.soundnessYears=5;h.fatigue=0;h.bond=90;h.controlability=90;h.personality='Bomb-Proof';h.feedPlan=[{type:'Basic Feed',grams:h.preferredFeedGrams}];for(const group of Object.values(h.stats))for(const key of Object.keys(group))group[key]=100;h.potential={jumping:100,dressage:100,eventing:100,hunter:100};h.tack={bridle:'Snaffle Bridle',bit:'Loose Ring Snaffle',saddle:'Jumping Saddle',pad:'Basic Cotton Pad'};return h;}
 function eventOf(format,level='0.70',discipline='jumping',custom={}){const r=createCalendarHorseShow({format,discipline,level,year:app.year,month:app.month,day:app.day+1,entryFee:0,prizeMoney:500,custom});check(r.ok,r.message||'create failed');return r.event;}
 `;
 let passed=0;

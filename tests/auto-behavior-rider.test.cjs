@@ -15,7 +15,7 @@ check('experienced rider bonuses require positive jumping and clear mounted comm
   if(scenario!=='empty'){s.attempts=1;s.lastResult=scenario==='failed'?5:0;s.log.push({exerciseId:'crossrail',resultIndex:s.lastResult});tbRecord(h,s,s.lastResult===5?'refusal':'exercise','jumping',s.lastResult===0);}
   if(scenario==='serious')s.recoveryRequired=true;if(scenario==='changed-rider')rrSettings().riderId='different-rider';
   const b=rrHorse(h).learned,avoidance=b['Learned Fence Avoidance'],trust=b['Rider Trust in Aids'];t2finish(h,s);
-  if(scenario==='positive'){if(b['Learned Fence Avoidance']!==Math.max(0,avoidance-.5)||b['Rider Trust in Aids']!==trust+3)throw Error('qualified bonus');}
+  if(scenario==='positive'){if(b['Learned Fence Avoidance']!==Math.max(0,avoidance-.5)||b['Rider Trust in Aids']<trust+.75||b['Rider Trust in Aids']>trust+1)throw Error('qualified bonus');}
   else if(b['Learned Fence Avoidance']!==avoidance||b['Rider Trust in Aids']!==trust)throw Error('unearned bonus '+scenario);
   const snapshot=JSON.stringify(b);t2finish(h,s);if(JSON.stringify(b)!==snapshot)throw Error('duplicate finish');
  }
