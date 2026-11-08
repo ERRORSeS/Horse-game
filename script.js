@@ -118,10 +118,10 @@ const PERSONALITIES = [
 ];
 
 const LEVEL_SKILL_BANDS = {
-  jumping: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[60,70],[70,80],[80,90],[90,95],[95,100],[95,100]],
-  dressage: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[60,70],[70,80],[90,100]],
-  eventing: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[60,70],[70,80],[90,100]],
-  hunter: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[60,70],[70,80],[80,90],[95,100]]
+  jumping: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[70,80],[80,90],[90,94],[90,94],[95,100],[95,100]],
+  dressage: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[70,80],[80,90],[90,100]],
+  eventing: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[70,80],[80,90],[90,100]],
+  hunter: [[5,10],[10,20],[20,30],[30,40],[40,50],[50,60],[70,80],[80,90],[90,95],[95,100]]
 };
 
 const DISCIPLINE_SKILLS = {
@@ -4372,7 +4372,7 @@ function horseDisciplineAverage(horse, discipline) {
   const jumpAvg = Object.values(jump).reduce((a, b) => a + b, 0) / 6;
   const dressAvg = Object.values(dress).reduce((a, b) => a + b, 0) / 6;
   if (discipline === 'dressage') return dressAvg;
-  if (discipline === 'jumping') return (jumpAvg * 0.9) + (dress.Connection * 0.1);
+  if (discipline === 'jumping') return jumpAvg;
   if (discipline === 'hunter') {
     return (dress.Flowiness + dress.Balance + dress.Collection + jump.Striding + jump.Confidence + jump.Balance + jump.Structure) / 7;
   }
@@ -4448,7 +4448,7 @@ function effectiveDisciplineSkill(horse, discipline) {
   const talentBoost = horse.extraPotential ? 3 : 0;
   const activeImpact = (horse.illnesses || []).filter((i) => i.active).reduce((sum, i) => sum + (Number(i.impact) || 0), 0);
   const injuryDebuff = Math.round(activeImpact * 0.5);
-  return Math.max(0, Math.min(raw + talentBoost - injuryDebuff, horse.potential[discipline] || 100));
+  return Math.max(0, Math.min(raw + talentBoost - injuryDebuff, horse.potential[discipline] ?? 100));
 }
 
 function horseSkillScore(horse) {
