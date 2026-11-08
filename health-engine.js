@@ -712,6 +712,7 @@
     }
   }
   function cooperation(h,farrier=false,tension=0) {
+    if(typeof root.i6HandlingCooperation==='function')return root.i6HandlingCooperation(h,farrier,tension);
     const traits=h.training2?.traits||[],hoof=h.hoofHealth;let pp=farrier?85:80;
     const modifiers=farrier?{'Hoof-Handling Difficulties':-15,'Nervous with Farrier':-12,'Calm with Farrier':8,'Stands Quietly':6}:{'Stands Quietly':8,'Patient Worker':6,'Very People-Oriented':(h.bond||0)>=40?5:0,'Equipment Cautious':-7};
     for(const [trait,value] of Object.entries(modifiers))if(traits.includes(trait))pp+=value;

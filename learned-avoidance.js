@@ -50,6 +50,7 @@ function tbEvent(h,s,id,type,extra={}){
 function tbApply(h,s,event,stat,delta,cap=null,limit=Infinity){
  const state=tbSession(h,s),b=rrHorse(h),before=b.learned[stat];
  if(cap){const remaining=Math.max(0,limit-(state.learningCaps[cap]||0));delta=Math.sign(delta)*Math.min(Math.abs(delta),remaining);}
+ if(typeof individualityLearningDelta==='function')delta=individualityLearningDelta(h,s,event,stat,delta);
  const after=clamp(before+delta,0,100),actual=after-before;
  if(cap)state.learningCaps[cap]=(state.learningCaps[cap]||0)+Math.abs(actual);
  if(actual){b.learned[stat]=after;const prior=event.changes[stat];event.changes[stat]={before:prior?.before??before,after,delta:after-(prior?.before??before)};}

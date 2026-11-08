@@ -32,7 +32,7 @@ function groomingAction(h,action,region,tool,target){
     const allowed=region==='Face'?['Face Brush','Grooming Sponge']:region==='Mane'?['Mane Comb','Soft Body Brush']:region==='Tail'?['Tail Brush']:region==='Legs'?['Soft Body Brush','Hoof Brush']:['Rubber Curry Comb','Dandy Brush','Soft Body Brush','Grooming Sponge'];
     if(!allowed.includes(tool))throw new Error('Select an appropriate owned tool for this region.');groomingUse(tool);
     part.cleanliness=Math.min(100,part.cleanliness+12);if(['Mane','Tail'].includes(region))a.tangling=Math.max(0,a.tangling-10);
-    const r=HorseHealth.roll(HorseHealth.hash(h.id),`groom:${csDay()}:${a.history.length}`),sensitive=h.personality==='Sensitive'||h.personality==='Spooky',response=r<(sensitive?.62:.70)?'stands calmly':r<.85?'lowers its head and relaxes':r<.95?'shifts its feet':r<.99?'moves away from a sensitive area':'needs a pause before continuing';
+    const r=HorseHealth.roll(HorseHealth.hash(h.id),`groom:${csDay()}:${a.history.length}`),sensitive=h.personality==='Sensitive'||h.personality==='Spooky',response=typeof i6GroomResponse==='function'?i6GroomResponse(h,r,sensitive):r<(sensitive?.62:.70)?'stands calmly':r<.85?'lowers its head and relaxes':r<.95?'shifts its feet':r<.99?'moves away from a sensitive area':'needs a pause before continuing';
     return groomingRecord(h,`${h.name} ${response}. Loose dirt comes away from the ${region.toLowerCase()}.`);
   }
   if(action==='rinse'){part.wet=true;part.soap=0;part.cleanliness=Math.min(100,part.cleanliness+15);return groomingRecord(h,`Water runs along the ${region.toLowerCase()}. The soap residue is rinsed away.`);}

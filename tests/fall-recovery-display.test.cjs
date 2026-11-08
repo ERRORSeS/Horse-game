@@ -1,8 +1,8 @@
 const {check}=require('./behavior5-harness.cjs');
-const ready=`resetGame();rrSettings().enabled=true;app.settings.tackOwnership=false;const h=app.horses[0];h.age=10;h.behavior=800;h.requiresBreakingIn=false;h.medicalConditions=[];h.illnesses=[];h.retiredForever=false;h.retiredToBreeding=false;h.tack={bridle:'Snaffle Bridle',bit:'Loose Ring Snaffle',saddle:'Jumping Saddle',pad:'Basic Cotton Pad'};`;
+const ready=`resetGame();t2horse(app.horses[0]).traits=[];t2horse(app.horses[0]).attributes['Fence Resilience']=5;rrSettings().enabled=true;app.settings.tackOwnership=false;const h=app.horses[0];h.age=10;h.behavior=800;h.requiresBreakingIn=false;h.medicalConditions=[];h.illnesses=[];h.retiredForever=false;h.retiredToBreeding=false;h.tack={bridle:'Snaffle Bridle',bit:'Loose Ring Snaffle',saddle:'Jumping Saddle',pad:'Basic Cotton Pad'};`;
 check('avoidance summary shows only the base per-jump percentage and one decimal without changing saved precision',`{
  ${ready} rrSettings().level='Professional';const b=rrHorse(h).learned;b['Learned Fence Avoidance']=12.270000000000001;const before=b['Learned Fence Avoidance'],text=fenceAvoidanceSummary(h);
- if(text!=='Learned Fence Avoidance: 12.3/100 — Mild avoidance. Base refusal/run-out risk: 30.7% per jump.')throw Error(text);
+ if(text!=='Learned Fence Avoidance: 12.3/100 — Mild reluctance. Base refusal/run-out risk: 8.4% per jump.')throw Error(text);
  if(text.includes('current rider')||text.includes('000000')||b['Learned Fence Avoidance']!==before)throw Error('display changed precision');
  for(const score of [0,1,2]){b['Learned Fence Avoidance']=score;if(!fenceAvoidanceSummary(h).includes('4.0% per jump'))throw Error('low band');}
  b['Learned Fence Avoidance']=before;const profile=fenceAvoidanceProfile(h);if(profile.chance===profile.base)throw Error('rider modifiers discarded');

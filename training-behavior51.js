@@ -10,6 +10,7 @@ fenceAvoidanceProfile=function(h,s={}){const p=TB51_REFUSAL(h,s);p.parts.trust=t
 const TB51_APPLY=tbApply;
 tbApply=function(h,s,event,stat,delta,cap=null,limit=Infinity){
  if(!rrEnabled())return TB51_APPLY(h,s,event,stat,delta,cap,limit);
+ if(stat==='Learned Fence Avoidance'&&delta>0&&typeof i6NegativeFenceEvent==='function'&&!i6NegativeFenceEvent(event))return 0;
  const state=tb51State(h,s),b=rrHorse(h).learned;
  if(event.type==='incident'||event.type==='trust-session'||event.type==='reward'||event.type==='welfare')return TB51_APPLY(h,s,event,stat,delta);
  if(event.type==='session'){
@@ -47,7 +48,7 @@ tbFinish=function(h,s){
  const work=state.events.filter(e=>e.type==='attempt'&&e.riderId===rrSettings().riderId),positive=work.some(e=>e.clean&&e.mounted&&e.flags.clearCommunication)&&fenceAvoidanceSafeAids(h,s),bad=state.severeCommunication||s.rrWelfareIncident||s.riderFell||s.hadRiderFall||s.horseFell||s.recoveryRequired||(s.tension||0)>=65||tbMedical(h);
  if(positive&&!bad){
   const event=tbEvent(h,s,'trust-session-51','trust-session',{flags:{sessionComplete:true,clearCommunication:true}});
-  if(event){const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[3,3],Professional:[3,3]},amount=tb51Value(h,s,'rider-trust-session',...ranges[rrSettings().level]);tbApply(h,s,event,'Rider Trust in Aids',amount);const abilities=rrSettings().abilities,compatibleLowStability=abilities['Leg Stability']<20&&!taEquippedAid(h,'spurs',s)||abilities['Hand Stability']<20&&eqSetup(h).bit!=='Pelham Bit';if(compatibleLowStability){event.flags.compatibleAids=true;tbApply(h,s,event,'Rider Trust in Aids',1);}tb51RiderAdjustment(h,s,tb51Value(h,s,'rider-specific-positive',.25,.5));event.riderAdjustment=rrHorse(h).riderTrustAdjustments[rrSettings().riderId];event.effectiveTrust=tb51EffectiveTrust(h);state.learningCaps.sessionTrustGain=event.changes['Rider Trust in Aids']?.delta||0;tbCommit(h,s,event);}
+  if(event){const ranges={Beginner:[0,.25],Novice:[.25,.5],Intermediate:[.5,.75],Advanced:[.75,1],Professional:[.75,1]},amount=tb51Value(h,s,'rider-trust-session',...ranges[rrSettings().level]);tbApply(h,s,event,'Rider Trust in Aids',amount);const abilities=rrSettings().abilities,compatibleLowStability=abilities['Leg Stability']<20&&!taEquippedAid(h,'spurs',s)||abilities['Hand Stability']<20&&eqSetup(h).bit!=='Pelham Bit';if(compatibleLowStability){event.flags.compatibleAids=true;tbApply(h,s,event,'Rider Trust in Aids',1);}tb51RiderAdjustment(h,s,tb51Value(h,s,'rider-specific-positive',.25,.5));event.riderAdjustment=rrHorse(h).riderTrustAdjustments[rrSettings().riderId];event.effectiveTrust=tb51EffectiveTrust(h);state.learningCaps.sessionTrustGain=event.changes['Rider Trust in Aids']?.delta||0;tbCommit(h,s,event);}
  }
  if(s.report&&(s.report.behavior||state.events.length)){s.report.behavior ||= {initial:{...state.initialBehavior},final:{...rrHorse(h).learned},caps:{...state.learningCaps},eventIds:state.events.map(e=>e.key)};s.report.behavior.version='5.1';s.report.behavior.final={...rrHorse(h).learned};s.report.behavior.caps={...state.learningCaps};s.report.behavior.cleanJumpBudget=state.balance51?.cleanJumpBudget||0;s.report.behavior.effectiveTrust=tb51EffectiveTrust(h);s.report.behavior.riderId=rrSettings().riderId;}
 };
@@ -178,7 +179,7 @@ const TB51_BEFORE=t2xBeforeAttempt;t2xBeforeAttempt=function(h,s,e){
  const existing=TB51_BEFORE(h,s,e);if(existing||!rrEnabled())return existing;
  const state=tb51State(h,s),stimulus=tb51Stimulus(s);
  if(stimulus&&!state.stimuli[stimulus.id]){
-  const profile=tb51SpookProfile(h,s,stimulus),roll=t2random(s)*100;state.stimuli[stimulus.id]={profile,roll,occurred:roll<profile.chance};
+  const profile=tb51SpookProfile(h,s,stimulus),roll=t2random(s)*100;state.stimuli[stimulus.id]={stimulus,profile,roll,occurred:roll<profile.chance};
   if(roll<profile.chance){const severity=t2xPickSeverity(tb51SpookSeverity(h),s),kind=['mildSpook','moderateSpook','severeSpook'][severity];return tb51InterruptedAttempt(h,s,e,kind,{stimulus,severity,spookProfile:profile,spookRoll:roll});}
  }
  if(!['standing','tying','mount','equipment'].includes(e.id)){
@@ -259,6 +260,7 @@ const TB51_WARMUP=t2warmup;t2warmup=function(h,s,action,minutes=2){
  return result;
 };
 function tb51ShowIncident(h,s,cause,actualEventText=''){
+ const owned=s.interactive7?.ledger?.[s.stepIndex+':'+(s.interactive7.representations[s.stepIndex]||0)],recorded=owned?.incidentId&&(s.incidents||[]).find(i=>i.id===owned.incidentId);if(recorded)return recorded;
  const prior=(s.incidents||[]).find(i=>i.attempt===s.stepIndex);if(prior)return prior;
  const phase=s.steps?.[s.stepIndex]?.phase||'',seriousJump=tbJump(s)&&(/landing|major.*balance|serious.*jump/i.test(actualEventText)||s.seriousJumpDisruption===true),kind=/runout/i.test(cause)?'runout':/spook/i.test(cause)?'severeSpook':/buck/i.test(cause)?'strongBuck':/rear/i.test(cause)?'highRear':/bolt/i.test(cause)?'bolt':seriousJump?'landing':'refusal';
  const record={exerciseId:s.exerciseId||(/dressage/i.test(phase)?'large-circle':'vertical'),resultIndex:5,text:'A destabilizing show incident was resolved.',changes:{}};

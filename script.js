@@ -7121,7 +7121,7 @@ function renderShows() {
     const includesCourseWalk = activeSession.steps.some((x) => x.stage === 'course_walk');
     const schemeText = includesCourseWalk ? 'Course walk → Warm-up → Main round' : 'Warm-up → Main round';
     const sceneLine = step.stage === 'main_round'
-      ? `${step.jumpNumber || stageIndex} (Jump Number), ${step.jumpType || 'Course element'} (Jump Type), ${variant.scene}`
+      ? `${step.jumpNumber || stageIndex} (Jump Number), ${typeof c7Quick==='function'&&!c7Quick(activeSession)?c7Plan(activeSession,step).title:step.jumpType || 'Course element'} (Jump Type), ${variant.scene}`
       : `${variant.title}, ${variant.scene}`;
 
     panel.innerHTML = `
@@ -7154,8 +7154,7 @@ function renderShows() {
       box.className = 'box';
       box.innerHTML = `
         <p><strong>${String.fromCharCode(97 + idx)})</strong> ${opt.label}</p>
-        <p class='small'>Final chance: success ${finalSuccess}% / partial ${computed.neutralChance}% / fail ${finalFail}%</p>
-        <p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>
+        ${typeof c7Quick==='function'&&!c7Quick(activeSession)?`<p class='small'>${entry.refusalChance?`Refusal/run-out risk per jump: ${entry.refusalChance.toFixed(1)}%`:''}</p>`:`<p class='small'>Final chance: success ${finalSuccess}% / partial ${computed.neutralChance}% / fail ${finalFail}%</p><p class='small'>intent: ${opt.intent || 'adaptive_riding'}</p>`}
         <button data-comp-opt='${idx}' ${activeSession.awaitingAdvance ? 'disabled' : ''}>Choose</button>
       `;
       wrap.append(box);
