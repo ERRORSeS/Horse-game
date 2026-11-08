@@ -2,6 +2,8 @@
 
 Follow-up: competition choices show one-decimal Success (clear), Partial (pole), and Fail (refusal) chances. Partial uses the conditional pole probability, including the chance of reaching the jump without a refusal. Displayed percentages total 100.0; outcome resolution retains full precision. Reorganization choices identify that no jump is attempted. Time penalties are removed from interactive, Quick, NPC, jump-off, and legacy eventing scoring; elapsed time is still recorded and used to rank equal-fault rounds. Existing saved historical results remain intact.
 
+Loading follow-up: failed loading attempts keep the booked itinerary and remain available for retry or staff assistance. Only explicit abandonment returns to planning. Rebooking preserves the attempt sequence, preventing the same deterministic failure from repeating; bookings, payments, and loading progress survive reload.
+
 ## 1. Files and existing handlers
 
 `individuality6.js` supplies the shared refusal profile, negative learning filter, Fence Resilience, inheritance, and environmental recovery. `traits6.js` connects the existing 55 canonical Training 2.0 traits to contextual calculations and resolved consequences. `competition7.js` wraps the existing interactive choice, advancement, score, NPC, jump-off, preparation, and rendering handlers. `index.html` loads these after the existing behavior layers.

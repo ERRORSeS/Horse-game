@@ -77,7 +77,7 @@ function showTravelChoice(show,action,values={}){
     const paid=show.travel?.paidTotal??(app.careEconomy?.receipts||[]).find(r=>r.number===show.travel?.receipt)?.total??0,due=Math.max(0,total-paid);
     const receipt=HorseHealth.ledger(app,show.id+(paid?':transport-adjust:'+total:':transport'),due,csDay(),h,[{name:'Show transport and stabling',quantity:1,unitPrice:due}]);if(!receipt)throw new Error('Insufficient funds for the selected transport and stabling.');
     if(!show.eventSnapshot)show.classTime=Math.max(show.classTime,pastureCalendarHour()+duration+buffer);
-    show.travel={timing,transport,cost:amount,overnight,paidTotal:Math.max(paid,total),receipt:receipt.number,duration,departure:show.classTime-buffer-duration,plannedArrival:show.classTime-buffer,delay:0,loadingAttempts:0};show.clock=show.travel.departure;
+    show.travel={timing,transport,cost:amount,overnight,paidTotal:Math.max(paid,total),receipt:receipt.number,duration,departure:show.classTime-buffer-duration,plannedArrival:show.classTime-buffer,delay:0,loadingAttempts:Math.max(0,Number(show.travel?.loadingAttempts)||0)};show.loadingAbandoned=false;show.clock=show.travel.departure;
     show.readiness=choice(timing==='early'?[90,9,1]:timing==='morning'?[70,25,5]:[35,45,20],'arrival-readiness')===0?8:-5;
     advance('horse-preparation','The departure schedule is now confirmed. The equipment and competition supplies are added to the preparation checklist.',0);
   }
@@ -92,8 +92,7 @@ function showTravelChoice(show,action,values={}){
     const weights=show.loadingProfile==='confident'?[[95,5,0],[93,7,0],[90,10,0],[95,5,0]][intent]:[[85,12,3],[75,18,7],[82,15,3],[90,8,2]][intent],attempt=show.travel.loadingAttempts++,result=choice(weights,'loading-action:'+attempt);
     show.travel.delay+=result===0?0:result===1?.25:.5;show.clock+=result===0?.1:result===1?.25:.5;
     (show.loadingOutcomes ||= []).push({attempt,intent:action,result});
-    if(result>=2&&attempt<2){show.stress+=4;showNote(show,`${h.name} backs away and needs time to settle. The transport staff offer assistance.`);}
-    else if(result>=2){advance('planning','The loading attempt has been abandoned, and the travel schedule must be revised.',0);}
+    if(result>=2){show.travel.loaded=false;show.stress+=4;showNote(show,`${h.name} backs away and needs time to settle. You can try another loading action or request transport staff assistance. The booked itinerary is still in place.`);}
     else{show.travel.loaded=true;h.transportHistory.push({showId:show.id,loaded:true,outcome:result,day:csDay()});h.transportExperience=(h.transportExperience||0)+1;advance('departure',`${h.name} finally steps fully aboard. Loading is complete and the journey can begin.`,0);}
   }
   else if(stage==='departure'){
