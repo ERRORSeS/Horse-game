@@ -2220,6 +2220,7 @@ function randomAlleles(dominant, recessive, opts = {}) {
 
 function randomGenetics(breed = '') {
   const warmblood = BREEDS.slice(0, 19).includes(breed);
+  const welsh = typeof CAREER_WELSH !== 'undefined' && Boolean(CAREER_WELSH[breed]);
   const genetics = {
     extension: randomAlleles('E', 'e', { chanceDominant: 76, chanceHomoDominant: 24 }),
     agouti: randomAlleles('A', 'a', { chanceDominant: 68, chanceHomoDominant: 20 }),
@@ -2230,8 +2231,8 @@ function randomGenetics(breed = '') {
     pearl: randomAlleles('Prl', 'n', { chanceDominant: 9, chanceHomoDominant: 2 }),
     roan: randomAlleles('Rn', 'n', { chanceDominant: 20, chanceHomoDominant: 4 }),
     appaloosa: randomAlleles('Lp', 'n', { chanceDominant: 18, chanceHomoDominant: 4 }),
-    tobiano: randomAlleles('TO', 'n', { chanceDominant: warmblood ? 3 : 24, chanceHomoDominant: warmblood ? 0.2 : 6 }),
-    overo: randomAlleles('O', 'n', { chanceDominant: warmblood ? 1 : 16, chanceHomoDominant: warmblood ? 0.01 : 2 }),
+    tobiano: randomAlleles('TO', 'n', { chanceDominant: welsh ? 0.5 : warmblood ? 3 : 24, chanceHomoDominant: warmblood || welsh ? 0.2 : 6 }),
+    overo: randomAlleles('O', 'n', { chanceDominant: welsh ? 0.2 : warmblood ? 1 : 16, chanceHomoDominant: warmblood || welsh ? 0.01 : 2 }),
     splash: randomAlleles('SW', 'n', { chanceDominant: 13, chanceHomoDominant: 2 }),
     sabino: randomAlleles('Sb', 'n', { chanceDominant: warmblood ? 3 : 16, chanceHomoDominant: warmblood ? 0.2 : 3 })
   };
@@ -3387,6 +3388,7 @@ function hydrateFromSave(data) {
     stallAssignments: data.settings.stallAssignments === true,
     tackOwnership: data.settings.tackOwnership === true,
     saddleFitting: data.settings.saddleFitting === true,
+    welshStandard: data.settings.welshStandard === 'North American-inspired' ? 'North American-inspired' : 'UK-inspired',
     barnName: data.settings.barnName || 'Oxer to Oxer Stable Manager',
     breedingCode: data.settings.breedingCode || '',
     breedingCodePosition: data.settings.breedingCodePosition === 'end' ? 'end' : 'front',
@@ -4202,7 +4204,7 @@ function heightFromBreed(breed) {
   const pickHeight = (min, max) => {
     const heights = [];
     for (let whole = Math.floor(min); whole <= Math.floor(max); whole += 1) {
-      [1, 2, 3].forEach((decimal) => {
+      (typeof CAREER_WELSH !== 'undefined' && CAREER_WELSH[breed] ? [0, 1, 2, 3] : [1, 2, 3]).forEach((decimal) => {
         const value = Number((whole + decimal / 10).toFixed(1));
         if (value >= min && value <= max) heights.push(value);
       });
@@ -4845,7 +4847,8 @@ function baseHorse(type = 'trained', origin = 'player') {
   horse.controlability = controlabilityFromPersonality(horse.personality);
   applyBreedTraits(horse);
   horse.genetics = randomGenetics(horse.breed);
-  const phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
+  let phenotype = resolvePhenotypeFromGenetics(horse.genetics, horse.breed);
+  if (typeof careerWelshMarkings === 'function') phenotype = careerWelshMarkings(phenotype, horse.genetics, horse.breed, horse.id, false);
   horse.coat = normalizeCoatShade(phenotype.coat);
   horse.marking = phenotype.marking;
   horse.marking2 = phenotype.marking2;
@@ -4865,6 +4868,7 @@ function baseHorse(type = 'trained', origin = 'player') {
       horse.potential[k] = Math.min(100, horse.potential[k] + rnd(6, 14));
     });
   }
+  if (typeof careerAssignBreedPotential === 'function') careerAssignBreedPotential(horse);
   applyBreedPotential(horse);
   stallPreferences(horse);
   mgSizing(horse);
@@ -4957,7 +4961,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     mare.gestationLengthDays = 0;
     return;
   }
-  const foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
+  let foalPhenotype = resolvePhenotypeFromGenetics(foal.genetics, foal.breed);
+  if (typeof careerWelshMarkings === 'function') foalPhenotype = careerWelshMarkings(foalPhenotype, foal.genetics, foal.breed, foal.id, true);
   foal.coat = normalizeCoatShade(foalPhenotype.coat);
   foal.marking = foalPhenotype.marking;
   foal.marking2 = foalPhenotype.marking2;
@@ -5058,6 +5063,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     sire.offspring.push({ id: uid(), foalId: foal.id, name: foal.name, gender: foal.gender, age: 0, status: 'Active', date: dateLabel() });
   }
 
+  foal.birthYear = app.year;
+  if (typeof careerAssignBreedPotential === 'function') careerAssignBreedPotential(foal, true);
   applyBreedPotential(foal);
   newborns.push(foal);
   if (dramaticEvents.twinBirth) {
@@ -5067,9 +5074,13 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
     twin.gender = pick(['Mare', 'Stallion']);
     twin.breed = foal.breed;
     twin.conformation = foalConformationFromParents(mare, sire || {});
-    twin.height = Number((Number(foal.height || heightFromBreed(foal.breed)) + ((Math.random() * 0.6) - 0.3)).toFixed(1));
+    const twinHeightRoll = Math.random();
+    const birthHeight = Number.parseFloat(foal.height) || Number.parseFloat(heightFromBreed(foal.breed));
+    twin.height = typeof CAREER_WELSH !== 'undefined' && CAREER_WELSH[twin.breed]
+      ? heightFromBreed(twin.breed) : Number((birthHeight + (twinHeightRoll * 0.6 - 0.3)).toFixed(1));
     twin.genetics = foalGeneticsFromParents(mare, sire || {});
-    const twinPhenotype = resolvePhenotypeFromGenetics(twin.genetics, twin.breed);
+    let twinPhenotype = resolvePhenotypeFromGenetics(twin.genetics, twin.breed);
+    if (typeof careerWelshMarkings === 'function') twinPhenotype = careerWelshMarkings(twinPhenotype, twin.genetics, twin.breed, twin.id, true);
     twin.coat = normalizeCoatShade(twinPhenotype.coat);
     twin.marking = twinPhenotype.marking;
     twin.marking2 = twinPhenotype.marking2;
@@ -5095,6 +5106,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
       sire.offspring.push({ id: uid(), foalId: twin.id, name: twin.name, gender: twin.gender, age: 0, status: 'Active', date: dateLabel() });
     }
     pushReport(`${mare.name}: ${WATCH_MARE_RARE_EVENT_PROMPTS.twins}`);
+    twin.birthYear = app.year;
+    if (typeof careerAssignBreedPotential === 'function') careerAssignBreedPotential(twin, true);
     applyBreedPotential(twin);
     newborns.push(twin);
   }
