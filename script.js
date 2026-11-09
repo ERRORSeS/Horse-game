@@ -2786,9 +2786,16 @@ function stablehandFeedPlanForHorse(horse) {
   return [{ type: managedFeed, grams: targetGrams }];
 }
 
+function setStablehandFeedOverride(horseId, keepFeed) {
+  const horse = app.horses.find(h => h.id === horseId);
+  if (!app.stablehandHired || !horse || (horse.owner !== 'Your Stable' && !horse.isLeased)) return false;
+  horse.stablehandKeepFeed = keepFeed === true;
+  return true;
+}
+
 function applyStablehandCare(horse) {
   if (!app.stablehandHired || !horse || (horse.owner !== 'Your Stable' && !horse.isLeased)) return;
-  horse.feedPlan = stablehandFeedPlanForHorse(horse);
+  if (horse.stablehandKeepFeed !== true) horse.feedPlan = stablehandFeedPlanForHorse(horse);
   horse.managed = horse.managed || {};
   horse.managed.fed = true;
   horse.managed.vet = true;
@@ -5445,7 +5452,11 @@ function createHorseCard(horse, options = {}) {
     <button data-action='save-notes'>Save Notes</button>
     <button data-action='toggle-notes'>${horse.showNotes ? 'Hide Notes' : 'Show Notes'}</button>
     ${horse.showNotes && horse.notes ? `<div class='box'><p class='small'>${horse.notes}</p></div>` : ''}
-    <label>Feed Plan</label>
+    <div class='inline'>
+      <label>Feed Plan</label>
+      ${app.stablehandHired && (horse.owner === 'Your Stable' || horse.isLeased) ? `<button type='button' class='stablehand-feed-control' data-action='toggle-stablehand-feed' aria-pressed='${horse.stablehandKeepFeed === true}'>Allow changing feed</button>` : ''}
+    </div>
+    ${app.stablehandHired && (horse.owner === 'Your Stable' || horse.isLeased) ? `<p class='small' data-stablehand-feed-status>${horse.stablehandKeepFeed === true ? 'Selected: your feed types and amounts are kept. The stablehand continues other care.' : 'Not selected: the stablehand may adjust feed types and amounts during care.'}</p>` : ''}
     <select class='feed-type'>${FEEDS.map((f) => `<option value='${f}'>${f}</option>`).join('')}</select>
     <label>Amount (grams)</label>
     <input type='number' class='feed-grams' min='50' max='250' value='150' />
@@ -5539,6 +5550,13 @@ function createHorseCard(horse, options = {}) {
   node.querySelectorAll('[data-action]').forEach((btn) => {
     btn.onclick = () => {
       const action = btn.dataset.action;
+      if (action === 'toggle-stablehand-feed') {
+        if (setStablehandFeedOverride(horse.id, horse.stablehandKeepFeed !== true)) {
+          render();
+          saveGame(false);
+        }
+        return;
+      }
       if (action === 'rename') {
         const val = node.querySelector('input').value.trim();
         if (val) horse.name = val;
@@ -5573,7 +5591,7 @@ function createHorseCard(horse, options = {}) {
         app.stablehandHired = !app.stablehandHired;
         if (app.stablehandHired) {
           app.horses.forEach((h) => applyStablehandCare(h));
-          pushReport('Stablehand hired for free. Feed is now adjusted automatically, injuries are treated, and care stays high.');
+          pushReport('Stablehand hired for free. Feed is adjusted automatically unless a horse’s feed plan is kept manually; other care continues.');
         } else {
           pushReport('Stablehand dismissed. Manual horse care is active again.');
         }
@@ -5635,6 +5653,7 @@ function createHorseCard(horse, options = {}) {
         horse.managed[key] = !horse.managed[key];
       }
       render();
+      if (action === 'add-feed' || action === 'clear-feed') saveGame(false);
     };
   });
   if (app.horses.some((h) => h.id === horse.id)) {

@@ -1,0 +1,15 @@
+const {check}=require('./behavior5-harness.cjs');
+const ready=`resetGame();app.stablehandHired=true;const [h,other]=app.horses;for(const horse of [h,other]){horse.owner='Your Stable';horse.age=10;horse.illnesses=[];horse.medicalConditions=[];horse.weightStatus='Moderate';horse.preferredFeedGrams=150;horse.stallCleanliness=10;horse.hoofCare=10;horse.turnoutQuality=10;horse.dailyGrooming=10;horse.farrierCare=10;horse.managed.fed=false;horse.managed.vet=false;}h.feedPlan=[{type:'Basic Feed',grams:90},{type:'Basic Feed',grams:50}];other.feedPlan=[{type:'Basic Feed',grams:55}];`;
+check('selected feed override preserves every type and amount while other stablehand care continues',`{
+ ${ready}const plan=h.feedPlan,before=JSON.stringify(plan);if(!setStablehandFeedOverride(h.id,true))throw Error('selection failed');applyStablehandCare(h);applyStablehandCare(other);
+ if(h.feedPlan!==plan||JSON.stringify(h.feedPlan)!==before||!h.managed.fed||!h.managed.vet)throw Error('manual feed or care lost');for(const key of ['stallCleanliness','hoofCare','turnoutQuality','dailyGrooming','farrierCare'])if(h[key]<90)throw Error('other care stopped: '+key);if(JSON.stringify(other.feedPlan)!==JSON.stringify(stablehandFeedPlanForHorse(other))||other.stablehandKeepFeed===true)throw Error('per-horse isolation');
+}`);
+check('unselecting restores automatic feed changes and old horses default to automatic feeding',`{
+ ${ready}setStablehandFeedOverride(h.id,true);setStablehandFeedOverride(h.id,false);applyStablehandCare(h);if(JSON.stringify(h.feedPlan)!==JSON.stringify(stablehandFeedPlanForHorse(h)))throw Error('automatic feed did not resume');delete other.stablehandKeepFeed;applyStablehandCare(other);if(JSON.stringify(other.feedPlan)!==JSON.stringify(stablehandFeedPlanForHorse(other)))throw Error('old default changed');
+}`);
+check('the per-horse feed choice survives real day and month advancement',`{
+ ${ready}setStablehandFeedOverride(h.id,true);const before=JSON.stringify(h.feedPlan);advanceOneDay();if(JSON.stringify(h.feedPlan)!==before||h.stablehandKeepFeed!==true)throw Error('day overwrote feed');monthlyProgress();if(JSON.stringify(h.feedPlan)!==before||h.stablehandKeepFeed!==true)throw Error('month overwrote feed');
+}`);
+check('saving, dismissal and rehiring retain the selected horse feed choice independently',`{
+ ${ready}setStablehandFeedOverride(h.id,true);const id=h.id,otherId=other.id,before=JSON.stringify(h.feedPlan);importStableSave(exportStableSave());const restored=app.horses.find(h=>h.id===id),peer=app.horses.find(h=>h.id===otherId);if(!app.stablehandHired||restored.stablehandKeepFeed!==true||peer.stablehandKeepFeed===true||JSON.stringify(restored.feedPlan)!==before)throw Error('save lost per-horse preference');app.stablehandHired=false;if(setStablehandFeedOverride(id,false)||setStablehandFeedOverride('not-owned',true))throw Error('off-duty edit accepted');applyStablehandCare(restored);app.stablehandHired=true;applyStablehandCare(restored);if(JSON.stringify(restored.feedPlan)!==before||restored.stablehandKeepFeed!==true)throw Error('rehiring reset preference');
+}`);

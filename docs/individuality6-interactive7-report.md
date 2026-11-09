@@ -205,3 +205,10 @@ New sale listings and auction lots receive a saved, varied learned-behavior prof
 A profile is generated once, before preview or trial work, and kept through purchase. Legacy fixed-default sales, auction deliveries and lesson-horse buyouts receive the same initialization on a successful transfer. Existing learned/customized values and preview/trial progress remain authoritative. Inspecting, rendering, retrying delivery or loading a save does not reroll the profile. No training successes or behavioral history events are invented.
 
 The owned-horse card adds “Shuffle Behavior” immediately beside “Make Horse Ridable”. Each explicit click generates a new saved profile for the nine learned values. Technical skills, riding attributes, innate spookiness and intensity, personality, genetics, medical records, bond and QOL remain intact. Seven regression scenarios cover generation variety, personality/schooling relevance, real sale transfers, auction and lesson purchases, legacy defaults, repeat safety, protected data and persistence. Chromium checks cover a complete purchase through the UI, button placement, displayed changes and cold IndexedDB reload.
+
+
+## 20. Per-horse stablehand feed control
+
+While a stablehand is on duty, each eligible horse’s Feed Plan has an “Allow changing feed” toggle. As requested, selected means the player’s feed types and amounts are preserved; unselected means the stablehand may adjust them during the usual care cycle. The visible status and pressed styling make that direction explicit. Other stablehand care continues for the selected horse, and other horses retain their own independent choice.
+
+The preference is saved on the horse, survives day/month skips and dismissal/rehiring, and defaults to automatic feeding in existing saves. Feed edits and toggle changes save immediately. Tests cover plan preservation, continued care, default automatic behavior, per-horse isolation, calendar advancement and saves. Chromium validation uses the actual hire, feed-edit, day-skip, toggle and dismissal buttons, including a cold reload.
