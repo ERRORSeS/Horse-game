@@ -318,21 +318,20 @@ resolvePendingCompetitions=function(h){
 // Named competitors are generated once and retained with their horse and rider IDs.
 function showEnsureNames(show){
   if(!show?.competitors)return;
-  const prefixes=['Silver','Midnight','Winter','Storm','Emerald','Hope','Royal','Velvet','Sol','Luna','Aster','Río','Nieve','Cielo','Frost','Sable','Aquila','Noir','Azul','Viento','Sakura','Kumo','Brisa','Ravn','Fuego','Aurum','Étoile','Vega'];
-  const suffixes=['Dream','River','Valor','Cross','Echo','Flight','Blessing','Danza','Cielo','Mistral','Reina','Fleur','Nimbus','Solstice','Gloria','Mariposa','Orion','Zenith','Eclipse','Horizon','Belle','Shadow','Storm','Mirage'];
   const first=['Alex','Samira','Jordan','Sofia','Daniel','Maya','Luca','Aisha','Robin','Elena','Noah','Camille','Elias','Leila','Morgan','Nina'];
   const last=['Bennett','Reyes','Laurent','Khan','Andersen','Costa','Dubois','Patel','Santos','Novak','Martin','Okafor','Hansen','Rivera','Moreau','Chen'];
-  const used=new Set(show.competitors.filter(e=>e.player||e.name&&!/^Combination \d+$/.test(e.name)).map(e=>e.name));
+  const used=new Set(show.competitors.filter(e=>e.player||e.name&&!/^Combination \d+$/.test(e.name)).map(e=>horseNameKey(e.name)));
   for(const entry of show.competitors){
     const seed=HorseHealth.hash(show.id+'|'+entry.id),pick=(rows,key)=>rows[Math.floor(HorseHealth.roll(seed,key)*rows.length)];
     if(entry.player){entry.horseName=entry.name;entry.riderName ||= 'You';continue;}
     if(!entry.name||/^Combination \d+$/.test(entry.name)){
-      let name=pick(prefixes,'horse-prefix')+' '+pick(suffixes,'horse-suffix'),attempt=0;
-      while(used.has(name)&&attempt<100){attempt++;name=pick(prefixes,'horse-prefix:'+attempt)+' '+pick(suffixes,'horse-suffix:'+attempt);}
-      entry.name=name;used.add(name);
+      let draw = 0;
+      const identity = generateHorseIdentity({ used, random: () => HorseHealth.roll(seed, 'horse-name:' + draw++) });
+      Object.assign(entry, identity);
+      used.add(horseNameKey(entry.name));
     }
     entry.horseName=entry.name;entry.riderName ||= pick(first,'rider-first')+' '+pick(last,'rider-last');entry.riderId ||= entry.id+':rider';
-    entry.horse ||= {id:entry.horseId,name:entry.name,breed:pick(BREEDS,'breed'),skills:HorseHealth.copy(entry.skills)};
+    entry.horse ||= {id:entry.horseId,name:entry.name,naming:entry.naming,breed:pick(BREEDS,'breed'),skills:HorseHealth.copy(entry.skills)};
   }
   for(const row of show.finalStandings||[]){const source=show.competitors.find(e=>e.id===row.id);if(source)Object.assign(row,{name:source.name,horseName:source.horseName,riderName:source.riderName,riderId:source.riderId});}
 }

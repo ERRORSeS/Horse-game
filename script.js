@@ -3633,6 +3633,7 @@ function hydrateFromSave(data) {
 }
 
 function resetGame() {
+  RECENT_HORSE_NAMES.clear();
   app.pastureRelationships = null;
   app.management = null;
   app.uiDisclosures = {};
@@ -4551,16 +4552,135 @@ function horseWorth(horse) {
   return Math.max(350, Math.round(base - agePenalty));
 }
 
-function randomHorseName(){
- const first=['Silver','Midnight','Winter','Storm','Emerald','Hope','Royal','Velvet','Sol','Luna','Aster','Río','Nieve','Cielo','Frost','Sable','Aquila','Noir','Azul','Viento','Sakura','Kumo','Brisa','Ravn','Fuego','Aurum','Étoile','Vega','Atlas','Celeste','Dante','Aurora','Caspian','Odessa','Valentino','Amara','Bellatrix','Orion','Phoenix','Florentina','Sirocco','Indigo','Seraphina','Apollo','Calypso','Dahlia','Everest','Fable','Galileo','Isadora','Jupiter','Lorenzo','Magnolia','Nerina','Oberon','Paloma','Quentin','Rosalie','Soleil','Talisman'];
- const last=['Dream','River','Valor','Cross','Echo','Flight','Blessing','Danza','Cielo','Mistral','Reina','Fleur','Nimbus','Solstice','Gloria','Mariposa','Orion','Zenith','Eclipse','Horizon','Belle','Shadow','Storm','Mirage','Allegro','Rhapsody','Cadence','Serenade','Legacy','Jubilee','Starlight','Symphony','Breeze','Destiny','Sonata','Reverie','Diamant','Fantasia','Nocturne','Promise','Comet','Radiance','Melody','Liberty','Cascade','Ember','Aria','Sovereign','Firefly','Waltz'];
- const lead=pick(first),draw=Math.random()*last.length,index=Math.floor(draw),fraction=draw-index,suffixes=['Z','DVZ','II','III','IV','V','VDL','H','B','SF'];
- return lead+' '+last[index]+(fraction<.35?' '+suffixes[Math.floor(fraction/.35*suffixes.length)]:'');
+const HORSE_NAME_WORDS = Object.fromEntries(Object.entries({
+  everyday: "Milo, Jasper, Archie, Chester, Charlie, Hugo, Theo, Oliver, Oscar, Felix, Arthur, Murphy, Percy, Toby, Rupert, Alfie, Finn, Louie, Harvey, George, Casper, Stanley, Marley, Teddy, Rory, Freddie, Enzo, Bruno, Otis, Nelson, Albert, Lenny, Cooper, Benny, Monty, Maximus, Rowan, Sullivan, Dexter, Willow, Clover, Daisy, Poppy, Hazel, Maple, Juniper, Fern, Meadow, Blossom, Flora, Ivy, Opal, Pearl, Olive, Honey, Rosie, Sunday, Cricket, Marmalade, Pepper, Biscuit, Cinnamon, Copper, Smokey, Ash, Flint, River, Birch, Ember, Pebble, Dusk, Echo, Storm, Winter, Autumn, Comet, Misty, Sage, Breeze",
+  sport: "Contender, Legacy, Remedy, Encore, Anthem, Harmony, Victory, Prestige, Cadence, Eclipse, Obsidian, Mirage, Legend, Maverick, Majesty, Solitaire, Revelation, Catalyst, Momentum, Dominion, Dynasty, Paramount, Radiance, Allegro, Valentino, Crescendo, Sterling, Revival, Serendipity, Ambition, Voltage, Perspective, Renegade, Invictus, Revolution, Providence, Odyssey, Imperium, Vantage",
+  elite: "Aurelian, Cassiano, Bellissimo, Florentino, Fidelio, Valentino, Veridian, Vivaldi, Caledon, Bellario, Orsino, Adelino, Corvado, Sereno, Belladore, Allegretto, Marcello, Cassander, Remington, Cavalier, Calisto, Novello, Aramis, Aurelio, Lorenzo, Luciano, Veronique, Marcellino, Dorian, Constantin, Valerio, Caspian, Azurion, Corentin, Solaris, Caldera, Aurelius, Bellatrix, Levantino, Cavendish",
+  continental: "Quavero, Zelquiro, Calzaro, Vellador, Qorviano, Darquino, Velquino, Ceravox, Kessario, Miravello, Quentaro, Revandor, Orzelio, Ivarixo, Bellanox, Korvando, Serquino, Dovares, Raventino, Korrando, Talerox, Venzaro, Celtrino, Monqaro, Eldrivo, Zalmero, Lurevico, Quarvicio, Vantoro, Carvalex, Valquino, Zovandro, Kaelviro, Xavello, Axorino, Yavendro, Corravino, Arvelon, Zarmello, Dolverin, Kelviano, Kyrvano, Jalmiero, Ozarino, Vezario, Zirando, Calviero, Bellavox, Quarino, Zeravon, Kessandor, Vellario, Arquinox, Cervado, Veltrino, Dalviero, Corzello, Mirquino, Quirado, Zeltravi, Norvando, Azelrio, Quessaro, Calvario, Orvello, Veleron, Quarzino, Aveltrix, Ceravino, Quintero, Dalmorix, Orquado, Velario, Zarello, Torquino, Cassavero, Vardello, Cervalino, Talmerio, Joravox, Quaventino",
+  unusual: "Riddle, Detour, Mischief, Shortcut, Uproar, Nonsense, Paradox, Oops, Kerfuffle, Whoops, Ditto, Wildcard, Doodle, Mayhem, Fiasco, Spanner, Smudge, Wonky, Shenanigan",
+  adjectives: "Silver, Golden, Midnight, Northern, Southern, Eastern, Western, Grand, Royal, Final, First, Last, Secret, Hidden, Wild, True, Perfect, Lucky, Quiet, Dark, Blue, Scarlet, Crimson, Black, White, Velvet, Copper, Diamond, Amber, Ivory, Stormy, Rising, Falling, Broken, Lost, Forgotten, Endless, Eternal, Summer, Winter, Autumn, Spring, Morning, Evening, Noble, Gentle, Little, Major, Silent, Burning, Dancing, Running, Electric, Paper, Glass, Iron, Soft, Rare, Bold, Red, Fine, Bright, Second",
+  nouns: "Echo, Legacy, Promise, Story, Edition, Chance, Horizon, Glory, Affair, Moment, Diamond, Anthem, Rhythm, Melody, Crown, Secret, Victory, Shadow, Dream, Theory, Heart, Empire, Kingdom, Memory, Legend, Desire, Mystery, Miracle, Quest, Chapter, Letter, Song, Storm, Flame, Ember, Journey, Adventure, Dancer, Rebel, Riot, Romance, Paradise, Fortune, Destiny, Reflection, Illusion, Silence, Lightning, Thunder, Jewel, Arrival, Departure, Vision, Echoes, Revolution, Intentions, Reputation, Connection, Obsession, Celebration, Hour, Rain, Light",
+  farms: "Lys, Vale, Mera, Arden, Solen, Bellmont, Caldera, Aster, Rosel, Varen, Noire, Corval, Riven, Montel, Dore, Altura, Havren, Cael, Maris, Velmont, Avel, Seren, Liora, Breven, Elmont, Verdane, Lunel, Merrow, Halden, Vesper, Ravelle, Cendre, Aerden, Valenne, Ardent, Solenne, Belaro, Taren, Orvelle",
+  prefixes: "RAC, DVZ, KJ, MRD, RC, EL, ST, RS, VR, AC, ZH, HN, BV, AV, KD, RL",
+  suffixes: "Z, DVZ, J, K, M'D, M'R, VZ, DC, B, H, TS, LK, AC, RS, ST, ZH, EL, VR, RN, C, N, MRD, DH, RC, KJ",
+  particles: "de, del, da, di, du, des, van, von, der, den, ter, ze, zu, le, la, della, de la, van de, van der, van den, von der, du Val, de l', van 't",
+}).map(([key, words]) => [key, words.split(', ')]));
+
+const HORSE_NAME_STYLES = [
+  ['everyday', 25], ['sport', 25], ['elite', 20], ['continental', 18], ['unusual', 12]
+];
+
+const HORSE_NAME_PHRASES = {
+  everydayPair: [
+    'Silver, Golden, Quiet, Little, Soft, Bright, Summer, Winter, Autumn, Spring, Morning, Evening',
+    'Rain, Light, Melody, Breeze, Storm, Dream, Song, Dancer, Flame, Ember, Promise, Hour'
+  ],
+  unusualPair: [
+    ['Wrong, Good, Last, Lucky, Final, Quick', 'Number, Question, Chance, Minute, Guess, Call'],
+    ['No', 'Comment, Pressure, Refunds, Regrets, Promises, Advice'],
+    ['Almost, Quite, Entirely, Definitely', 'Famous, Perfect, Unlikely, Possible, Ordinary'],
+    ['Just, Only', 'Kidding, Guessing, Asking, Visiting']
+  ],
+  threeWords: [
+    ['The', 'Last, Golden, Silent, Perfect, Grand, Final', 'Chapter, Theory, Crown, Storm, Affair, Word'],
+    ['Made, Ready, Bound, Waiting', 'for', 'Glory, Love, Trouble, Fortune, Victory'],
+    ['Take, Read, Follow', 'the', 'Lead, Clue, Signs'],
+    ['One', 'More, Last, Final', 'Chance, Dance, Question, Guess, Ride']
+  ],
+  long: [
+    ['Beyond, Above, Across, Under', 'the', 'Silver, Golden, Dark, Northern, Summer, Winter', 'Sky, Clouds, Horizon, Mountains, Moon'],
+    ['Out, Ahead', 'of', 'the', 'Blue, Crowd, Shadows, Storm'],
+    ['Just', 'One', 'More, Last, Final', 'Question, Guess, Dance, Ride'],
+    ['The', 'First, Last, Next, Only', 'Word, Chapter, Page', 'Tonight, Tomorrow, Again']
+  ]
+};
+
+const RECENT_HORSE_NAMES = new Set();
+
+function horseNameKey(name) {
+  return String(name || '').normalize('NFC').trim().replace(/\s+/g, ' ').replace(/’/g, "'").toLowerCase();
+}
+
+function occupiedHorseNames() {
+  return new Set([
+    ...app.horses, ...app.saleBarn, ...app.rescueBarn, ...app.rescueHorses,
+    ...app.npcSales, ...app.npcStuds, ...Object.values(app.lessonHorsesByBarn || {}).flat()
+  ].map(horse => horseNameKey(horse.name)));
+}
+
+function generateHorseIdentity({ random = Math.random, used = occupiedHorseNames(), recent = null } = {}) {
+  const styleRoll = random() * 100;
+  const seed = Math.floor(random() * 0x100000000) >>> 0;
+  let state = seed;
+  // Isolate name choices from the random stream that generates horse stats and genetics.
+  function draw() {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  }
+  const words = HORSE_NAME_WORDS;
+  const sample = values => values[Math.floor(draw() * values.length)];
+  const phrase = slots => slots.map(slot => sample(slot.split(', ')));
+  let boundary = 0;
+  const style = HORSE_NAME_STYLES.find(([, weight]) => (boundary += weight) > styleRoll)[0];
+  const registrationStyle = style === 'continental' || style === 'elite';
+
+  function candidate() {
+    const lengthRoll = draw() * 100;
+    const single = sample(words[style]);
+    let tokens;
+    if (lengthRoll < 25) {
+      tokens = [single];
+    } else if (lengthRoll < 63) {
+      if (style === 'unusual') tokens = phrase(sample(HORSE_NAME_PHRASES.unusualPair));
+      else if (style === 'everyday') tokens = phrase(HORSE_NAME_PHRASES.everydayPair);
+      else if (registrationStyle) tokens = [single, sample(['Royale', 'Noble', 'Imperial', 'Velluto', 'Maestro', 'Étoile', 'Fleur', 'Lumière', 'Soleil', 'Opaline'])];
+      else tokens = [sample(words.adjectives), sample(words.nouns)];
+    } else if (registrationStyle && (lengthRoll < 87 || draw() < .65)) {
+      const particle = sample(words.particles);
+      const farm = sample(words.farms);
+      tokens = [single, particle.endsWith("'") ? particle + farm : particle + ' ' + farm];
+    } else if (lengthRoll < 87) {
+      tokens = phrase(sample(HORSE_NAME_PHRASES.threeWords));
+    } else {
+      tokens = phrase(sample(HORSE_NAME_PHRASES.long));
+    }
+
+    const affixChance = style === 'continental' ? .65 : registrationStyle ? .25 : .04;
+    let breederPrefix = null;
+    let breederSuffix = null;
+    if (tokens.join(' ').split(' ').length < 5 && draw() < affixChance) {
+      if (draw() < .23) breederPrefix = sample(words.prefixes);
+      else breederSuffix = sample(words.suffixes);
+    }
+    const name = [breederPrefix, ...tokens, breederSuffix].filter(Boolean).join(' ').normalize('NFC');
+    return { name, naming: { style, breederPrefix, breederSuffix, seed } };
+  }
+
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const result = candidate();
+    const key = horseNameKey(result.name);
+    if (/\b(?:nieve|viento)\b|\b(\w+) \1\b/.test(key)) continue;
+    if (!used.has(key) && !recent?.has(key)) return remember(result);
+  }
+
+  // A crowded roster can exhaust a narrow bank. Use a short name with a distinct ordinal.
+  const shortName = sample(words[style]);
+  let ordinal = 2;
+  while (used.has(horseNameKey(shortName + ' ' + ordinal)) || recent?.has(horseNameKey(shortName + ' ' + ordinal))) ordinal++;
+  return remember({ name: shortName + ' ' + ordinal, naming: { style, breederPrefix: null, breederSuffix: null, seed } });
+
+  function remember(result) {
+    if (recent) {
+      recent.add(horseNameKey(result.name));
+      if (recent.size > 96) recent.delete(recent.values().next().value);
+    }
+    return result;
+  }
 }
 function baseHorse(type = 'trained', origin = 'player') {
   const minAge = type === 'untrained' ? 4 : type === 'trained' ? 8 : 10;
   const maxAge = type === 'untrained' ? 6 : type === 'trained' ? 11 : 12;
-  const name = randomHorseName();
+  const identity = generateHorseIdentity({ recent: RECENT_HORSE_NAMES });
   const potential = {
     dressage: rnd(35, 100),
     jumping: rnd(35, 100),
@@ -4570,7 +4690,7 @@ function baseHorse(type = 'trained', origin = 'player') {
   const statRange = type === 'untrained' ? [0, 10] : type === 'trained' ? [30, 60] : [85, 95];
   const horse = {
     id: uid(),
-    name,
+    ...identity,
     breed: pick(BREEDS),
     gender: pick(['Mare', 'Stallion', 'Gelding']),
     age: rnd(minAge, maxAge),
