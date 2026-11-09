@@ -111,6 +111,7 @@ textarea {
 .money-clickable:hover { color: #66f0a7; }
 .small { font-size: .85rem; color: var(--muted); }
 .inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.stablehand-feed-control[aria-pressed='true'] { background: #355e54; border-color: #80b5ab; }
 .dashboard-news-tabs button.active {
   border-color: var(--accent);
   background: #2f4458;
