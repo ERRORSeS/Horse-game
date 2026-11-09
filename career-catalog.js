@@ -78,7 +78,7 @@ for (const [discipline, stem, levels] of [
       : tier < 10 ? starCode + (tier - 4) + '★ Circuit' : tier === 10 ? 'International Masters' : 'World Championship';
     const level = levels[tier] === '1.25' ? '1.20' : levels[tier];
     careerClass(discipline + '-tier-' + tier, stem + ' ' + title, discipline, tier, level, tier % 12 + 1, {
-      series: discipline + '-ladder', day: 8 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
+      series: discipline + '-ladder', ...(tier===11 ? {cycle:4,edition:2} : {}), day: 8 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
       ...(discipline === 'eventing' && tier >= 5 ? { course: tier >= 8 ? 'Long' : 'Short' } : {})
     });
   }

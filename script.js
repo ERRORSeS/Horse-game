@@ -3511,7 +3511,9 @@ function hydrateFromSave(data) {
     h.postFoalingRecoveryMonths = Number.isFinite(h.postFoalingRecoveryMonths) ? h.postFoalingRecoveryMonths : 0;
     h.tack = typeof h.tack === 'object' && h.tack ? h.tack : {};
     h.tack.bridle = h.tack.bridle || 'Snaffle Bridle';
-    h.tack.bit = h.tack.bit || 'Loose Ring Snaffle';
+    if (!h.tack.bit && !eqBitlessBridle(h.tack.bridle) && !Object.hasOwn(h.tack, 'bit')) {
+      h.tack.bit = 'Loose Ring Snaffle';
+    }
     h.tack.saddle = h.tack.saddle || 'All-Purpose Saddle';
     h.tack.pad = h.tack.pad || 'Basic Pad';
     h.tack.footwear = h.tack.footwear || 'Tendon Boots';
