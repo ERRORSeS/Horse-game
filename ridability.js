@@ -39,6 +39,15 @@ function makeHorseRidable(horseId){
  restoreBasicRidingEducation(h);syncRidability(h);
  return {ok:canRideUnderSaddle(h),message:canRideUnderSaddle(h)?'Riding eligibility repaired. This horse is now ridable.':'This horse still has a riding restriction.'};
 }
+// Refresh derived levels from existing skills and potential without rerolling either.
+function rerunHorseSkills(horseId){
+ const h=app.horses.find(h=>h.id===horseId);
+ if(!h)return {ok:false,message:'Select a horse in your stable.'};
+ if(h.deceased)return {ok:false,message:'Levels cannot be recalculated for a deceased horse.'};
+ if(!h.stats?.jumping||!h.stats?.dressage)return {ok:false,message:'This horse has no technical skills to recalculate.'};
+ const levels=Object.fromEntries(Object.keys(SHOW_LEVELS).map(discipline=>[discipline,SHOW_LEVELS[discipline][highestAllowedLevelIndex(h,discipline)]]));
+ return {ok:true,levels,message:'Maximum levels recalculated. Showjumping: '+levels.jumping+' m; Dressage: '+levels.dressage+'; Eventing: '+levels.eventing+'; Hunters: '+levels.hunter+'.'};
+}
 const RIDABILITY_CARD=createHorseCard;
 createHorseCard=function(h,...args){
  const node=RIDABILITY_CARD(h,...args);
@@ -47,7 +56,8 @@ createHorseCard=function(h,...args){
  const button=document.createElement('button');button.type='button';button.textContent='Make Horse Ridable';button.dataset.makeHorseRidable=h.id;
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent=h.ridabilityRepairMessage||'';
  button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
- controls.appendChild(button);controls.appendChild(status);node.appendChild(controls);return node;
+ const rerun=document.createElement('button');rerun.type='button';rerun.textContent='Rerun Skills';rerun.dataset.rerunHorseSkills=h.id;rerun.title='Recalculate maximum levels from current skills and potential without changing skill scores.';const skillStatus=document.createElement('p');skillStatus.setAttribute('role','status');skillStatus.textContent=h.skillRerunMessage||'';rerun.onclick=()=>{const result=rerunHorseSkills(h.id);h.skillRerunMessage=result.message;render();if(result.ok)saveGame(false);};
+ controls.appendChild(button);controls.appendChild(rerun);controls.appendChild(status);controls.appendChild(skillStatus);node.appendChild(controls);return node;
 };
 
 // Ridable horses may enter competitions regardless of legacy administrative flags.
