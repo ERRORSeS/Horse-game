@@ -1,5 +1,4 @@
 /* Town shop fronts share the established Tack Shop presentation. */
-function csDate(day){if(!Number.isFinite(day))return 'Unknown date';const d=pastureDate(day*24);return `${String(d.day).padStart(2,'0')}/${String(d.month).padStart(2,'0')}/${String(d.year).padStart(4,'0')}`;}
 // Routine feedback belongs to the page, including seller dialogue and errors.
 csNotice=function(result){app.careFeedback=result?.message||'';render();saveGame(false);};
 const CS_FEEDBACK_RENDER=render;

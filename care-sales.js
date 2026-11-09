@@ -3,6 +3,8 @@ const CARE_VERSION=1;
 let careMigrationBlocked=false;
 let csLastHealthDay=null;
 function csDay(){return Math.floor((typeof careSimulationHour==='number'?careSimulationHour:pastureCalendarHour())/24);}
+// Shared by horse profiles, veterinary history and shops.
+function csDate(day){if(!Number.isFinite(day))return 'Unknown date';const d=pastureDate(day*24);return `${String(d.day).padStart(2,'0')}/${String(d.month).padStart(2,'0')}/${String(d.year).padStart(4,'0')}`;}
 function csId(prefix){app.careSequence=(app.careSequence||0)+1;return `${prefix}:${app.careSequence}`;}
 function csEscape(value){return mgEscape(String(value??''));}
 function csOptions(values,current){return values.map(v=>`<option value="${csEscape(v)}" ${v===current?'selected':''}>${csEscape(v)}</option>`).join('');}
