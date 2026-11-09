@@ -351,7 +351,7 @@ showCreate = function (horse, session, event, entryId) {
   const show = CAREER_CREATE_SHOW(horse,session,event,entryId);
   if (!event?.careerEvent) {
     careerOrdinaryField(show);
-    if (careerActive()) show.careerRider = careerRider();
+    show.careerRider = careerRider();
     return show;
   }
   const rider = careerRider();

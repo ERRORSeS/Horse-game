@@ -3830,7 +3830,7 @@ function pushCompetitionReport(report) {
 }
 
 function requiredBehaviorForRiding(horse) {
-  if (!horse) return 0;
+  if (!horse || horse.ridingEducationOverride === true && horse.age > 3) return 0;
   if (horse.requiresBreakingIn) return 500;
   if (horse.bredBy === 'Your Stable') return 500;
   return 0;

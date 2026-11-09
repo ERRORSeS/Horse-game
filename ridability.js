@@ -1,7 +1,7 @@
 /* Permanent ridability is independent of age and sporting longevity estimates. */
 function kissingSpines(h){return (h.medicalConditions||[]).find(c=>c.diagnosis==='kissing-spines'||/kissing spines/i.test(c.legacyName||c.name||''));}
 function restoreBasicRidingEducation(h,manual=false){
- if(!h||h.deceased||h.age<3||h.auctionTier&&h.age<=3||h.auctionUnbroken&&h.requiresBreakingIn&&!manual)return h;
+ if(!h||h.deceased||h.age<3||h.ridingEducationOverride||h.auctionTier&&h.age<=3||h.auctionUnbroken&&h.requiresBreakingIn&&!manual)return h;
  h.requiresBreakingIn=false;
  h.behavior=Math.max(500,Number(h.behavior)||0);
  return h;
@@ -34,9 +34,11 @@ function makeHorseRidable(horseId){
  if(!h)return {ok:false,message:'Select a horse in your stable.'};
  syncRidability(h);
  if(h.deceased)return {ok:false,message:'A deceased horse cannot be made ridable.'};
- if(h.age<3)return {ok:false,message:'This horse must be at least three years old for ridden work.'};
+ if(!(h.age>3))return {ok:false,message:'This control is available for horses older than three years.'};
  if(kissingSpines(h))return {ok:false,message:'Kissing Spines is lifelong; this horse cannot be made ridable.'};
- restoreBasicRidingEducation(h,true);syncRidability(h);
+ h.ridingEducationOverride=true;
+ h.requiresBreakingIn=false;
+ syncRidability(h);
  return {ok:canRideUnderSaddle(h),message:canRideUnderSaddle(h)?'Riding eligibility repaired. This horse is now ridable.':'This horse still has a riding restriction.'};
 }
 // Refresh derived levels from existing skills and potential without rerolling either.
@@ -61,7 +63,7 @@ createHorseCard=function(h,...args){
  const node=RIDABILITY_CARD(h,...args);
  if(!app.horses.some(owned=>owned.id===h.id))return node;
  const controls=document.createElement('section');controls.className='ridability-repair';
- const button=document.createElement('button');button.type='button';button.textContent='Make Horse Ridable';button.dataset.makeHorseRidable=h.id;
+ const button=document.createElement('button');button.type='button';button.textContent='Make Horse Ridable';button.dataset.makeHorseRidable=h.id;button.disabled=!(h.age>3)||h.deceased;
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent=h.ridabilityRepairMessage||'';
  button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
  const rerun=document.createElement('button');rerun.type='button';rerun.textContent='Rerun Skills';rerun.dataset.rerunHorseSkills=h.id;rerun.title='Recalculate maximum levels from current skills and potential without changing skill scores.';const skillStatus=document.createElement('p');skillStatus.setAttribute('role','status');skillStatus.textContent=h.skillRerunMessage||'';rerun.onclick=()=>{const result=rerunHorseSkills(h.id);h.skillRerunMessage=result.message;render();if(result.ok)saveGame(false);};

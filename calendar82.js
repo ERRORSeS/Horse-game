@@ -10,19 +10,22 @@ function show82EventList(year,month,view) {
   const from=pastureCalendarHour(year,view==='major' || view==='list' ? 1 : month,1,0);
   const to=view==='major' || view==='list' ? pastureCalendarHour(year,12,30,23) : from+CAREER_HOURS_PER_MONTH-1;
   const events=[...careerSchedule(from,to),...customShowEvents(from,to)];
+  const seen=new Set(events.map(event=>event.id));
   if (view!=='major') {
     for (const event of [...(app.barnShows || []),...(app.upcomingEvents || []),...(mgState().calendarShows || [])]) {
       const at=event.at ?? pastureCalendarHour()+ (event.daysUntilStart || 0)*24;
-      if (at<from || at>to || events.some(row=>row.id===event.id)) continue;
+      if (at<from || at>to || seen.has(event.id)) continue;
+      seen.add(event.id);
       const classification=event.careerClassification;
       events.push({...event,at,date:pastureDate(at),name:calendarEventName(event),legacy:true,
         tier:classification?.tier ?? 0,prestige:classification?.prestige ?? 3,custom:!!event.userHosted,
         entryFee:event.entryFee ?? event.fee ?? 0});
     }
   }
-  return view==='major' ? events.filter(show82Major) : events;
+  const hidden=app.career?.showRecords?.hidden || {};
+  return events.filter(event=>!hidden[event.id] && (view!=='major' || show82Major(event)));
 }
-function show82Blocker(event,rider,horse) {
+function show82Blocker(event,rider,horse,historyFor) {
   if (event.status==='Completed' || app.career?.meets[event.id] || app.career?.customShows?.results[event.id]) return 'Completed';
   if (event.at<pastureCalendarHour()) return 'Entries closed';
   if (app.career?.customShows?.shows[event.customShowId]?.registrations[event.id]) return 'Already entered';
@@ -32,10 +35,12 @@ function show82Blocker(event,rider,horse) {
     const nomination=federationNomination(event,rider,horse);
     if (!nomination || !['Selected — National Squad','Selected — Championship Team'].includes(nomination.status)) return 'Federation nomination required.';
   }
-  const issue=careerEligibility(event,rider,event.allocated ? null : horse);
-  if (issue) return issue;
   const earliest=event.country===app.currentBarn?.country ? 24 : 60;
-  if (event.at < pastureCalendarHour()+earliest || event.at > pastureCalendarHour()+90*24) return 'Outside the booking window.';
+  const now=pastureCalendarHour();
+  if (event.at < now+earliest || event.at > now+90*24) return 'Outside the booking window.';
+  const history=event.tier>=5 || event.youngFinal || event.final ? historyFor?.(event.discipline) : undefined;
+  const issue=careerEligibility(event,rider,event.allocated ? null : horse,{history});
+  if (issue) return issue;
   return '';
 }
 function show82Sort(rows,key) {
@@ -88,22 +93,39 @@ function show82RenderCalendar() {
   const view=filters.view,year=Number(filters.year) || app.year,month=Number(filters.month) || app.month;
   const rider=careerRider(), horses=competitionEligibleHorses();
   const horse=horses.find(row=>row.id===filters.horse) || horses[0];
-  const events=show82EventList(year,month,view);
-  const rows=show82Sort(events.filter(event=>show82Matches(event,filters)).map(event=>({event,blocker:show82Blocker(event,rider,horse)}))
+  const fixtures=view!=='reference' && view!=='history';
+  const events=fixtures ? show82EventList(year,month,view) : [];
+  const history= view==='history' ? showHistoryRows() : [];
+  const histories=new Map();
+  const historyFor=discipline=>{
+    if (!histories.has(discipline)) histories.set(discipline,careerResults({riderId:rider.id,discipline}));
+    return histories.get(discipline);
+  };
+  const blocker=event=>show82Blocker(event,rider,horse,historyFor);
+  const needsEligibility=filters.sort==='recommended' || Boolean(filters.status);
+  const rows=show82Sort(events.filter(event=>show82Matches(event,filters))
+    .map(event=>({event,blocker:needsEligibility ? blocker(event) : null}))
     .filter(row=>filters.status==='eligible' ? !row.blocker : filters.status==='completed' ? row.blocker==='Completed' : true),filters.sort);
+  const pageSize=24, total=view==='history' ? history.length : rows.length;
+  const page=Math.min(Math.max(0,Number(filters.page) || 0),Math.max(0,Math.ceil(total/pageSize)-1));
+  const pageRows=rows.slice(page*pageSize,(page+1)*pageSize);
+  if (!needsEligibility) for (const row of pageRows) row.blocker=blocker(row.event);
+  const pageNav=total>pageSize ? `<div class="shop-meta"><span>${page*pageSize+1}–${Math.min(total,(page+1)*pageSize)} of ${total}</span>
+    <button type="button" data-show82-page="${page-1}"${page===0 ? ' disabled' : ''}>Previous</button>
+    <button type="button" data-show82-page="${page+1}"${(page+1)*pageSize>=total ? ' disabled' : ''}>Next</button></div>` : '';
   const section=document.createElement('section');
   section.className='tack-shop horse-sales-shop career-shell career-calendar-wrap';
   const choices=(values)=>[['','All'],...values];
   const references=MAJOR_REFERENCE_2026.filter(row=>!filters.discipline || row[4].includes(filters.discipline));
   const rendered = view==='major' ? Array.from({length:12},(_,i)=>i+1).map(m=>{
-    const matches=rows.filter(row=>row.event.date.month===m);
+    const matches=pageRows.filter(row=>row.event.date.month===m);
     return matches.length ? `<details class="shop-drawer" open><summary>Month ${m} <span class="shop-count">${matches.length}</span></summary>
       <div class="shop-drawer-body cards sales-listings">${matches.map(row=>show82Card(row.event,row.blocker)).join('')}</div></details>` : `<details class="shop-drawer"><summary>Month ${m}</summary><div class="shop-drawer-body">No major events match.</div></details>`;
-  }).join('') : `<div class="sales-shop-body cards sales-listings">${rows.map(row=>show82Card(row.event,row.blocker)).join('')}</div>`;
+  }).join('') : `<div class="sales-shop-body cards sales-listings">${pageRows.map(row=>show82Card(row.event,row.blocker)).join('')}</div>`;
   section.innerHTML=careerHero('Show office · Season calendar','Competition calendar','Find a suitable class, follow the year’s major events, or organize a show.')+
-    `<div class="shop-meta"><span>${view==='reference' ? references.length+' published references' : rows.length+' visible classes'}</span><span>${csEscape(rider.name)}</span><span>${csEscape(pastureDateLabel(pastureCalendarHour()))}</span></div>
+    `<div class="shop-meta"><span>${view==='reference' ? references.length+' published references' : view==='history' ? history.length+' past shows' : rows.length+' visible classes'}</span><span>${csEscape(rider.name)}</span><span>${csEscape(pastureDateLabel(pastureCalendarHour()))}</span></div>
     <div class="sales-filter-bar career-filters">
-      ${show82Filter('View','view',[['monthly','Monthly'],['list','Season list'],['major','Annual majors'],['reference','2026 reference']],view)}
+      ${show82Filter('View','view',[['monthly','Monthly'],['list','Season list'],['major','Annual majors'],['reference','2026 reference'],['history','Show history']],view)}
       ${show82Filter('Discipline','discipline',choices(Object.entries(CAREER_DISCIPLINE_LABELS)),filters.discipline)}
       ${show82Filter('Year','year',Array.from({length:6},(_,i)=>app.year-1+i).filter(y=>y>0).map(y=>[y,'Year '+y]),year)}
       ${show82Filter('Month','month',Array.from({length:12},(_,i)=>[i+1,'Month '+(i+1)]),month)}
@@ -117,13 +139,13 @@ function show82RenderCalendar() {
       <label>Maximum prestige<input type="number" min="0" max="100" data-show82-filter="max" value="${Number(filters.max ?? 100)}"></label>
     </div>
     <p class="shop-status" role="status" data-show82-message></p>
-    ${view==='reference' ? `<div class="sales-shop-body cards sales-listings">${references.map(([name,start,end,venue,disciplines,kind,source])=>
+    ${view==='history' ? showHistoryMarkup(history.slice(page*pageSize,(page+1)*pageSize)) : view==='reference' ? `<div class="sales-shop-body cards sales-listings">${references.map(([name,start,end,venue,disciplines,kind,source])=>
       `<article class="box sales-horse-card"><p class="shop-eyebrow">Published 2026 reference · ${kind}</p><h3>${csEscape(name)}</h3>
       <p>${start}${start===end ? '' : ' to '+end} · ${csEscape(venue)}</p><p>${disciplines.map(d=>CAREER_DISCIPLINE_LABELS[d]).join(' · ')}</p>
       <a href="${source}" target="_blank" rel="noopener noreferrer">Organizer schedule</a></article>`).join('')}</div>` :
-      rows.length ? rendered : '<div class="sales-shop-body"><p class="shop-empty">No events match the filters.</p></div>'}`;
-  section.innerHTML += federationMarkup82(rider,horses) + show82CreatorMarkup();
-  if (panel.children?.length > 0 && typeof panel.append === 'function') {
+      rows.length ? rendered : '<div class="sales-shop-body"><p class="shop-empty">No events match the filters.</p></div>'}${pageNav}`;
+  if (fixtures) section.innerHTML += federationMarkup82(rider,horses) + show82CreatorMarkup();
+  if (panel.children?.length > 0 && typeof panel.append === 'function' && !panel.querySelector('.calendar82-stable-tools')) {
     const tools=document.createElement('details'), summary=document.createElement('summary'), content=document.createElement('div');
     tools.className='tack-shop shop-drawer calendar82-stable-tools';
     summary.textContent='Stable calendar tools and reminders';
@@ -137,8 +159,13 @@ function show82RenderCalendar() {
   show82BindFederation(panel,rider,horses);
   for (const input of panel.querySelectorAll('[data-show82-filter]')) input.onchange=()=>{
     filters[input.dataset.show82Filter]=input.value;
-    renderCalendar();
+    filters.page=0;
+    show82RenderCalendar();
   };
+  for (const button of panel.querySelectorAll('[data-show82-page]')) button.onclick=()=>{
+    filters.page=Number(button.dataset.show82Page);show82RenderCalendar();
+  };
+  bindShowHistory(panel,history);
   for (const button of panel.querySelectorAll('[data-show82-enter]')) button.onclick=()=>{
     const event=events.find(row=>row.id===button.dataset.show82Enter);
     if (!event) return;
@@ -222,7 +249,7 @@ function show82BindCreator(panel) {
   root.querySelector('[data-show82-create]').onclick=()=>{
     const result=customShowCreate({...values(root,'data-show-value'),classes:[...classes.children].map(row=>values(row,'data-class-value'))});
     if (!result.ok) {root.querySelector('[data-show82-create-status]').textContent=result.message;return;}
-    Object.assign(careerSelection().show82,{view:'monthly',year:result.show.year,month:result.show.month,kind:'custom',status:''});
+    Object.assign(careerSelection().show82,{view:'monthly',year:result.show.year,month:result.show.month,kind:'custom',status:'',page:0});
     saveGame(false);
     renderCalendar();
   };
