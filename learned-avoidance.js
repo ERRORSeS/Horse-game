@@ -11,7 +11,7 @@ function getBaseAvoidanceRisk(value){
 }
 function tbTier(value,rows){return rows[Math.min(4,Math.floor(clamp(Number(value)||0,0,100)/20))];}
 function fenceAvoidanceOverLevel(s={}){
- const levels=SHOW_LEVELS.jumping,experience=parseFloat(rrSettings().experience.jumping),height=parseFloat(s.setup?.height??s.level);
+ const levels=SHOW_LEVELS.jumping,experience=parseFloat(rrSettings().experience.jumping),height=parseFloat(s.setup?.height??competitionLevel(s.discipline,s.level));
  if(!Number.isFinite(height))return 0;
  const tier=levels.findIndex(level=>parseFloat(level)>=height-.00001),current=levels.findIndex(level=>parseFloat(level)>=experience-.00001);
  const gap=Math.max(0,(tier<0?levels.length:tier)-Math.max(0,current));
@@ -301,7 +301,7 @@ function tbEnrichEvent(h,s,event){
  f.underChallenged=event.jumping&&Number(s.setup?.height)<t2height(h)-.2;
  f.storylineProposal=rrSettings().difficultStories&&event.failed;
  f.potentialContext=event.type==='session'&&Object.values(h.potential||{}).some(value=>Number.isFinite(value));
- f.higherPastPerformance=(h.showResults||[]).some(row=>row.discipline==='jumping'&&parseFloat(row.level)>parseFloat(s.level||s.setup?.height));
+ f.higherPastPerformance=(h.showResults||[]).some(row=>row.discipline==='jumping'&&parseFloat(row.level)>parseFloat(competitionLevel(s.discipline,s.level)||s.setup?.height));
  f.historicalDecline=prior.filter(row=>Object.entries(row.changes).some(([stat,c])=>/Avoidance|Sensitivity|Anticipation/.test(stat)?c.delta>0:c.delta<0)).length>=2;
  f.stagnation=(rrHorse(h).completedBehaviorSessions||[]).slice(-3).length===3&&(rrHorse(h).completedBehaviorSessions||[]).slice(-3).every(row=>!row.positive);
 }

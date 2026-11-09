@@ -172,3 +172,27 @@ All four discipline tables use the requested skill ranges. Showjumping uses sepa
 The owned horse card has a “Rerun Skills” button immediately beside “Make Horse Ridable”. It recalculates and displays all four current maximum levels from existing skills and potential. It does not reset or reroll skill scores, genetics, attributes, behavior, bond or QOL. Levels remain derived from the authoritative skills rather than a separate saved level cache. Existing saves immediately use the revised tables; the button saves its confirmation message through the normal save system.
 
 Eight regression scenarios cover the exact tables, boundaries, the 95-skill jumping case, all four recalculated levels, potential caps including zero, unchanged horse data, repeated recalculation, saves and medical career limits. Chromium validation checks button placement, unchanged scores, the revised 1.70 m result at 95 jumping skill and cold IndexedDB reload without uncaught page exceptions.
+
+
+## 17. Responsiveness, Crosspoles, manual aging and daily therapy
+
+Equipment catalog lookups now use an index that refreshes when stock definitions are added. Seller-tack checks skip ownership scans when a horse has no seller-tack reference. Disclosure toggles reuse keys already calculated during the render, and latest-five medical histories copy and hash only the displayed records. Full history, stable row identifiers, archive/hide controls, save verification and gameplay simulation remain intact.
+
+A Chromium benchmark with a 30-horse stable measured average horse-panel redraws at 15.4 ms before and 7.6 ms after, and training redraws at 71.3 ms before and 29.8 ms after. These are local five-redraw measurements, not a guarantee for every device or save. A 10,000-record history test verifies that the latest-five view hashes five records instead of every record while retaining all stored history.
+
+Showjumping competition and calendar menus include Crosspoles. It is an alias of 0.70 m for skills, eligibility, rider experience, refusal, execution and pole risk; its displayed and saved label stays Crosspoles. Canonical schooling indices, breed limits and saved medical career caps do not shift. The horse-card Add year button increases only the selected living horse’s age by one, including its foal day counter where present, without advancing the calendar or awarding skills.
+
+The therapy panel explains that day one is assessment day, shows when massage sessions begin, and identifies the next required daily step. Check Horse, review, massage and recording controls follow the actual saved course state. Already-recorded days, clinical pauses and final reviews retain their existing rules. Browser checks cover an actual daily massage and recording, alongside a Crosspoles registration and saved manual age edit.
+
+Before age six, technical training completion targets are 0.5–1.0 and riding-attribute targets are 0.1–0.4. Eligible attempts share those session caps, and completion tops up the work already earned. At age six the existing 3–5 and 1.5–2.0 ranges resume. These ranges do not change learned behavior, temperament or innate aid sensitivity. Potential caps, actual-work requirements and saved reward deduplication remain in effect.
+
+
+## 18. Young sale horses, prospect auctions and generated coats
+
+Ordinary sale generation limits horses aged three and four to 1.00 m and five-year-olds to 1.10 m, including talent modifiers and optimistic advertised heights. Older horses retain varied schooling. Unstarted sale horses remain unstarted, and sale catalogs include weaned foals without ridden trials or invented show records. Current untouched NPC listings adopt the age limits; owned horses and negotiated transactions keep their existing training data.
+
+New auction catalogs contain Sport Horse, Green Horse and Foal collections, with Normal and Elite tiers alternating between catalog cycles. Green Horse lots are unbroken three- to five-year-old prospects. Elite lots have actual potential above the medium tier in their main advertised discipline. Foal lots are age zero and unstarted. Existing bids, prices, contracts and shipped horses remain in the existing purchase lifecycle. Saved unbroken flags prevent the riding-education repair from silently starting these prospects. Existing collections are retained until their normal turnover; an available third slot can add a Foal collection.
+
+Generated horse names have a larger vocabulary and occasional Z, DVZ, II, III, IV, V, VDL, H, B and SF endings. Existing names are not rerolled. Newly generated warmblood tobiano and sabino rates are 3% and frame-overo is 1%; plain coats are more common. Existing genetic data and Mendelian inheritance are unchanged. Seeded tests check age limits, foal listings and saved state, prospect potential and education, catalog bounds, name variety and coat frequencies.
+
+Migration also restores a missing saved Fence Resilience field to the existing safe default of 5; finite saved values and newly generated resilience remain intact. The final regression run was completed in stages, with auction fixtures updated for three collections, explicit purchase funds and intentionally unbroken prospects. The final browser flows passed for Crosspoles, manual aging, daily massage recording, foal sales and both prospect auction categories through cold saves.

@@ -1,7 +1,7 @@
 /* Permanent ridability is independent of age and sporting longevity estimates. */
 function kissingSpines(h){return (h.medicalConditions||[]).find(c=>c.diagnosis==='kissing-spines'||/kissing spines/i.test(c.legacyName||c.name||''));}
-function restoreBasicRidingEducation(h){
- if(!h||h.deceased||h.age<3||h.auctionTier&&h.age<=3)return h;
+function restoreBasicRidingEducation(h,manual=false){
+ if(!h||h.deceased||h.age<3||h.auctionTier&&h.age<=3||h.auctionUnbroken&&h.requiresBreakingIn&&!manual)return h;
  h.requiresBreakingIn=false;
  h.behavior=Math.max(500,Number(h.behavior)||0);
  return h;
@@ -36,7 +36,7 @@ function makeHorseRidable(horseId){
  if(h.deceased)return {ok:false,message:'A deceased horse cannot be made ridable.'};
  if(h.age<3)return {ok:false,message:'This horse must be at least three years old for ridden work.'};
  if(kissingSpines(h))return {ok:false,message:'Kissing Spines is lifelong; this horse cannot be made ridable.'};
- restoreBasicRidingEducation(h);syncRidability(h);
+ restoreBasicRidingEducation(h,true);syncRidability(h);
  return {ok:canRideUnderSaddle(h),message:canRideUnderSaddle(h)?'Riding eligibility repaired. This horse is now ridable.':'This horse still has a riding restriction.'};
 }
 // Refresh derived levels from existing skills and potential without rerolling either.
@@ -48,6 +48,14 @@ function rerunHorseSkills(horseId){
  const levels=Object.fromEntries(Object.keys(SHOW_LEVELS).map(discipline=>[discipline,SHOW_LEVELS[discipline][highestAllowedLevelIndex(h,discipline)]]));
  return {ok:true,levels,message:'Maximum levels recalculated. Showjumping: '+levels.jumping+' m; Dressage: '+levels.dressage+'; Eventing: '+levels.eventing+'; Hunters: '+levels.hunter+'.'};
 }
+// A manual age edit affects this horse, without advancing the simulation clock.
+function addHorseYear(horseId){
+ const h=app.horses.find(h=>h.id===horseId);
+ if(!h||h.deceased||!Number.isFinite(h.age))return {ok:false,message:'Choose a living horse in your stable.'};
+ h.age+=1;
+ if(Number.isFinite(h.foalVitality?.ageDays))h.foalVitality.ageDays+=365;
+ return {ok:true,message:h.name+' is now '+h.age+' years old.'};
+}
 const RIDABILITY_CARD=createHorseCard;
 createHorseCard=function(h,...args){
  const node=RIDABILITY_CARD(h,...args);
@@ -57,7 +65,8 @@ createHorseCard=function(h,...args){
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent=h.ridabilityRepairMessage||'';
  button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
  const rerun=document.createElement('button');rerun.type='button';rerun.textContent='Rerun Skills';rerun.dataset.rerunHorseSkills=h.id;rerun.title='Recalculate maximum levels from current skills and potential without changing skill scores.';const skillStatus=document.createElement('p');skillStatus.setAttribute('role','status');skillStatus.textContent=h.skillRerunMessage||'';rerun.onclick=()=>{const result=rerunHorseSkills(h.id);h.skillRerunMessage=result.message;render();if(result.ok)saveGame(false);};
- controls.appendChild(button);controls.appendChild(rerun);controls.appendChild(status);controls.appendChild(skillStatus);node.appendChild(controls);return node;
+ const addYear=document.createElement('button');addYear.type='button';addYear.textContent='Add year';addYear.dataset.addHorseYear=h.id;addYear.onclick=()=>{const result=addHorseYear(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
+ controls.appendChild(button);controls.appendChild(addYear);controls.appendChild(rerun);controls.appendChild(status);controls.appendChild(skillStatus);node.appendChild(controls);return node;
 };
 
 // Ridable horses may enter competitions regardless of legacy administrative flags.

@@ -20,7 +20,7 @@ function tb52JumpAlreadyResolved(h,s){return rrEnabled()&&tbJump(s)&&!!rrHorse(h
 function tb52SaveJump(h,s,profile,roll,show=false){
  const b=rrHorse(h),id=tb52JumpKey(s,show);b.jumpAttempts52 ||= {};
  if(b.jumpAttempts52[id])return b.jumpAttempts52[id];
- const attempt={id,horseId:h.id,riderId:rrSettings().riderId,sessionId:rrSessionId(s),attempt:show?s.stepIndex:(s.attempts||0)+1,exercise:s.exerciseId||s.level,height:Number(s.setup?.height??s.level),score:profile.score,chance:profile.chance,roll,refused:roll<profile.chance,day:rrDay(s),show};
+ const attempt={id,horseId:h.id,riderId:rrSettings().riderId,sessionId:rrSessionId(s),attempt:show?s.stepIndex:(s.attempts||0)+1,exercise:s.exerciseId||s.level,height:Number(s.setup?.height??competitionLevel(s.discipline,s.level)),score:profile.score,chance:profile.chance,roll,refused:roll<profile.chance,day:rrDay(s),show};
  b.jumpAttempts52[id]=attempt;for(const key of Object.keys(b.jumpAttempts52).slice(0,-200))delete b.jumpAttempts52[key];return attempt;
 }
 function tb52JumpDecision(h,s,profile){const prior=rrHorse(h).jumpAttempts52?.[tb52JumpKey(s)];if(prior)return prior;return tb52SaveJump(h,s,profile,t2random(s)*100);}
