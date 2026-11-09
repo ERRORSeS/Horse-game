@@ -240,7 +240,7 @@ function t2xAidStatus(h,e,s){
 }
 function t2xAward(h,s,name,requested,changes){
  if(name==='Sensitivity to Aids'||!Number.isFinite(requested)||requested<=0)return 0;
- s.attributeGains=s.attributeGains||Object.fromEntries(T2_ATTRIBUTES.map(a=>[a,s.progress?.['Riding '+a]||0]));const value=t2attribute(h,name),gain=Math.max(0,Math.min(requested,T2X.attributeCap-(s.attributeGains[name]||0),10-value));
+ s.attributeGains=s.attributeGains||Object.fromEntries(T2_ATTRIBUTES.map(a=>[a,s.progress?.['Riding '+a]||0]));const value=t2attribute(h,name),gain=Math.max(0,Math.min(requested,(h.age<6&&typeof trainingCompletionTargets==='function'?Math.min(T2X.attributeCap,trainingCompletionTargets(h,s).attribute):T2X.attributeCap)-(s.attributeGains[name]||0),10-value));
  if(name==='Focus')h.focus+=gain*10;else t2horse(h).attributes[name]=value+gain;
  s.attributeGains[name]=(s.attributeGains[name]||0)+gain;s.attributeGain+=gain;changes['Riding '+name]=(changes['Riding '+name]||0)+gain;return gain;
 }

@@ -30,13 +30,13 @@ check('warmblood champagne and double cream genes are much rarer while inheritan
  if(!wbChampagne||wbChampagne>=otherChampagne/4||!wbCream||wbCream>=otherCream/5)throw Error('rare coat rates');
  const h={genetics:{...randomGenetics('Hanoverian'),cream:'Cr/Cr',champagne:'Ch/Ch'}};const foal=foalGeneticsFromParents(h,h);if(foal.cream!=='Cr/Cr'||foal.champagne!=='Ch/Ch')throw Error('inheritance rewritten');
 }`);
-check('ordinary sale horses have varied schooling and ages three and four stay at or below 1.10m',`{
+check('ordinary sales keep ages three and four at 1.00m and age five at 1.10m with varied older schooling',`{
  resetGame();let high=0;const levels=new Set();
  for(const age of [3,4,5,6,12])for(let n=0;n<100;n++){
-  const h=baseHorse('fully','npc');h.breed='Hanoverian';h.potential={jumping:100,dressage:100,eventing:100,hunter:100};h.age=age;applySalesAgeSkillBand(h);const level=Number(SHOW_LEVELS.jumping[highestAllowedLevelIndex(h,'jumping')]);if(age<=4&&level>1.1)throw Error('young sale too advanced');if(age>4){levels.add(level);if(level>=1.6)high++;}
+  const h=baseHorse('fully','npc');h.breed='Hanoverian';h.potential={jumping:100,dressage:100,eventing:100,hunter:100};h.age=age;applySalesAgeSkillBand(h);const level=Number(SHOW_LEVELS.jumping[highestAllowedLevelIndex(h,'jumping')]);if(age<=4&&level>1||age===5&&level>1.1)throw Error('young sale too advanced');if(age>=6){levels.add(level);if(level>=1.6)high++;}
  }
  if(levels.size<8||!high)throw Error('older sales lack variety');
- for(const h of app.npcSales)if(h.age<=4&&Number(SHOW_LEVELS.jumping[highestAllowedLevelIndex(h,'jumping')])>1.1)throw Error('generated advert age limit');
+ for(const h of app.npcSales)if(h.age<=5&&Number(SHOW_LEVELS.jumping[highestAllowedLevelIndex(h,'jumping')])>(h.age<5?1:1.1))throw Error('generated advert age limit');
 }`);
 check('Normal and Elite auction age schooling bands are actual saved levels in all disciplines',`{
  resetGame();const seen=new Set();let unstarted=0,normalLow=0,eliteHigh=0;

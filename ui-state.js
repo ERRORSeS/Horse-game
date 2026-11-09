@@ -1,12 +1,13 @@
 // Remember player-controlled disclosure state independently of redraws and counts.
 function uiDisclosureBaseKey(el){
- const panel=el.closest('.panel')?.id||'page',owner=el.closest('[data-ui-owner]')?.dataset?.uiOwner||'';
+ const panelElement=el.closest('.panel'),panel=panelElement?.id||'page',owner=el.closest('[data-ui-owner]')?.dataset?.uiOwner||'';
  if(el.dataset.uiKey)return `${panel}|${owner}|${el.dataset.uiKey}`;
  if(el.dataset.pastureToggle)return `${panel}|${el.dataset.pastureToggle}|${el.dataset.pastureField}`;
- const labels=[];for(let node=el;node&&node!==el.closest('.panel');node=node.parentElement){if(node.tagName==='DETAILS'){const text=node.querySelector(':scope > summary')?.textContent||'';labels.unshift(text.replace(/\s*\(\d+[^)]*\)/g,'').replace(/\s+/g,' ').trim());}}
+ const labels=[];for(let node=el;node&&node!==panelElement;node=node.parentElement){if(node.tagName==='DETAILS'){const text=node.querySelector(':scope > summary')?.textContent||'';labels.unshift(text.replace(/\s*\(\d+[^)]*\)/g,'').replace(/\s+/g,' ').trim());}}
  return `${panel}|${owner}|${labels.join('/')}`;
 }
-function uiDisclosureEntries(scope=document){const seen=new Map();return [...scope.querySelectorAll('details')].map(el=>{const base=uiDisclosureBaseKey(el),index=seen.get(base)||0;seen.set(base,index+1);return {el,key:`${base}|${index}`};});}
+const uiDisclosureKeys=new WeakMap();
+function uiDisclosureEntries(scope=document){const seen=new Map();return [...scope.querySelectorAll('details')].map(el=>{const base=uiDisclosureBaseKey(el),index=seen.get(base)||0;seen.set(base,index+1);const key=`${base}|${index}`;uiDisclosureKeys.set(el,key);return {el,key};});}
 function uiSelectionEntries(scope=document){const seen=new Map();return [...scope.querySelectorAll('select, textarea')].filter(el=>el.dataset?.authoritativeSelection!=='true'&&!el.id?.startsWith('shop-')&&!el.closest('.training2')?.classList?.contains('training2')).map(el=>{const panel=el.closest('.panel')?.id||'page',owner=el.closest('[data-ui-owner]')?.dataset?.uiOwner||'',attribute=[...(el.attributes||[])].filter(a=>a.name.startsWith('data-')).map(a=>`${a.name}:${a.value}`).join('|'),label=el.closest('label')?.textContent?.replace(/\s+/g,' ').trim()||'',base=`${panel}|${owner}|${el.id||attribute||el.className||label}`,n=seen.get(base)||0;seen.set(base,n+1);return {el,key:`${base}|${n}`};});}
 function uiCapturePanels(scope=document){app.uiDisclosures=app.uiDisclosures||{};app.uiSelections=app.uiSelections||{};for(const {el,key}of uiDisclosureEntries(scope))app.uiDisclosures[key]=el.open;for(const {el,key}of uiSelectionEntries(scope))app.uiSelections[key]=el.value;}
 function uiRestorePanels(scope=document){for(const {el,key}of uiDisclosureEntries(scope))if(Object.hasOwn(app.uiDisclosures||{},key))el.open=app.uiDisclosures[key];for(const {el,key}of uiSelectionEntries(scope)){const value=app.uiSelections?.[key];if(value!=null&&(el.tagName==='TEXTAREA'||[...el.options].some(o=>o.value===value)))el.value=value;}}
@@ -18,7 +19,7 @@ function uiFlushSave(){if(uiSaveTimer===null)return;clearTimeout(uiSaveTimer);ui
 function uiQueueSave(){if(uiSaveTimer!==null)clearTimeout(uiSaveTimer);uiSaveTimer=setTimeout(uiFlushSave,180);}
 window.addEventListener('pagehide',uiFlushSave);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')uiFlushSave();});
-document.addEventListener('toggle',event=>{const el=event.target;if(el.tagName!=='DETAILS'||!el.isConnected)return;const entry=uiDisclosureEntries(el.closest('.panel')||document).find(e=>e.el===el);if(!entry)return;app.uiDisclosures=app.uiDisclosures||{};if(app.uiDisclosures[entry.key]!==el.open){app.uiDisclosures[entry.key]=el.open;uiQueueSave();}},true);
+document.addEventListener('toggle',event=>{const el=event.target;if(el.tagName!=='DETAILS'||!el.isConnected)return;const key=uiDisclosureKeys.get(el)||uiDisclosureEntries(el.closest('.panel')||document).find(e=>e.el===el)?.key;if(!key)return;app.uiDisclosures=app.uiDisclosures||{};if(app.uiDisclosures[key]!==el.open){app.uiDisclosures[key]=el.open;uiQueueSave();}},true);
 
 // Selection changes survive direct panel redraws as well as the full render.
 document.addEventListener('change',event=>uiCapturePanels(event.target?.closest?.('.panel')||document),true);

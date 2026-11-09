@@ -2230,10 +2230,10 @@ function randomGenetics(breed = '') {
     pearl: randomAlleles('Prl', 'n', { chanceDominant: 9, chanceHomoDominant: 2 }),
     roan: randomAlleles('Rn', 'n', { chanceDominant: 20, chanceHomoDominant: 4 }),
     appaloosa: randomAlleles('Lp', 'n', { chanceDominant: 18, chanceHomoDominant: 4 }),
-    tobiano: randomAlleles('TO', 'n', { chanceDominant: 24, chanceHomoDominant: 6 }),
-    overo: randomAlleles('O', 'n', { chanceDominant: 16, chanceHomoDominant: 2 }),
+    tobiano: randomAlleles('TO', 'n', { chanceDominant: warmblood ? 3 : 24, chanceHomoDominant: warmblood ? 0.2 : 6 }),
+    overo: randomAlleles('O', 'n', { chanceDominant: warmblood ? 1 : 16, chanceHomoDominant: warmblood ? 0.01 : 2 }),
     splash: randomAlleles('SW', 'n', { chanceDominant: 13, chanceHomoDominant: 2 }),
-    sabino: randomAlleles('Sb', 'n', { chanceDominant: 16, chanceHomoDominant: 3 })
+    sabino: randomAlleles('Sb', 'n', { chanceDominant: warmblood ? 3 : 16, chanceHomoDominant: warmblood ? 0.2 : 3 })
   };
   if (breed === 'Friesian') {
     genetics.extension = rnd(1, 100) <= 50 ? 'E/E' : 'E/e';
@@ -4432,8 +4432,11 @@ function applyExerciseSession(horse, options = {}) {
   return { exercise, hours };
 }
 
+// Competition-only alias; canonical schooling indices and saved career caps stay stable.
+function competitionLevel(discipline, level) { return discipline === 'jumping' && level === 'Crosspoles' ? '0.70' : level; }
+function competitionLevels(discipline) { return discipline === 'jumping' ? ['Crosspoles', ...SHOW_LEVELS.jumping] : SHOW_LEVELS[discipline]; }
 function levelIndex(discipline, level) {
-  return SHOW_LEVELS[discipline].indexOf(level);
+  return SHOW_LEVELS[discipline]?.indexOf(competitionLevel(discipline, level)) ?? -1;
 }
 
 
@@ -4541,10 +4544,16 @@ function horseWorth(horse) {
   return Math.max(350, Math.round(base - agePenalty));
 }
 
+function randomHorseName(){
+ const first=['Silver','Midnight','Winter','Storm','Emerald','Hope','Royal','Velvet','Sol','Luna','Aster','Río','Nieve','Cielo','Frost','Sable','Aquila','Noir','Azul','Viento','Sakura','Kumo','Brisa','Ravn','Fuego','Aurum','Étoile','Vega','Atlas','Celeste','Dante','Aurora','Caspian','Odessa','Valentino','Amara','Bellatrix','Orion','Phoenix','Florentina','Sirocco','Indigo','Seraphina','Apollo','Calypso','Dahlia','Everest','Fable','Galileo','Isadora','Jupiter','Lorenzo','Magnolia','Nerina','Oberon','Paloma','Quentin','Rosalie','Soleil','Talisman'];
+ const last=['Dream','River','Valor','Cross','Echo','Flight','Blessing','Danza','Cielo','Mistral','Reina','Fleur','Nimbus','Solstice','Gloria','Mariposa','Orion','Zenith','Eclipse','Horizon','Belle','Shadow','Storm','Mirage','Allegro','Rhapsody','Cadence','Serenade','Legacy','Jubilee','Starlight','Symphony','Breeze','Destiny','Sonata','Reverie','Diamant','Fantasia','Nocturne','Promise','Comet','Radiance','Melody','Liberty','Cascade','Ember','Aria','Sovereign','Firefly','Waltz'];
+ const lead=pick(first),draw=Math.random()*last.length,index=Math.floor(draw),fraction=draw-index,suffixes=['Z','DVZ','II','III','IV','V','VDL','H','B','SF'];
+ return lead+' '+last[index]+(fraction<.35?' '+suffixes[Math.floor(fraction/.35*suffixes.length)]:'');
+}
 function baseHorse(type = 'trained', origin = 'player') {
   const minAge = type === 'untrained' ? 4 : type === 'trained' ? 8 : 10;
   const maxAge = type === 'untrained' ? 6 : type === 'trained' ? 11 : 12;
-  const name = `${pick(['Silver', 'Midnight', 'Winter', 'Storm', 'Emerald', 'Hope', 'Royal', 'Velvet', 'Sol', 'Luna', 'Aster', 'Río', 'Nieve', 'Cielo', 'Frost', 'Sable', 'Aquila', 'Noir', 'Azul', 'Viento', 'Sakura', 'Kumo', 'Brisa', 'Ravn', 'Fuego', 'Aurum', 'Étoile', 'Vega'])} ${pick(['Dream', 'River', 'Valor', 'Cross', 'Echo', 'Flight', 'Blessing', 'Danza', 'Cielo', 'Mistral', 'Reina', 'Fleur', 'Nimbus', 'Solstice', 'Gloria', 'Mariposa', 'Orion', 'Zenith', 'Eclipse', 'Horizon', 'Belle', 'Shadow', 'Storm', 'Mirage'])}`;
+  const name = randomHorseName();
   const potential = {
     dressage: rnd(35, 100),
     jumping: rnd(35, 100),
@@ -5020,28 +5029,33 @@ function seedShowHistory(horse, showCount = rnd(1, 4), maxLevelIndex = 4) {
 }
 
 
+function saleJumpingLimit(horse){return horse.age<5?'1.00':horse.age<6?'1.10':null;}
+function enforceSaleAgeLimit(horse){
+ if(horse.age<3){horse.requiresBreakingIn=true;horse.behavior=Math.min(499,horse.behavior||0);for(const group of Object.values(horse.stats))for(const skill of Object.keys(group))group[skill]=Math.min(10,group[skill]);return;}
+ const level=saleJumpingLimit(horse);if(!level)return;
+ const next=SHOW_LEVELS.jumping[levelIndex('jumping',level)+1],maximum=requiredSkillBand('jumping',next)[0]-(horse.extraPotential?3:0)-.01;
+ for(const skill of Object.keys(horse.stats.jumping))horse.stats.jumping[skill]=Math.min(horse.stats.jumping[skill],Math.max(0,maximum));
+}
 function applySalesAgeSkillBand(horse) {
-  applyBreedPotential(horse);
-  for (const discipline of ['dressage', 'jumping']) {
-    const maxSkill = Math.min(horse.potential[discipline], horse.age <= 4 && discipline === 'jumping' ? 49.99 - (horse.extraPotential ? 3 : 0) : 100);
-    const center = Math.random() * maxSkill;
-    for (const skill of Object.keys(horse.stats[discipline])) horse.stats[discipline][skill] = Math.max(0, Math.min(maxSkill, center + rnd(-4, 4)));
-  }
-  // Connection contributes 10% of the actual jumping score.
-  if (horse.age <= 4) {
-    const maximum = 49.99 - (horse.extraPotential ? 3 : 0), actual = horseDisciplineAverage(horse, 'jumping');
-    if (actual > maximum) for (const skill of Object.keys(horse.stats.jumping)) horse.stats.jumping[skill] *= Math.max(0, (maximum - horse.stats.dressage.Connection * .1) / Math.max(.01, actual - horse.stats.dressage.Connection * .1));
-  }
+ applyBreedPotential(horse);
+ for(const discipline of ['dressage','jumping']){
+  const maxSkill=horse.potential[discipline],center=Math.random()*maxSkill;
+  for(const skill of Object.keys(horse.stats[discipline]))horse.stats[discipline][skill]=Math.max(0,Math.min(maxSkill,center+rnd(-4,4)));
+ }
+ enforceSaleAgeLimit(horse);
+}
+function saleFoal(){
+ const h=baseHorse('untrained','npc');h.age=0;h.owner='Foal Breeder';h.foalVitality={score:rnd(60,95),ageDays:rnd(210,330),shownUntilDay:180,rareEvents:[]};h.weaned=true;applySalesAgeSkillBand(h);h.showResults=[];h.competitionResults=[];return h;
 }
 
 function refreshNpcAds() {
   const saleCount = 6;
   const studCount = 5;
-  app.npcSales = Array.from({ length: saleCount }, () => {
-    const horse = baseHorse(pick(['trained', 'fully']), 'npc');
-    horse.age = rnd(3, 25);
+  app.npcSales = Array.from({ length: saleCount }, (_,index) => {
+    const horse = index===0?saleFoal():baseHorse(pick(['trained', 'fully']), 'npc');
+    if(index!==0)horse.age = rnd(1, 25);
     applySalesAgeSkillBand(horse);
-    seedShowHistory(horse, rnd(1, 4), 8);
+    if(horse.age>=3&&!horse.requiresBreakingIn)seedShowHistory(horse, rnd(1, 4), 8);
     horse.owner = pick(['North Ridge Stable', 'Willow Creek Farm', 'Silverline Equestrian', 'Ravenwood Horses']);
     horse.marking = randomMarking(horse.breed, { salesMarketBoost: true });
     horse.saleId = uid();
@@ -7235,7 +7249,7 @@ function renderShows() {
         </select>
         <p class='small'>Foals/youngsters under age 3 are in-hand only (registries/breeders), not under-saddle shows.</p>
         <label>Division</label>
-        <select id='show-level-${s.key}'>${SHOW_LEVELS[s.key].map((lvl) => `<option>${lvl}</option>`).join('')}</select>
+        <select id='show-level-${s.key}'>${competitionLevels(s.key).map((lvl) => `<option>${lvl}</option>`).join('')}</select>
         ${showHorsePool.length ? '' : '<p class="small">No eligible horses for this filter.</p>'}
         <button id='enter-${s.key}' ${showHorsePool.length ? '' : 'disabled'}>Register Show Entry</button>
         <p class='small'>Results are delivered after the next hour/day/month skip.</p>
@@ -9177,7 +9191,7 @@ function normalizeCoatShade(coat) {
 }
 
 function showjumpingPoleChance(horse, level) {
-  const height = Number(level);
+  const height = Number(competitionLevel('jumping', level));
   const base = height <= 0.9 ? 0.30 : height <= 1.2 ? 0.40 : 0.45;
   const personality = { 'Easy-Going': -0.6, 'Bomb-proof': -0.8, Sensitive: -0.3, Spooky: 0.7, 'Hot-Blooded': 0.7, Excitable: 0.6, Unfocused: 0.8, Lazy: 0.3, Stubborn: 0.5, Energetic: 0.3 }[horse.personality] || 0;
   const tack = clamp(-tackControlabilityDelta(horse, 'jumping') / 30, -1, 1);

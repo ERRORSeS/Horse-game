@@ -13,7 +13,8 @@ mgCatalog('Leg Protection','forelegs',[['Tendon Boots',95],['Fetlock Boots',65],
 mgCatalog('Accessories','headwear',[['Ear Bonnet',45],['Noise-Reducing Ear Bonnet',95],['Fly Mask',35],['Race Mask/Blinder Hood',85],['Fly Veil',40],['Nose Net',30],['Tail Guard',45],['Stable Blanket',120],['Turnout Rug',160]]);
 const MG_ALIASES={'Neckrope':'Neck Rope','Basic Pad':'Basic Cotton Pad','Ear-Bonnet':'Ear Bonnet','Race Mask':'Race Mask/Blinder Hood','Martingal':'Running Martingale','Racing / Close-Contact Saddle':'Close-Contact Saddle','Cavesson Bridle':'Plain Cavesson Bridle','All-Purpose':'All-Purpose Saddle','Jumping':'Jumping Saddle','Dressage':'Dressage Saddle'};
 function mgName(name){return MG_ALIASES[name]||name;}
-function mgType(name){return MG_CATALOG.find(t=>t.id===mgName(name));}
+let mgCatalogIndex=null,mgCatalogIndexLength=-1;
+function mgType(name){if(mgCatalogIndexLength!==MG_CATALOG.length){mgCatalogIndex=new Map();for(const item of MG_CATALOG)if(!mgCatalogIndex.has(item.id))mgCatalogIndex.set(item.id,item);mgCatalogIndexLength=MG_CATALOG.length;}return mgCatalogIndex.get(mgName(name));}
 function mgEscape(x){return pastureEscape(x);}
 function mgId(){const s=mgState();return `equipment-${++s.sequence}`;}
 function mgState(){
