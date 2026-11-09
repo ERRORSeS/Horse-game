@@ -21,6 +21,7 @@ function bookShowTrip(show,values={}){
   const h=showHorse(show),scope=tripScope(show,values.scope),duration=tripDuration(show,scope),minimum=duration>5?1:0,nights=Number(values.nights??Math.max(minimum,values.timing==='early'?1:0));
   if(!Number.isInteger(nights)||nights<minimum||nights>14)throw Error('Travel over five hours requires an overnight stall; choose 0–14 appropriate nights.');
   const buffer=Math.max(nights*24+2,scope==='continent'?48:scope==='country'?36:values.timing==='early'?26:values.timing==='late'?1:5),now=Math.max(pastureCalendarHour(),show.travel?show.clock:pastureCalendarHour()),classTime=Math.max(Number(show.classTime)||0,now+duration+buffer),departure=classTime-buffer-duration,arrival=departure+duration;
+  if (show.eventSnapshot?.careerEvent && classTime > show.eventSnapshot.at) throw Error('This itinerary misses the fixed class time. Choose an earlier departure or a shorter stay.');
   // Each entered show runs on its own itinerary clock, even for a late booking.
   // Retain the advertised time while allowing enough time for travel and rest.
   if(nights&&overnightAvailability(show,arrival,classTime)===0)throw Error('No overnight stalls are available for these dates.');

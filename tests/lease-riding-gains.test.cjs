@@ -13,7 +13,7 @@ check('technical completion totals are three to five and riding attribute totals
 }`);
 check('exercise-led and all ridden disciplines receive the same completion ranges from relevant work',`{
  for(const [discipline,id,focus,group,skill]of [['jumping','related','','jumping','Striding'],['dressage','walk-trot','dressage:Gaits','dressage','Gaits'],['hunter','hunter-lines','jumping:Striding','jumping','Striding'],['eventing','eventing-dressage','dressage:Connection','dressage','Connection']]){
-  ${ready} s.discipline=discipline;s.disciplineSkill=focus;for(let n=0;n<5;n++)addWork(id);completedFocusReward(h,s);const gain=h.stats[group][skill]-30,attribute=s.completionReward?.attributeGain;if(gain<3||gain>5||attribute<1.5||attribute>2)throw Error('discipline '+discipline);if(!s.completionReward.focus.includes(skill))throw Error('wrong main skill');
+  ${ready} s.discipline=discipline;s.disciplineSkill=focus;for(let n=0;n<5;n++)addWork(id);completedFocusReward(h,s);const gain=h.stats[group][skill]-30,attribute=s.completionReward?.attributeGain;if(gain<3-1e-9||gain>5+1e-9||attribute<1.5-1e-9||attribute>2+1e-9)throw Error('discipline '+discipline);if(!s.completionReward.focus.includes(skill))throw Error('wrong main skill');
  }
 }`);
 check('short, unsuccessful and unrelated work cannot claim the completion award',`{

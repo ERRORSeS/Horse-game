@@ -163,7 +163,10 @@
       const tx=current||inquiry(app,l.id,day);if(!tx)continue;
       const seed=H.hash(l.id+'|buyer:'+ (l.buyerCount||0));l.buyerCount=(l.buyerCount||0)+1;
       tx.buyerName=['Willow Creek Stable','Northfield Equestrian','Oakridge Horses','Meadowbrook Rider'][Math.floor(H.roll(seed,'name')*4)];
-      tx.buyerOffer=Math.max(1,Math.round(l.ask*(.85+H.roll(seed,'offer')*.15)));tx.buyerLimit=Math.round(l.ask*(1+H.roll(seed,'limit')*.12));
+      const proven = typeof careerHorseRecord === 'function' ? careerHorseRecord(l.horse).premium : 0;
+      const interest = Math.min(.06, proven * .25);
+      tx.buyerOffer=Math.max(1,Math.round(l.ask*Math.min(1,.85+H.roll(seed,'offer')*.15+interest)));
+      tx.buyerLimit=Math.round(l.ask*(1+H.roll(seed,'limit')*.12+interest));
       tx.status='Buyer Offer Received';tx.conversation.push({day,topic:'Buyer inquiry',text:tx.buyerName+' offers $'+tx.buyerOffer+' for '+l.horse.name+'.'});tx.events.push({day,type:'Buyer Offer',amount:tx.buyerOffer});l.nextBuyerDay=day+3;
     }
   }
