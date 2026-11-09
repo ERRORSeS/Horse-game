@@ -202,11 +202,11 @@ function careerEvent(definition, year) {
     entries: []
   };
 }
-function careerSchedule(from, to, includeGames = careerState().settings.games) {
+function careerSchedule(from, to, includeGames = careerState().settings.games, includeForeground = true) {
   const events = [];
   for (let year = pastureDate(from).year; year <= pastureDate(to).year; year++) {
     for (const row of CAREER_SERIES) {
-      if ((row.games || row.gamesTrial) && !includeGames || row.cycle && year % row.cycle !== row.edition) continue;
+      if (row.foregroundOnly && !includeForeground || (row.games || row.gamesTrial) && !includeGames || row.cycle && year % row.cycle !== row.edition) continue;
       const hour = pastureCalendarHour(year, row.month, row.day, 12);
       if (hour >= from && hour <= to) events.push(careerEvent(row, year));
     }
@@ -495,7 +495,7 @@ function careerAdvance(hour = pastureCalendarHour()) {
   const firstMonth = Math.floor(world.cursor / CAREER_HOURS_PER_MONTH);
   const lastMonth = Math.floor(hour / CAREER_HOURS_PER_MONTH);
   const events = careerActive() && world.settings.background
-    ? careerSchedule(from - 72, hour).filter(event => careerEventEnd(event) >= from && careerEventEnd(event) <= hour)
+    ? careerSchedule(from - 72, hour, undefined, false).filter(event => careerEventEnd(event) >= from && careerEventEnd(event) <= hour)
       .sort((a,b) => careerEventEnd(a)-careerEventEnd(b) || a.id.localeCompare(b.id))
     : [];
   let index = 0;

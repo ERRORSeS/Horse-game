@@ -204,3 +204,18 @@ const CAREER_SPONSORS = [
   { id: 'aster', name: 'Aster Performance', tier: 6, starts: 3, stipend: 900, bonus: 700, category: 'equipment' },
   { id: 'vellmont', name: 'Vellmont Equestrian', tier: 9, starts: 3, stipend: 1800, bonus: 1400, category: 'apparel' }
 ];
+
+// Extra development fixtures fill the gaps between the existing championships.
+for (const [discipline,label,ponyLevel,youngLevels] of [
+  ['jumping','Showjumping','0.80',['0.70','0.80','0.90','1.00','1.10']],
+  ['dressage','Dressage','Training',['Introductory','Training','Level One','Level Two','Level Three']],
+  ['eventing','Eventing','Starter',['Starter','Starter','Pre-Entry','Entry','Pre-Training']],
+  ['hunter','Hunter','Novice',['Poles and Crosspoles','Novice','Pre-Green','Green','Low']]
+]) {
+  careerLeague(discipline+'-pony-development','Pony '+label+' Development Circuit',discipline,2,ponyLevel,[1,4,8,12],
+    {division:'pony',ponyCm:148,base:15,foregroundOnly:true});
+  for (let age=4;age<=8;age++) {
+    careerLeague(discipline+'-young-development-'+age,age+'-Year-Old '+label+' Development Circuit',discipline,2,youngLevels[age-4],
+      [2,5,9,12],{horseAge:age,base:10+(age-4)*5,foregroundOnly:true});
+  }
+}

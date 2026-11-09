@@ -254,7 +254,6 @@ function renderCareerRankings() {
   const filter = options.some(([value]) => String(value) === String(choice)) ? choice
     : type === 'national' ? rider.country : options[0]?.[0] ?? '';
   const rows = state.rankings[careerBoardKey(type,discipline,filter)] || [];
-  const champions = ['team','tour'].includes(type) ? careerSeriesHistory(filter,discipline) : [];
   const top = rows.slice(0,100);
   const own = rows.find(row => row.id === rider.id);
   if (own && !top.includes(own)) top.push(own);
@@ -270,7 +269,20 @@ function renderCareerRankings() {
       <label>Discipline<select data-career-board="discipline">${careerOptions(Object.entries(CAREER_DISCIPLINE_LABELS),discipline)}</select></label>
       ${options.length ? `<label>Division or series<select data-career-board="boardFilter:${type}">${careerOptions(options,filter)}</select></label>` : ''}
     </div>
-    <div class="sales-shop-body career-board">
+    <details class="shop-drawer" data-career-rider-list${selected.rankingsCollapsed ? '' : ' open'}>
+      <summary><span>Rankings list</span><span class="shop-count">${rows.length}</span></summary>
+      <div class="shop-drawer-body career-board"></div>
+    </details>
+    ${typeof riderShowPointsMarkup==='function' ? '<div class="sales-shop-body">' + riderShowPointsMarkup(rider) + '</div>' : ''}
+    ${careerHistoryMarkup(rider,discipline)}
+    ${careerSponsorMarkup(rider)}
+    ${careerGuide()}</section>`;
+  const list=panel.querySelector('[data-career-rider-list]');
+  function fillRankingsList() {
+    const board=list?.querySelector('.career-board');
+    if (!board || board.innerHTML) return;
+    const champions=['team','tour'].includes(type) ? careerSeriesHistory(filter,discipline) : [];
+    board.innerHTML=`
       ${top.length ? top.map((row,index) => {
         const change = row.previous == null ? 'New' : row.previous - row.rank;
         return `<details class="career-rank-row" data-career-rank-row="${index}">
@@ -281,17 +293,23 @@ function renderCareerRankings() {
         </details>`;
       }).join('') : '<p class="shop-empty">No classified points in this release.</p>'}
       ${champions.length ? '<h3>Season champions</h3>' + champions.map(row => `<p>Year ${row.year} · ${csEscape(row.winner.name)} · ${row.winner.points} pts</p>`).join('') : ''}
-    </div>
-    ${careerHistoryMarkup(rider,discipline)}
-    ${careerSponsorMarkup(rider)}
-    ${careerGuide()}</section>`;
-  panel.querySelectorAll('[data-career-rank-row]').forEach(details => details.ontoggle = () => {
+`;
+    board.querySelectorAll('[data-career-rank-row]').forEach(details => details.ontoggle = () => {
     const body = details.querySelector('.career-rank-detail');
     if (details.open && !body.innerHTML) {
       body.innerHTML = careerLeaderboardDetails(top[Number(details.dataset.careerRankRow)],type,discipline,filter);
     }
   });
+  }
+  if (list) {
+    list.ontoggle=()=>{
+      selected.rankingsCollapsed=!list.open;
+      if (list.open) fillRankingsList();
+    };
+    if (list.open) fillRankingsList();
+  }
   panel.querySelectorAll('[data-career-board]').forEach(select => select.onchange = () => {
+    if (list) selected.rankingsCollapsed=!list.open;
     selected[select.dataset.careerBoard] = select.value;
     renderCareerRankings();
   });
