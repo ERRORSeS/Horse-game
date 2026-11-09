@@ -255,7 +255,7 @@ function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
       return 'The horse does not meet the current schooling or medical requirements.';
     }
   } else if (!event.allocated) return 'Choose a horse.';
-  if (!npc && app.riderRealism?.enabled && rrOverLevel(event.discipline, event.level) >= 18) return 'The rider needs more discipline experience for this class.';
+  if (!npc && app.riderRealism?.enabled && levelIndex(event.discipline,event.level) - levelIndex(event.discipline,rider.experience?.[event.discipline]) >= 3) return 'The rider needs more discipline experience for this class.';
 
   const needsHistory = event.tier >= 5 && (event.division === 'senior' || event.games) || event.youngFinal || event.final;
   if (!needsHistory) return '';
