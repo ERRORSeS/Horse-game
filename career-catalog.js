@@ -160,14 +160,16 @@ for (const [name, cm] of [['Small', 127], ['Medium', 137], ['Large', 148]]) {
     { division: 'pony', ponyCm: cm, ponyMinCm: cm === 148 ? 137 : cm === 137 ? 127 : 0, base: 30 });
 }
 
-for (const [discipline, level, horseMinAge] of [['jumping','1.60',9], ['dressage','Grand Prix',8], ['eventing','Four Star',8]]) {
+for (const [discipline, level, continentalLevel, horseMinAge] of [
+  ['jumping','1.60','1.40',9], ['dressage','Grand Prix','Intermediate',8], ['eventing','Four Star','Advanced',8]
+]) {
   careerClass('world-games-' + discipline, 'World Arena Games · ' + cap(discipline), discipline, 11, level, 8, {
     day: 13 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline), cycle: 4, edition: 0, games: true,
     country: 'FRA', horseMinAge, team: 3, count: 3, quota: 3, ranking: 'championship', base: 0
   });
   for (const month of [2,4,6]) {
     careerClass('asian-trials-' + discipline + '-' + month, 'Asian Continental Games Trial · ' + cap(discipline),
-      discipline, 7, level, month, { day: 20 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
+      discipline, 7, continentalLevel, month, { day: 20 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
         cycle: 4, edition: 2, gamesTrial: true, country: 'KAZ', region: 'Asia', horseMinAge, ranking: 'none', base: 0, starters: 40 });
   }
   for (const month of [2,5,7]) {
@@ -175,7 +177,7 @@ for (const [discipline, level, horseMinAge] of [['jumping','1.60',9], ['dressage
       discipline, 8, level, month, { day: 20 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
         cycle: 4, edition: 0, gamesTrial: true, country: 'FRA', horseMinAge, ranking: 'none', base: 0, starters: 40 });
   }
-  careerClass('asian-games-' + discipline, 'Asian Continental Games · ' + cap(discipline), discipline, 11, level, 9, {
+  careerClass('asian-games-' + discipline, 'Asian Continental Games · ' + cap(discipline), discipline, 11, continentalLevel, 9, {
     day: 13 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline), cycle: 4, edition: 2, games: true,
     country: 'KAZ', region: 'Asia', horseMinAge, team: 4, count: 3, quota: 4, ranking: 'championship', base: 0
   });
