@@ -397,3 +397,9 @@ details[open] > summary { margin-bottom:.8rem; }
   .career-movement { grid-column: 3; justify-self: end; }
   .career-shell .shop-cart-line { align-items: flex-start; flex-direction: column; }
 }
+
+.calendar82-stable-tools { margin-top: 1.25rem; }
+.calendar82-stable-tools .box { background: linear-gradient(145deg,#203942,#1a2b32); border-color: #3a5b5c; }
+[data-show82-class] { min-width: 0; }
+[data-show82-class] legend { color: #a0c8c1; padding: .25rem .5rem; }
+[data-show82-classes] { margin: 1rem 0; }

@@ -111,6 +111,7 @@ function careerCalendarMarkup() {
 const CAREER_CALENDAR_RENDER = renderCalendar;
 renderCalendar = function () {
   const result = CAREER_CALENDAR_RENDER();
+  if (typeof show82RenderCalendar === 'function') { show82RenderCalendar(); return result; }
   const panel = document.getElementById('calendar');
   if (!panel) return result;
   const section = document.createElement('section');
@@ -325,8 +326,8 @@ renderSettings = function () {
     ${age == null ? '<button type="button" data-career-profile-save>Set this rider’s age and nationality</button>' : ''}
     <details data-ui-key="career-settings"><summary>Career settings</summary>
       ${[['progression','Rider Career Progression & Rankings'],['background','Background NPC Career Simulation'],
-        ['games','International Championship Calendar'],['sponsors','Sponsor Offers']].map(([key,label]) =>
-        `<label><input type="checkbox" data-career-setting="${key}"${world.settings[key] ? ' checked' : ''}> ${label}</label>`).join('')}
+        ['games','International Championship Calendar'],['sponsors','Sponsor Offers'],['federations','National Team Applications']].map(([key,label]) =>
+        `<label><input type="checkbox" data-career-setting="${key}"${(key==='federations' ? world.settings.federations!==false : world.settings[key]) ? ' checked' : ''}> ${label}</label>`).join('')}
       <p>Career progression and background simulation require Rider Realism. Games scheduling is independent.</p>
       <label>Welsh registry profile<select data-career-welsh>${careerOptions(Object.keys(CAREER_WELSH_STANDARDS).map(key => [key,key]),app.settings.welshStandard || 'UK-inspired')}</select></label>
     </details>`;
