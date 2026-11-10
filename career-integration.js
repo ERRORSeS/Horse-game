@@ -335,7 +335,7 @@ function careerOrdinaryField(show) {
   const desired = show.competitors.filter(row => !row.player).length;
   const event = { id: show.id, discipline: show.discipline, level: show.level, at: show.classTime ?? pastureCalendarHour() };
   const home = careerCountry(show.eventSnapshot?.country || app.currentBarn?.country);
-  const candidates = roster.filter(rider => rider.specialty===show.discipline && !rider.retired && rider.horses.length && (!careerActive() || !careerBusy(rider.recentStarts || [],event)) && careerAge(rider,event.at) >= 6 && careerAge(rider,event.at) < 68)
+  const candidates = (careerRosterIndex(roster).byDiscipline.get(show.discipline)||[]).filter(rider => rider.specialty===show.discipline && !rider.retired && rider.horses.length && (!careerActive() || !careerBusy(rider.recentStarts || [],event)) && careerAge(rider,event.at) >= 6 && careerAge(rider,event.at) < 68)
     .map(rider => ({ rider, horse: rider.horses[0], draw: careerRoll(show.id, rider.id) + (rider.country === home ? -.38 : 0) }));
   candidates.sort((a,b) => a.draw - b.draw);
   const picked = candidates.filter(({horse}) => {
@@ -498,4 +498,4 @@ function careerEnter(event, horse) {
 }
 
 const SPECIALIST_RANKINGS_LOAD=hydrateFromSave;
-hydrateFromSave=function(...args){const result=SPECIALIST_RANKINGS_LOAD(...args);if(app.career){careerRoster();if(app.career.rankingHour)careerPublish(app.career.rankingHour,{repair:true});}return result;};
+hydrateFromSave=function(...args){const result=SPECIALIST_RANKINGS_LOAD(...args);if(app.career){if(app.career.npcs)careerRoster();if(app.career.rankingHour)careerPublish(app.career.rankingHour,{repair:true});}return result;};

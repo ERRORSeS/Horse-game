@@ -124,6 +124,7 @@ function show82RenderCalendar() {
   }).join('') : `<div class="sales-shop-body cards sales-listings">${pageRows.map(row=>show82Card(row.event,row.blocker)).join('')}</div>`;
   section.innerHTML=careerHero('Show office · Season calendar','Competition calendar','Find a suitable class, follow the year’s major events, or organize a show.')+
     `<div class="shop-meta"><span>${view==='reference' ? references.length+' published references' : view==='history' ? history.length+' past shows' : rows.length+' visible classes'}</span><span>${csEscape(rider.name)}</span><span>${csEscape(pastureDateLabel(pastureCalendarHour()))}</span></div>
+    ${fixtures ? '<button type="button" data-show82-office>National team registration</button>' : ''}
     <div class="sales-filter-bar career-filters">
       ${show82Filter('View','view',[['monthly','Monthly'],['list','Season list'],['major','Annual majors'],['reference','2026 reference'],['history','Show history']],view)}
       ${show82Filter('Discipline','discipline',choices(Object.entries(CAREER_DISCIPLINE_LABELS)),filters.discipline)}
@@ -157,6 +158,7 @@ function show82RenderCalendar() {
   panel.prepend(section);
   show82BindCreator(panel);
   show82BindFederation(panel,rider,horses);
+  const office=panel.querySelector('[data-show82-office]');if(office)office.onclick=()=>{const drawer=panel.querySelector('[data-ui-key="show82-federation"]');if(drawer){drawer.open=true;drawer.scrollIntoView?.({block:'start'});}};
   for (const input of panel.querySelectorAll('[data-show82-filter]')) input.onchange=()=>{
     filters[input.dataset.show82Filter]=input.value;
     filters.page=0;
@@ -255,16 +257,21 @@ function show82BindCreator(panel) {
   };
 }
 function federationMarkup82(rider,horses) {
-  if (!federationEnabled()) return `<details class="shop-drawer"><summary>National teams</summary><div class="shop-drawer-body"><p>Enable Rider Realism, Career Progression and National Team Applications in Settings.</p></div></details>`;
+  if (!federationEnabled()) return `<details class="shop-drawer" data-ui-key="show82-federation"><summary>National teams</summary><div class="shop-drawer-body"><p>Enable Rider Realism, Career Progression and National Team Applications in Settings.</p></div></details>`;
   const state=federationState(), now=pastureCalendarHour();
   const plans=federationPlans(app.year,rider.country).filter(plan=>careerDivisions(rider,plan.trial.at).includes(plan.division));
+  const teamEntries=federationTeamEntries(rider,now);
   const previous=Object.values(state.seasons).filter(season=>season.country===rider.country).sort((a,b)=>b.year-a.year);
-  return `<details class="shop-drawer" data-ui-key="show82-federation"><summary>National team applications</summary><div class="shop-drawer-body">
+  return `<details class="shop-drawer" data-ui-key="show82-federation"${Object.values(state.applications).some(row=>row.riderId===rider.id&&row.status==='Trial Invited') ? ' open' : ''}><summary>National team applications</summary><div class="shop-drawer-body">
     <p class="shop-eyebrow">${csEscape(CAREER_COUNTRIES[rider.country][0])} · Federation selection office</p>
     <p>Applications close on month 3, day 15. Trials run in month 5 and squad selection is announced in month 6.</p>
     <p role="status" data-federation-status></p>
+    <details${teamEntries.length ? ' open' : ''}><summary>Represent ${csEscape(CAREER_COUNTRIES[rider.country][0])} · Team competitions</summary>
+    ${teamEntries.length ? teamEntries.map(({event,horse})=>{const blocker=show82Blocker(event,rider,horse),registered=app.activeShow?.eventId===event.id;return `<article class="box"><strong>${csEscape(event.name)}</strong><p>${csEscape(pastureDateLabel(event.at))} · ${csEscape(horse.name)}</p>${registered ? '<button type="button" data-federation-open-trial>Open registered team show</button>' : `<button type="button" data-federation-team-enter="${event.id}"${blocker ? ' disabled' : ''}>Enter for ${csEscape(CAREER_COUNTRIES[rider.country][0])}</button>${blocker ? '<p>'+csEscape(blocker)+'</p>' : ''}`}</article>`;}).join('') : '<p>Upcoming team entries appear here after national or championship squad selection, within the 90-day booking window.</p>'}
+    <p>Compete for show prizes and your country’s team ranking points. Games results can earn individual and team medals.</p></details>
     <div class="cards sales-listings">${plans.map(plan=>{
       const id=plan.id+':'+rider.id, row=state.applications[id], invitation=state.invitations[id];
+      const registered=app.activeShow?.eventId===plan.trial.id,trialBlocker=row?.status==='Trial Invited' ? show82Blocker(plan.trial,rider,calendarHorseById(row.horseId)) : '';
       return `<article class="box sales-horse-card"><p class="shop-eyebrow">${CAREER_DISCIPLINE_LABELS[plan.discipline]}</p>
       <h3>${CAREER_AGE_DIVISIONS[plan.division].label}</h3>
       <p>${csEscape(row?.status || (now<plan.opens ? 'Not Open' : now<=plan.closes ? 'Open' : 'Expired'))}</p>
@@ -272,6 +279,7 @@ function federationMarkup82(rider,horses) {
       ${row ? `<p>${csEscape(row.horseName)}${row.reason ? ' · '+csEscape(row.reason) : ''}</p>
         <details><summary>Application history</summary>${row.history.map(item=>`<p>${item.status} · ${csEscape(pastureDateLabel(item.hour))}</p>`).join('')}
         ${row.selection ? `<p>Selection score ${row.selection.score.toFixed(1)}/100</p>` : ''}</details>
+        ${row.status==='Trial Invited' ? `<p>Selection trial · ${csEscape(pastureDateLabel(plan.trial.at))}</p>${registered ? '<p>Registered — attend through your active show.</p><button type="button" data-federation-open-trial>Open registered trial</button>' : `<button type="button" data-federation-register-trial="${plan.id}"${trialBlocker ? ' disabled' : ''}>Register for selection trial</button>${trialBlocker ? '<p>'+csEscape(trialBlocker)+'</p>' : ''}`}` : ''}
         ${['Submitted','Under Review','Shortlisted','Trial Invited'].includes(row.status) ? `<button type="button" data-federation-withdraw="${id}">Withdraw application</button>` : ''}`
       : now<=plan.closes ? `<p>Requires a verified top-ten regional or higher result with this horse.</p>
         <label>Horse<select data-federation-mount>${careerOptions(horses.map(horse=>[horse.id,horse.name]),invitation?.horseId)}</select></label>
@@ -294,6 +302,17 @@ function show82BindFederation(panel,rider,horses) {
     if (!result.ok) {panel.querySelector('[data-federation-status]').textContent=result.message;return;}
     saveGame(false);renderCalendar();panel.querySelector('[data-ui-key="show82-federation"]')?.setAttribute('open','');
   };
+  for(const button of panel.querySelectorAll('[data-federation-register-trial]'))button.onclick=()=>{
+    const result=federationRegisterTrial(button.dataset.federationRegisterTrial,rider);
+    if(!result.ok){panel.querySelector('[data-federation-status]').textContent=result.message;return;}
+    saveGame(false);changeTab('shows');
+  };
+  for(const button of panel.querySelectorAll('[data-federation-team-enter]'))button.onclick=()=>{
+    const result=federationRegisterTeam(button.dataset.federationTeamEnter,rider);
+    if(!result.ok){panel.querySelector('[data-federation-status]').textContent=result.message;return;}
+    saveGame(false);changeTab('shows');
+  };
+  for(const button of panel.querySelectorAll('[data-federation-open-trial]'))button.onclick=()=>changeTab('shows');
   for (const button of panel.querySelectorAll('[data-federation-withdraw]')) button.onclick=()=>{
     const row=federationState().applications[button.dataset.federationWithdraw];
     if (!row || row.riderId!==rider.id || !['Submitted','Under Review','Shortlisted','Trial Invited'].includes(row.status)) return;

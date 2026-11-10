@@ -87,7 +87,7 @@ const Save3=(()=>{
  function enqueue(){
   identity();dirty=true;saveFeedback('Saving on this device…');
   if(timer!==null)clearTimeout(timer);
-  timer=setTimeout(()=>{timer=null;flush().catch(()=>{});},180);return true;
+  timer=setTimeout(()=>{timer=null;flush().catch(()=>{});},600);return true;
  }
  function flush(){
   if(timer!==null){clearTimeout(timer);timer=null;}
@@ -98,7 +98,7 @@ const Save3=(()=>{
    while(dirty){
     const saveId=identity().id;
     try{
-     const current=record();validate(JSON.parse(current.payload));dirty=false;
+     validate(app);const current=record();dirty=false;
      const existing=await get(current.id);
      if(existing&&existing.createdAt!==current.createdAt)throw Error('Save ID collision detected. Export this stable before retrying.');
      await put(current);lastError=null;
