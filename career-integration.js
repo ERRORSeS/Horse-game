@@ -29,6 +29,7 @@ function careerPointCredits(meet,row) {
 }
 function careerComputeBoards(hour) {
   const boards = {};
+  const specialties=new Map((careerState().npcs||[]).map(r=>[r.id,r.specialty]));
   const year = pastureDate(hour).year;
   function add(discipline,{type,filter,id,name,country,points}) {
     if (!points) return;
@@ -40,7 +41,7 @@ function careerComputeBoards(hour) {
   for (const meet of Object.values(careerState().meets)) {
     if (meet.sandbox || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
     const seasonal = pastureDate(meet.hour).year === year;
-    for (const row of meet.results) for (const credit of careerPointCredits(meet,row)) {
+    for (const row of meet.results.filter(row=>!specialties.has(row.riderId)||specialties.get(row.riderId)===meet.discipline)) for (const credit of careerPointCredits(meet,row)) {
       if (!credit.seasonal || seasonal) add(meet.discipline,credit);
     }
     if (seasonal && meet.series) for (const row of meet.teams || []) {
@@ -334,7 +335,7 @@ function careerOrdinaryField(show) {
   const desired = show.competitors.filter(row => !row.player).length;
   const event = { id: show.id, discipline: show.discipline, level: show.level, at: show.classTime ?? pastureCalendarHour() };
   const home = careerCountry(show.eventSnapshot?.country || app.currentBarn?.country);
-  const candidates = roster.filter(rider => !rider.retired && rider.horses.length && (!careerActive() || !careerBusy(rider.recentStarts || [],event)) && careerAge(rider,event.at) >= 6 && careerAge(rider,event.at) < 68)
+  const candidates = roster.filter(rider => rider.specialty===show.discipline && !rider.retired && rider.horses.length && (!careerActive() || !careerBusy(rider.recentStarts || [],event)) && careerAge(rider,event.at) >= 6 && careerAge(rider,event.at) < 68)
     .map(rider => ({ rider, horse: rider.horses[0], draw: careerRoll(show.id, rider.id) + (rider.country === home ? -.38 : 0) }));
   candidates.sort((a,b) => a.draw - b.draw);
   const picked = candidates.filter(({horse}) => {
@@ -495,3 +496,6 @@ function careerEnter(event, horse) {
   saveGame(false);
   return { ok: true, show };
 }
+
+const SPECIALIST_RANKINGS_LOAD=hydrateFromSave;
+hydrateFromSave=function(...args){const result=SPECIALIST_RANKINGS_LOAD(...args);if(app.career){careerRoster();if(app.career.rankingHour)careerPublish(app.career.rankingHour,{repair:true});}return result;};
