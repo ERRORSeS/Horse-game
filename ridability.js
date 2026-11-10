@@ -63,7 +63,7 @@ createHorseCard=function(h,...args){
  const node=RIDABILITY_CARD(h,...args);
  if(!app.horses.some(owned=>owned.id===h.id))return node;
  const controls=document.createElement('section');controls.className='ridability-repair';
- const button=document.createElement('button');button.type='button';button.textContent='Make Horse Ridable';button.dataset.makeHorseRidable=h.id;button.disabled=!(h.age>3)||h.deceased;
+ const button=document.createElement('button');button.type='button';button.textContent='Make Ridable';button.dataset.makeHorseRidable=h.id;button.disabled=!(h.age>3)||h.deceased;
  const status=document.createElement('p');status.setAttribute('role','status');status.textContent=h.ridabilityRepairMessage||'';
  button.onclick=()=>{const result=makeHorseRidable(h.id);h.ridabilityRepairMessage=result.message;render();if(result.ok)saveGame(false);};
  const rerun=document.createElement('button');rerun.type='button';rerun.textContent='Rerun Skills';rerun.dataset.rerunHorseSkills=h.id;rerun.title='Recalculate maximum levels from current skills and potential without changing skill scores.';const skillStatus=document.createElement('p');skillStatus.setAttribute('role','status');skillStatus.textContent=h.skillRerunMessage||'';rerun.onclick=()=>{const result=rerunHorseSkills(h.id);h.skillRerunMessage=result.message;render();if(result.ok)saveGame(false);};

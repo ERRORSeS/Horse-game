@@ -3835,7 +3835,9 @@ function pushCompetitionReport(report) {
 }
 
 function requiredBehaviorForRiding(horse) {
-  if (!horse || horse.ridingEducationOverride === true && horse.age > 3) return 0;
+  if (!horse) return 0;
+  // A manual riding override removes the behavior threshold entirely.
+  if (horse.ridingEducationOverride === true && horse.age > 3) return -Infinity;
   if (horse.requiresBreakingIn) return 500;
   if (horse.bredBy === 'Your Stable') return 500;
   return 0;
