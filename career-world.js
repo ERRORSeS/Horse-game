@@ -26,6 +26,28 @@ function careerState() {
     allocations: {}, contracts: [], practice: {}, rankings: {}, rankHistory: {}
   };
 }
+// Reuse lookup tables across renders and meets; roster arrays are replaced on load.
+const CAREER_ROSTER_INDEX=new WeakMap();
+function careerRosterIndex(roster=careerRoster()){
+ let index=CAREER_ROSTER_INDEX.get(roster);if(index?.size===roster.length)return index;
+ index={size:roster.length,byId:new Map(),byDiscipline:new Map(),byCountry:new Map()};
+ for(const rider of roster){index.byId.set(rider.id,rider);for(const [map,key]of [[index.byDiscipline,rider.specialty],[index.byCountry,rider.country]]){if(!map.has(key))map.set(key,[]);map.get(key).push(rider);}}
+ CAREER_ROSTER_INDEX.set(roster,index);return index;
+}
+const CAREER_RESULT_INDEX=new WeakMap();
+function careerResultIndex(meets){
+ const keys=Object.keys(meets);let index=CAREER_RESULT_INDEX.get(meets);
+ // Results are written atomically. Rebuild only for deletions, replacements or repaired arrays.
+ if(index&&(keys.length<index.entries.size||keys.some(key=>index.entries.has(key)&&(index.entries.get(key)!==meets[key]||index.counts.get(key)!==meets[key].results.length||index.arrays.get(key)!==meets[key].results))))index=null;
+ if(!index){index={entries:new Map(),counts:new Map(),arrays:new Map(),byRider:new Map(),byHorse:new Map(),byDiscipline:new Map(),order:new Map()};CAREER_RESULT_INDEX.set(meets,index);}
+ for(const key of keys){
+  if(index.entries.has(key))continue;
+  const meet=meets[key];index.order.set(meet,index.entries.size);index.entries.set(key,meet);index.counts.set(key,meet.results.length);index.arrays.set(key,meet.results);
+  const pairs=[[index.byDiscipline,meet.discipline],...meet.results.flatMap(row=>[[index.byRider,row.riderId],[index.byHorse,row.horseId]])];
+  for(const [map,id]of pairs){if(!map.has(id))map.set(id,new Set());map.get(id).add(meet);}
+ }
+ return index;
+}
 function careerActive() {
   return Boolean(app.riderRealism?.enabled && app.career?.settings.progression);
 }
@@ -292,7 +314,9 @@ function careerBusy(spans, event) {
 }
 
 function careerResults({ riderId, horseId, discipline, from = -Infinity, until = Infinity } = {}) {
-  return Object.values(app.career?.meets || {}).flatMap(meet =>
+  const meets=app.career?.meets||{},index=careerResultIndex(meets);
+  const candidates=riderId?index.byRider.get(riderId):horseId?index.byHorse.get(horseId):discipline?index.byDiscipline.get(discipline):new Set(Object.values(meets));
+  return [...(candidates||[])].sort((a,b)=>index.order.get(a)-index.order.get(b)).flatMap(meet =>
     meet.hour < from || meet.hour > until || meet.sandbox || discipline && meet.discipline !== discipline ? [] :
       meet.results.filter(row => row.started !== false && (!riderId || riderId === row.riderId) && (!horseId || horseId === row.horseId))
         .map(row => ({ ...row, hour: meet.hour, eventId: meet.id, event: meet.name, discipline: meet.discipline,
@@ -386,7 +410,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
   const conflict = booked?.eventSnapshot?.careerEvent && booked.eventId !== event.id &&
     careerBusy([{start:booked.eventSnapshot.at,end:careerEventEnd(booked.eventSnapshot)}],event)
     ? new Set(booked.competitors.filter(row=>!row.player).map(row=>row.riderId)) : null;
-  for (const rider of roster) {
+  for (const rider of careerRosterIndex(roster).byDiscipline.get(event.discipline)||[]) {
     const age = year-rider.birth?.year;
     if (rider.specialty!==event.discipline || rider.retired || age < minimumAge || age > maximumAge || conflict?.has(rider.id) ||
       careerBusy(rider.recentStarts || [],event)) continue;
@@ -515,7 +539,7 @@ function careerRecordMeet(event, standings, player = null, { recovery = false, r
   if (!counted) for (const team of meet.teams) team.points = 0;
   world.meets[event.id] = meet;
   if (event.sandbox || recovery) return meet;
-  const byId = new Map(careerRoster().map(rider => [rider.id, rider]));
+  const byId = careerRosterIndex().byId;
   for (const row of results) {
     if (row.player || !row.started) continue;
     const rider = byId.get(row.riderId);

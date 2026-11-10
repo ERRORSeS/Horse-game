@@ -86,6 +86,31 @@ function federationApply(plan,horse,rider = careerRider(),hour = pastureCalendar
   state.invitations[id] && (state.invitations[id].accepted = hour);
   return {ok:true,application};
 }
+function federationRegisterTrial(planId,rider=careerRider()){
+ const plan=federationPlans(app.year,rider.country).find(plan=>plan.id===planId);
+ const application=plan&&federationState().applications[plan.id+':'+rider.id];
+ if(!application||application.status!=='Trial Invited')return {ok:false,message:'A selection-trial invitation is required for this rider and horse.'};
+ const horse=calendarHorseById(application.horseId);
+ if(!horse)return {ok:false,message:'The invited horse is unavailable.'};
+ return careerEnter(plan.trial,horse);
+}
+function federationTeamEntries(rider=careerRider(),hour=pastureCalendarHour()){
+ if(!federationEnabled())return [];
+ const seasons=Object.values(federationState().seasons).filter(season=>season.country===rider.country).sort((a,b)=>b.selectedAt-a.selectedAt);
+ const entries=[];
+ for(const event of careerSchedule(hour+24,hour+90*24).filter(event=>event.team||event.games)){
+  const season=seasons.find(season=>season.discipline===event.discipline&&season.division===event.division&&season.selectedAt<=event.at&&season.expires>event.at);
+  const member=season?.members.find(row=>row.riderId===rider.id&&['Selected — National Squad','Selected — Championship Team'].includes(row.status));
+  const horse=member&&calendarHorseById(member.horseId);
+  if(horse&&federationNomination(event,rider,horse))entries.push({event,horse});
+ }
+ return entries;
+}
+function federationRegisterTeam(eventId,rider=careerRider()){
+ const entry=federationTeamEntries(rider).find(entry=>entry.event.id===eventId);
+ if(!entry)return {ok:false,message:'An active nomination and an open team competition are required.'};
+ return careerEnter(entry.event,entry.horse);
+}
 function federationScore(plan,rider,horse,hour,trial = null) {
   const npc = !rider.player, records = federationRecords(plan,rider.id,horse.id,hour);
   const finishes = records.filter(row => row.placing <= 10).length;
@@ -120,7 +145,7 @@ function federationReview(plan,hour) {
   }
   if (hour < plan.selection || state.seasons[plan.id]) return;
   const meet = careerState().meets[plan.trial.id];
-  const candidates = careerRoster().filter(rider=>rider.country===plan.country && !rider.retired).flatMap(rider=>{
+  const candidates = (careerRosterIndex().byCountry.get(plan.country)||[]).filter(rider=>rider.specialty===plan.discipline && !rider.retired).flatMap(rider=>{
     const horse = rider.horses.filter(horse=>!FEDERATION_ELIGIBILITY(plan.trial,rider,horse,{npc:true}))
       .sort((a,b)=>b.skills[plan.discipline]-a.skills[plan.discipline])[0];
     return horse ? [{rider,horse}] : [];
@@ -227,4 +252,13 @@ careerRecordMeet = function(event,standings,player=null) {
     }
   }
   return result;
+};
+
+const FEDERATION_RESULTS_MARKUP=showResultMarkup;
+showResultMarkup=function(show){
+ const html=FEDERATION_RESULTS_MARKUP(show);
+ if(!show.federationSelection)return html;
+ const team=app.career?.meets[show.eventId]?.teams?.find(team=>team.country===show.federationSelection.country);
+ if(!team)return html;
+ return html+`<section class="box" data-national-team-result><h3>National team result · ${csEscape(CAREER_COUNTRIES[team.country]?.[0]||team.country)}</h3><p>Team placing #${team.placing} · ${team.points} team ranking points${team.medal ? ' · '+csEscape(team.medal)+' medal' : ''}</p>${show.award ? '<p>Show prize received: '+money(show.award.prize)+'</p>' : ''}</section>`;
 };
