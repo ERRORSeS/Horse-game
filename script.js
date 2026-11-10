@@ -333,31 +333,34 @@ function refreshBarnCatalog(force = false) {
   if (!force && app.lastBarnRefreshMonth && now - app.lastBarnRefreshMonth < 4) return false;
   app.lastBarnRefreshMonth = now;
   const existingNames = new Set();
-  app.barnCatalog = Object.entries(BARN_COUNTRIES).flatMap(([country, cities]) => Array.from({ length: 10 }, () => {
-    let name = randomBarnName();
-    let attempts = 0;
-    while (existingNames.has(name) && rnd(1, 100) > 5 && attempts < 12) {
-      name = randomBarnName();
-      attempts += 1;
-    }
-    existingNames.add(name);
-    const careStars = rnd(1, 5);
-    const facilityStars = rnd(1, 5);
-    const eventsStars = rnd(1, 5);
-    const lessonsStars = rnd(1, 5);
-    return {
-      id: uid(),
-      name,
-      country,
-      city: pick(cities),
-      careStars,
-      facilityStars,
-      eventsStars,
-      lessonsStars,
-      boardPerHorse: boardPriceByStars(Math.round((careStars + facilityStars) / 2))
-    };
-  }));
+  app.barnCatalog = Object.entries(BARN_COUNTRIES).flatMap(([country, cities]) =>
+    Array.from({ length: 10 }, () => createBarnListing(country,cities,existingNames)));
   return true;
+}
+
+function createBarnListing(country,cities,existingNames) {
+  let name = randomBarnName();
+  let attempts = 0;
+  while (existingNames.has(name) && rnd(1, 100) > 5 && attempts < 12) {
+    name = randomBarnName();
+    attempts += 1;
+  }
+  existingNames.add(name);
+  const careStars = rnd(1, 5);
+  const facilityStars = rnd(1, 5);
+  const eventsStars = rnd(1, 5);
+  const lessonsStars = rnd(1, 5);
+  return {
+    id: uid(),
+    name,
+    country,
+    city: pick(cities),
+    careStars,
+    facilityStars,
+    eventsStars,
+    lessonsStars,
+    boardPerHorse: boardPriceByStars(Math.round((careStars + facilityStars) / 2))
+  };
 }
 
 function barnFacilityTurnoutRange(stars) {
@@ -3381,6 +3384,7 @@ function hydrateFromSave(data) {
   app.rescueHorses = Array.isArray(data.rescueHorses) ? data.rescueHorses : [];
   app.currentBarn = data.currentBarn && typeof data.currentBarn === 'object' ? data.currentBarn : null;
   app.barnCatalog = Array.isArray(data.barnCatalog) ? data.barnCatalog : [];
+  app.barnLocationCatalog = data.barnLocationCatalog || {};
   app.barnShows = Array.isArray(data.barnShows) ? data.barnShows : [];
   app.signedUpShows = Array.isArray(data.signedUpShows) ? data.signedUpShows : [];
   app.lastBarnRefreshMonth = Number.isFinite(data.lastBarnRefreshMonth) ? data.lastBarnRefreshMonth : 0;
@@ -3662,6 +3666,7 @@ function resetGame() {
   app.rescueHorses = [];
   app.currentBarn = null;
   app.barnCatalog = [];
+  app.barnLocationCatalog = {};
   app.barnShows = [];
   app.signedUpShows = [];
   app.lastBarnRefreshMonth = 0;
@@ -8157,6 +8162,7 @@ function renderBarn() {
   const lessonAvailBase = lessonAvailabilityBase(lessonStars);
   const currentCountry = currentBarn?.country || 'USA';
   const filterDefault = currentCountry;
+  const locations = barnLocationChoices();
   panel.innerHTML = `
     <h2>Barn</h2>
     ${pastureOverview(app.horses.filter((h) => !h.deceased))}
@@ -8202,9 +8208,12 @@ function renderBarn() {
       <p class='small'>Refresh barn list manually every 4 months.</p>
       <label>Filter</label>
       <select id='barn-filter-country'>
-        <option value='${filterDefault}'>My Country (${filterDefault})</option>
+        <option value='${csEscape(filterDefault)}'>My Country (${csEscape(filterDefault)})</option>
         <option value='OTHER'>Other Country</option>
+        ${Object.keys(locations).filter(country => country !== currentCountry).sort((a,b) => a.localeCompare(b))
+          .map(country => `<option value="${csEscape(country)}">${csEscape(country === 'UK' ? 'United Kingdom' : country === 'USA' ? 'United States' : country)}</option>`).join('')}
       </select>
+      <label>City <select id='barn-filter-city' aria-label='Barn city'></select></label>
       <button id='barn-refresh-list'>Refresh List</button>
       <div id='barn-catalog-list'></div>
     </details>
@@ -8291,15 +8300,23 @@ function renderBarn() {
 
   const renderCatalogList = () => {
     const filter = document.getElementById('barn-filter-country')?.value || filterDefault;
-    const list = app.barnCatalog.filter((b) => (filter === 'OTHER' ? b.country !== currentCountry : b.country === currentCountry));
+    const cityControl = document.getElementById('barn-filter-city');
+    const previousCity = cityControl.value;
+    cityControl.innerHTML = '<option value="">All cities</option>' + (locations[filter] || [])
+      .slice().sort((a,b) => a.localeCompare(b)).map(city => `<option value="${csEscape(city)}">${csEscape(city)}</option>`).join('');
+    cityControl.disabled = filter === 'OTHER';
+    if (locations[filter]?.includes(previousCity)) cityControl.value = previousCity;
+    const city = cityControl.value;
+    const list = city ? barnLocationListings(filter,city) : app.barnCatalog.filter(barn =>
+      filter === 'OTHER' ? barn.country !== currentCountry : barn.country === filter);
     const wrap = document.getElementById('barn-catalog-list');
     if (!wrap) return;
     wrap.innerHTML = list.map((barn) => {
       const moveCost = transportCost(currentCountry, barn.country);
       const horseOptions = privateHorses.map((h) => `<option value='${h.id}'>${horseDisplayName(h)}</option>`).join('');
       return `<div class='box'>
-        <p><strong>${barn.name}</strong></p>
-        <p class='small'>Location: ${barn.country}, ${barn.city} | Move fee: ${money(moveCost)}</p>
+        <p><strong>${csEscape(barn.name)}</strong></p>
+        <p class='small'>Location: ${csEscape(barn.country)}, ${csEscape(barn.city)} | Move fee: ${money(moveCost)}</p>
         <p class='small'>Care ${starText(barn.careStars)} | Events ${starText(barn.eventsStars)} | Lessons ${starText(barn.lessonsStars)} | Facility ${starText(barn.facilityStars)}</p>
         <p class='small'>Monthly Board: ${money(barn.boardPerHorse)} per horse</p>
         <label>Horse for board</label>
@@ -8309,38 +8326,42 @@ function renderBarn() {
           <button data-board-all='${barn.id}'>Board All</button>
         </div>
       </div>`;
-    }).join('') || '<p class="small">No barns for this filter.</p>';
+    }).join('') || '<p class="small">'+(cityControl.disabled ? 'No barns for this filter.' : 'Choose a city to see its barn listings.')+'</p>';
 
     wrap.querySelectorAll('[data-board-one]').forEach((btn) => {
       btn.onclick = () => {
-        const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardOne);
+        const barn = list.find((b) => b.id === btn.dataset.boardOne);
         if (!barn) return;
         const horseId = wrap.querySelector(`[data-board-horse='${barn.id}']`)?.value;
         const horse = horsesIncludingLessons().find((h) => h.id === horseId);
         if (!horse) return;
         const moveCost = transportCost(currentCountry, barn.country);
         if (!tryCharge(moveCost + barn.boardPerHorse)) return;
+        careerRider();
         app.currentBarn = { ...barn };
         horse.boardingBarnId = barn.id;
         ensureLessonRosterForBarn(app.currentBarn, true);
         pushReport(`${horse.name} boarded at ${barn.name}. Fees paid: ${money(moveCost + barn.boardPerHorse)}.`);
         refreshBarnShows();
+        saveGame(false);
         renderBarn();
       };
     });
     wrap.querySelectorAll('[data-board-all]').forEach((btn) => {
       btn.onclick = () => {
-        const barn = app.barnCatalog.find((b) => b.id === btn.dataset.boardAll);
+        const barn = list.find((b) => b.id === btn.dataset.boardAll);
         if (!barn) return;
         const count = privateHorses.length;
         const moveCost = transportCost(currentCountry, barn.country);
         const total = moveCost + (barn.boardPerHorse * count);
         if (!tryCharge(total)) return;
+        careerRider();
         app.currentBarn = { ...barn };
         privateHorses.forEach((h) => { h.boardingBarnId = barn.id; });
         ensureLessonRosterForBarn(app.currentBarn, true);
         pushReport(`All horses boarded at ${barn.name}. Fees paid: ${money(total)}.`);
         refreshBarnShows();
+        saveGame(false);
         renderBarn();
       };
     });
@@ -8349,7 +8370,11 @@ function renderBarn() {
   mgBindRoom(panel);
   bindStalls(panel);
   bindPastureControls(panel);
-  document.getElementById('barn-filter-country').onchange = renderCatalogList;
+  document.getElementById('barn-filter-country').onchange = () => {
+    document.getElementById('barn-filter-city').value = '';
+    renderCatalogList();
+  };
+  document.getElementById('barn-filter-city').onchange = renderCatalogList;
   document.getElementById('barn-refresh-list').onclick = () => {
     const refreshed = refreshBarnCatalog(true);
     if (refreshed) pushReport('Barn catalog refreshed manually.');

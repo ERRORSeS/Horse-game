@@ -29,9 +29,9 @@ check('sandbox classes persist without rank or career money and annual IDs remai
   player.scores.showjumping={time:70,faults:0,penalties:0,eliminated:false};
   const cash=app.money, starts=h.showResults.length;
   showCompletePhase(show);showAward(show);showAward(show);
-  if(app.money!==cash || h.showResults.length!==starts || !customShowState().results[event.id]) throw Error('sandbox farm');
+  if(app.money!==cash || h.showResults.length!==starts || !careerState().meets[event.id]?.sandbox) throw Error('sandbox farm');
   hydrateFromSave(JSON.parse(serializeAppState()));
-  if(!customShowState().results[event.id] || calendarFindEvent(events[1].id)?.id!==events[1].id) throw Error('custom history lost');
+  if(!careerState().meets[event.id]?.sandbox || calendarFindEvent(events[1].id)?.id!==events[1].id) throw Error('custom history lost');
 }`);
 
 check('federation applications are gated, idempotent and selected on scheduled milestones', `{

@@ -50,6 +50,12 @@ const CAREER_COUNTRIES = {
   RSA: ['South Africa', 'Africa', 'Cape Town']
 };
 
+// Keep the original country rotation for established world riders.
+const CAREER_ROSTER_COUNTRIES = Object.keys(CAREER_COUNTRIES);
+for (const [code,[name,region,cities]] of Object.entries(BARN_GEOGRAPHY)) {
+  CAREER_COUNTRIES[code] ||= [name,region,cities.split(', ')[0]];
+}
+
 const CAREER_SERIES = [];
 function careerClass(id, name, discipline, tier, level, month, options = {}) {
   const official = tier >= 1;
@@ -217,5 +223,55 @@ for (const [discipline,label,ponyLevel,youngLevels] of [
   for (let age=4;age<=8;age++) {
     careerLeague(discipline+'-young-development-'+age,age+'-Year-Old '+label+' Development Circuit',discipline,2,youngLevels[age-4],
       [2,5,9,12],{horseAge:age,base:10+(age-4)*5,foregroundOnly:true});
+  }
+}
+
+// Ordinary opportunities exclude restricted championships, teams and senior classes that require qualifying results.
+function careerOrdinaryDivision(row) {
+  return row.tier < (row.division==='senior' ? 5 : 10) && !row.major && !row.games && !row.gamesTrial && !row.team && !row.horseAge &&
+    (!row.ponyCm || row.ponyCm >= 145 && (row.ponyMinCm || 0) < 145);
+}
+const CAREER_JUNIOR_CLASSES = [
+  ['jumping','Regional Junior Jumping Cup',2,'0.90'],
+  ['dressage','Regional Junior Dressage Cup',2,'Level One'],
+  ['hunter','Junior Hunter Classic',2,'Pre-Green'],
+  ['eventing','Junior Eventing Series',2,'Entry'],
+  ['jumping','National Junior Showjumping Series',3,'1.10'],
+  ['hunter','Junior Hunter Derby',3,'Green'],
+  ['jumping','Junior Grand Prix',4,'1.20'],
+  ['dressage','National Junior Dressage Championship',4,'Level Two'],
+  ['eventing','National Junior Eventing Championship',4,'Pre-Training'],
+  ['hunter','Junior Hunter Championship',5,'Low'],
+  ['jumping','International Junior Masters',5,'1.20'],
+  ['dressage','Junior International Dressage Classic',5,'Level Three'],
+  ['eventing','Junior International Eventing Cup',5,'Training'],
+  ['dressage','Junior Dressage Masters',5,'Level Three'],
+  ['hunter','Junior Hunter National Finals',4,'Low'],
+  ['jumping','Junior Indoor Championships',4,'1.10'],
+  ['jumping','Junior National Finals',4,'1.20']
+];
+for (const [index,[discipline,name,tier,level]] of CAREER_JUNIOR_CLASSES.entries()) {
+  const months = [1+index%12,1+(index+5)%12];
+  careerLeague('junior-circuit-'+index,name,discipline,tier,level,months,
+    {division:'junior', divisionScope:tier>=5 ? 'international' : 'national', day:6+index%3*8, indoor:name==='Junior Indoor Championships', starters:tier>=5 ? 23 : 17});
+}
+
+const CAREER_BALANCE_LEVELS = {
+  kids: [0,0,0,0], prechildren: [0,0,1,1], children: [1,1,1,1], pony: [1,1,1,1],
+  junior: [2,1,2,2], young: [2,2,2,2], u25: [2,2,2,2], senior: [1,1,1,1]
+};
+for (const [divisionIndex,[division,levels]] of Object.entries(CAREER_BALANCE_LEVELS).entries()) {
+  for (let month=1;month<=12;month++) {
+    const current = CAREER_SERIES.filter(row => row.division === division && row.month === month && careerOrdinaryDivision(row)).length;
+    for (let i=0;i<7-current;i++) {
+      const d = (month+i)%4, discipline = DISCIPLINES[d];
+      const tier = division === 'senior' || division === 'kids' ? 1 : 2;
+      careerClass('division-circuit-'+division+'-'+month+'-'+i,
+        CAREER_AGE_DIVISIONS[division].label+' '+cap(discipline)+' Circuit',discipline,tier,
+        SHOW_LEVELS[discipline][levels[d]],month,{
+          division, day:4+i*4, ponyCm:division === 'pony' ? 148 : null,
+          calendarOnly:i>0 || (month+divisionIndex)%3!==0, starters:17
+        });
+    }
   }
 }
