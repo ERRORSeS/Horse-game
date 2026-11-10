@@ -1,13 +1,14 @@
 /* Permanent ridability is independent of age and sporting longevity estimates. */
 function kissingSpines(h){return (h.medicalConditions||[]).find(c=>c.diagnosis==='kissing-spines'||/kissing spines/i.test(c.legacyName||c.name||''));}
 function restoreBasicRidingEducation(h,manual=false){
- if(!h||h.deceased||h.age<3||h.ridingEducationOverride||h.auctionTier&&h.age<=3||h.auctionUnbroken&&h.requiresBreakingIn&&!manual)return h;
+ if(!h||h.deceased||!(h.age>3)||h.ridingEducationOverride||h.auctionTier&&h.age<=3||h.auctionUnbroken&&h.requiresBreakingIn&&!manual)return h;
  h.requiresBreakingIn=false;
- h.behavior=Math.max(500,Number(h.behavior)||0);
+ h.behavior=Math.max(150,Number(h.behavior)||0);
  return h;
 }
 function syncRidability(h){
  if(!h)return h;
+ if(h.age>3&&(h.behavior||0)>=150)h.requiresBreakingIn=false;
  if((h.isAuctionHorse||h.auctionPurchase)&&!(h.age<=3&&h.auctionTier))restoreBasicRidingEducation(h);
  let c=kissingSpines(h);
  const legacy=[...(h.legacyMedicalRecords||[]),...(h.illnesses||[])].find(c=>/kissing spines/i.test(c.name||''));
@@ -19,14 +20,14 @@ function syncRidability(h){
 const RIDABILITY_ENSURE=csEnsure;
 csEnsure=function(h,...args){return syncRidability(RIDABILITY_ENSURE(h,...args));};
 const RIDABILITY_RIDE=canRideUnderSaddle;
-canRideUnderSaddle=function(h){if(!h||h.age<3)return false;syncRidability(h);return !h.unridable&&RIDABILITY_RIDE(h);};
+canRideUnderSaddle=function(h){if(!h||!(h.age>3))return false;syncRidability(h);return !h.unridable&&RIDABILITY_RIDE(h);};
 function recordZeroSoundnessRiding(h,day){syncRidability(h);if((h.soundnessRemainingMonths??h.soundnessYears*12)>0){h.zeroSoundnessRiddenDays=[];return;}const days=h.zeroSoundnessRiddenDays ||= [];if(!days.includes(day))days.push(day);if(days.length>360&&!kissingSpines(h)){HorseHealth.add(h,'legacy',day,{legacyName:'Kissing Spines',known:true,confirmed:true,cause:'Ridden for over one game year at zero soundness'});syncRidability(h);}}
 const RIDABILITY_USE=eqRecordUse;
 eqRecordUse=function(h,context='flatwork',ridden=true,token=null,...args){const result=RIDABILITY_USE(h,context,ridden,token,...args);if(result!==false&&ridden)recordZeroSoundnessRiding(h,csDay());return result;};
 const RIDABILITY_LOAD=hydrateFromSave;
 hydrateFromSave=function(data,...args){const r=RIDABILITY_LOAD(data,...args);if(!data.ridingEducationRepairVersion){for(const h of app.horses)restoreBasicRidingEducation(h);}app.ridingEducationRepairVersion=1;for(const h of csHorses())syncRidability(h);return r;};
 const RIDABILITY_TACK_CHECK=eqTrainingAllowed;
-eqTrainingAllowed=function(h,context,...args){if(h&&h.age<3&&!['groundwork','lunging','Hand Work'].includes(context))return 'Ridden work requires age three and suitable riding education.';return RIDABILITY_TACK_CHECK(h,context,...args);};
+eqTrainingAllowed=function(h,context,...args){if(h&&!(h.age>3)&&!['groundwork','lunging','Hand Work'].includes(context))return 'Ridden work requires an age over three and suitable riding education.';return RIDABILITY_TACK_CHECK(h,context,...args);};
 
 // Explicit repair for already-owned horses; sporting and medical history stay intact.
 function makeHorseRidable(horseId){

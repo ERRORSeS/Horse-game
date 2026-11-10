@@ -84,3 +84,28 @@ check('a saved win with a recorded rider can be recovered without replaying awar
   recoverCareerShowHistory();
   if(careerResults({riderId:rider}).length!==1) throw Error('duplicated win');
 }`);
+
+check('breaking in requires 150 behavior and an age strictly over three', `{
+ resetGame();const h=app.horses[0];h.medicalConditions=[];h.illnesses=[];h.legacyMedicalRecords=[];h.bredBy='Your Stable';
+ for(const [age,behavior,eligible]of [[2,500,false],[3,500,false],[3.01,149,false],[4,150,true],[4,499,true]]){
+  h.age=age;h.behavior=behavior;h.requiresBreakingIn=true;delete h.ridingEducationOverride;
+  if(canRideUnderSaddle(h)!==eligible)throw Error('eligibility '+age+' '+behavior);
+  if((careTrainingStatus(h)==='Active Competition Horse')!==eligible)throw Error('care status');
+  if(eligible&&h.requiresBreakingIn)throw Error('breaking in not completed');
+ }
+ const id=h.id;hydrateFromSave(JSON.parse(serializeAppState()));if(!canRideUnderSaddle(app.horses.find(h=>h.id===id)))throw Error('reload');
+}`);
+
+check('Quick groundwork and lunging retain earned behavior and report it once', `{
+ for(const enabled of [false,true])for(const [discipline,exercise]of [['groundwork','leading'],['lunging','lunge-walk']]){
+  resetGame();rrSettings().enabled=enabled;const h=app.horses[0];h.age=4;h.behavior=149.99;h.requiresBreakingIn=true;delete h.ridingEducationOverride;
+  h.fatigue=0;h.medicalConditions=[];h.illnesses=[];h.legacyMedicalRecords=[];t2horse(h);h.training2.traits=[];
+  const old=t2random,weather=t2weather,error=rrErrorOnce;t2random=()=>.99;t2weather=()=>({type:'Clear',temperature:20,wind:0});rrErrorOnce=()=>false;
+  try{const r=t2start(h,{discipline,lesson:[exercise],facilityId:t2facilities()[0].id,length:60},true);
+   if(!r.ok)throw Error(r.message);const gained=h.behavior-149.99;
+   if(!(gained>0)||!(r.session.report.progress.Manners>0))throw Error('missing quick manners '+discipline+' '+enabled);
+   if(h.requiresBreakingIn||!canRideUnderSaddle(h))throw Error('not broken in');
+   const before=h.behavior;t2finish(h,r.session);if(h.behavior!==before)throw Error('duplicate reward');
+  }finally{t2random=old;t2weather=weather;rrErrorOnce=error;}
+ }
+}`);

@@ -18,7 +18,7 @@ t2finish=function(h,s){
   for(const [name,earned]of Object.entries(s.progress||{})){
    if(name.startsWith('Riding ')||!(earned>0)||earned>=1)continue;
    const needed=1-earned;let actual=0;
-   if(name==='Manners'){const before=h.behavior;h.behavior=Math.max(before,Math.min(1000,before+needed*10));actual=(h.behavior-before)/10;if(h.behavior>=500)h.requiresBreakingIn=false;}
+   if(name==='Manners'){const before=h.behavior;h.behavior=Math.max(before,Math.min(1000,before+needed*10));actual=(h.behavior-before)/10;if(h.age>3&&h.behavior>=150)h.requiresBreakingIn=false;}
    else if(name==='Flatwork Confidence (education)'){const before=h.confidenceFlat||0;h.confidenceFlat=Math.min(100,before+needed);actual=h.confidenceFlat-before;}
    else {const exercise=s.log.find(r=>r.exerciseId&&r.changes?.[name]>0);if(exercise){const e=t2exercise(exercise.exerciseId),group=t2skillGroup(e),before=h.stats[group][name];h.stats[group][name]=Math.max(before,clampSkill(h,t2learningDiscipline(e,s),before+needed));actual=h.stats[group][name]-before;}}
    if(actual>0){s.progress[name]+=actual;s.skillGain+=actual;h.handTrainingSkillGainsThisMonth=(h.handTrainingSkillGainsThisMonth||0)+actual;}
