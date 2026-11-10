@@ -15,12 +15,13 @@ function syncRidability(h){
  if(!c&&legacy){c=HorseHealth.add(h,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true,cause:'Recorded rescue or historical diagnosis'});}
  if(c){c.resolved=false;c.recoveryDays=Math.max(c.recoveryDays||0,1000000000);c.chronic=true;c.stage='Lifelong';h.unridable=true;h.unridableReason='Kissing Spines';}
  else{h.unridable=false;delete h.unridableReason;}
+ if(h.manualRidabilityOverride===true&&h.age>3&&!h.deceased){h.unridable=false;delete h.unridableReason;h.requiresBreakingIn=false;}
  return h;
 }
 const RIDABILITY_ENSURE=csEnsure;
 csEnsure=function(h,...args){return syncRidability(RIDABILITY_ENSURE(h,...args));};
 const RIDABILITY_RIDE=canRideUnderSaddle;
-canRideUnderSaddle=function(h){if(!h||!(h.age>3))return false;syncRidability(h);return !h.unridable&&RIDABILITY_RIDE(h);};
+canRideUnderSaddle=function(h){if(!h||h.deceased||!(h.age>3))return false;syncRidability(h);if(h.manualRidabilityOverride===true)return true;return !h.unridable&&RIDABILITY_RIDE(h);};
 function recordZeroSoundnessRiding(h,day){syncRidability(h);if((h.soundnessRemainingMonths??h.soundnessYears*12)>0){h.zeroSoundnessRiddenDays=[];return;}const days=h.zeroSoundnessRiddenDays ||= [];if(!days.includes(day))days.push(day);if(days.length>360&&!kissingSpines(h)){HorseHealth.add(h,'legacy',day,{legacyName:'Kissing Spines',known:true,confirmed:true,cause:'Ridden for over one game year at zero soundness'});syncRidability(h);}}
 const RIDABILITY_USE=eqRecordUse;
 eqRecordUse=function(h,context='flatwork',ridden=true,token=null,...args){const result=RIDABILITY_USE(h,context,ridden,token,...args);if(result!==false&&ridden)recordZeroSoundnessRiding(h,csDay());return result;};
@@ -36,7 +37,7 @@ function makeHorseRidable(horseId){
  syncRidability(h);
  if(h.deceased)return {ok:false,message:'A deceased horse cannot be made ridable.'};
  if(!(h.age>3))return {ok:false,message:'This control is available for horses older than three years.'};
- if(kissingSpines(h))return {ok:false,message:'Kissing Spines is lifelong; this horse cannot be made ridable.'};
+ h.manualRidabilityOverride=true;
  h.ridingEducationOverride=true;
  h.requiresBreakingIn=false;
  syncRidability(h);

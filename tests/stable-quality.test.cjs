@@ -11,7 +11,7 @@ check('the manual riding override survives reload and ignores changing behavior'
   const loaded=app.horses.find(h=>h.id===horse.id);
   if(!canRideUnderSaddle(loaded) || loaded.behavior!==0) throw Error('override lost');
   HorseHealth.add(loaded,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true});
-  if(canRideUnderSaddle(loaded)) throw Error('medical exclusion bypassed');
+  if(!canRideUnderSaddle(loaded)) throw Error('manual override lost after diagnosis');
 }`);
 
 check('Make Ridable bypasses every behavior score for adult unbroken horses', `{
@@ -108,4 +108,16 @@ check('Quick groundwork and lunging retain earned behavior and report it once', 
    const before=h.behavior;t2finish(h,r.session);if(h.behavior!==before)throw Error('duplicate reward');
   }finally{t2random=old;t2weather=weather;rrErrorOnce=error;}
  }
+}`);
+
+check('Make Ridable overrides lifelong and legacy unridable states but never young age', `{
+ resetGame();const h=app.horses[0];h.age=4;h.behavior=-20;h.requiresBreakingIn=true;h.unridable=true;
+ const c=HorseHealth.add(h,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true});
+ if(canRideUnderSaddle(h))throw Error('override applied before clicking');
+ if(!makeHorseRidable(h.id).ok||!canRideUnderSaddle(h)||h.unridable)throw Error('manual override blocked');
+ if(!kissingSpines(h)||kissingSpines(h).resolved||h.behavior!==-20)throw Error('history or behavior rewritten');
+ const id=h.id;hydrateFromSave(JSON.parse(serializeAppState()));const loaded=app.horses.find(x=>x.id===id);
+ if(!canRideUnderSaddle(loaded)||loaded.unridable)throw Error('override did not persist');
+ for(const age of [2,3]){loaded.age=age;if(makeHorseRidable(id).ok||canRideUnderSaddle(loaded))throw Error('age bypass');}
+ loaded.age=4;loaded.deceased=true;if(makeHorseRidable(id).ok||canRideUnderSaddle(loaded))throw Error('deceased horse revived');
 }`);
