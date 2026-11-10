@@ -59,7 +59,7 @@ function customShowEvents(from,to) {
         month:date.month,day:date.day,discipline:row.discipline,level:row.level,division:row.division,
         tier:show.sanctioned ? show.tier : 0, prestige:show.prestige,country:show.country,
         course:row.course,horseAge:row.horseAge || null,ponyCm:row.pony || row.division==='pony' ? 148 : null,
-        ranking:show.sanctioned ? 'national' : 'none',official:show.sanctioned,
+        ranking:show.sanctioned ? (row.division==='senior' ? 'national' : 'division') : 'none',official:show.sanctioned,
         base:show.sanctioned ? CAREER_TIERS[show.tier].national : 0,minField:8,cutoff:10
       },date.year);
       event.id='career:'+year+':'+show.id+'-'+(index+1);
@@ -103,21 +103,11 @@ showCreate = function(horse,session,event,...args) {
       show.home=true;
       show.stage='preparation';
     }
-    customShowState().shows[event.customShowId].registrations[event.id] = {
-      showId:show.id,riderId:show.careerRider.id,horseId:horse.id,entries:show.competitors.map(row=>({riderId:row.riderId,horseId:row.horseId}))
+    customShowState().shows[event.customShowId].registrations[event.id] ||= {
+      showId:show.id,riderId:show.careerRider.id,horseId:horse.id
     };
   }
   return show;
-};
-const CUSTOM_SHOW_PERSIST = showPersistResults;
-showPersistResults = function(show) {
-  const event=show.eventSnapshot;
-  if (!event?.customShowId) return CUSTOM_SHOW_PERSIST(show);
-  const results=customShowState().results;
-  results[event.id] ||= {id:event.id,showId:event.customShowId,date:event.date,standings:show.finalStandings.map(row=>({
-    riderId:row.riderId,riderName:row.riderName,horseId:row.horseId,horseName:row.horseName || row.name,placing:row.rank,score:row.total
-  })),paid:0};
-  if (!event.sandbox) return CUSTOM_SHOW_PERSIST(show);
 };
 const CUSTOM_SHOW_AWARD = showAward;
 showAward = function(show) {
@@ -130,7 +120,6 @@ showAward = function(show) {
     return;
   }
   CUSTOM_SHOW_AWARD(show);
-  if (customShowState().results[event.id]) customShowState().results[event.id].paid=show.award?.prize || 0;
 };
 
 const CUSTOM_SHOW_ENTER = careerEnter;

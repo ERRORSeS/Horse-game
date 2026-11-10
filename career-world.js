@@ -20,7 +20,7 @@ const CAREER_REGIONAL_NAMES = {
 
 function careerState() {
   return app.career ||= {
-    version: 1, settings: { progression: false, background: true, games: true, sponsors: true },
+    version: 1, recordVersion:84, settings: { progression: false, background: true, games: true, sponsors: true },
     origin: pastureCalendarHour(), cursor: pastureCalendarHour(), npcs: null, meets: {},
     allocations: {}, contracts: [], practice: {}, rankings: {}, rankHistory: {}
   };
@@ -58,7 +58,8 @@ rrNormalizeProfile = function (profile) {
   if (data && Object.hasOwn(CAREER_COUNTRIES, data.country)) {
     const birth = data.birth;
     result.career = { country: data.country, birth: birth && Number.isInteger(birth.year) &&
-      birth.month >= 1 && birth.month <= 12 && birth.day >= 1 && birth.day <= 30 ? { ...birth } : null, ageHistory: data.ageHistory || {} };
+      birth.month >= 1 && birth.month <= 12 && birth.day >= 1 && birth.day <= 30 ? { ...birth } : null, ageHistory: data.ageHistory || {},
+      activeDivision: Object.hasOwn(CAREER_AGE_DIVISIONS,data.activeDivision) ? data.activeDivision : '' };
   }
   return result;
 };
@@ -110,7 +111,7 @@ function careerRoster() {
   const world = careerState();
   if (world.npcs) return world.npcs;
   const originYear = pastureDate(world.origin).year;
-  const countries = Object.keys(CAREER_COUNTRIES), usedHorses = new Set(), usedRiders = new Set();
+  const countries = CAREER_ROSTER_COUNTRIES, usedHorses = new Set(), usedRiders = new Set();
   world.npcs = Array.from({ length: 480 }, (_, index) => {
     const id = 'world-rider-' + (index + 1);
     const country = countries[index % countries.length];
@@ -137,10 +138,61 @@ function careerRoster() {
   return world.npcs;
 }
 
+function careerAddYouthCohort(year,roster) {
+  const world = careerState();
+  const cohorts = world.youthCohorts ||= {};
+  const originYear = pastureDate(world.origin).year;
+  if (cohorts[year]) return;
+  const usedHorses = new Set(roster.flatMap(rider => rider.horses.map(horse => horseNameKey(horse.name))));
+  const usedRiders = new Set(roster.map(rider => rider.name));
+  const countries = Object.keys(CAREER_COUNTRIES);
+  const initial = !Object.keys(cohorts).length;
+  const count = initial ? 240 : 24;
+  const countriesPerCohort = initial ? CAREER_ROSTER_COUNTRIES : countries;
+  for (let i=0;i<count;i++) {
+    const id = 'youth-rider-'+year+'-'+(i+1);
+    const age = initial ? 7+i%15 : 7+i%2;
+    const country = countriesPerCohort[(i + Math.floor(i/15) + year-originYear + countriesPerCohort.length) % countriesPerCohort.length];
+    const [first,last] = CAREER_REGIONAL_NAMES[country] || [CAREER_FIRST_NAMES,CAREER_SURNAMES];
+    let name, attempt = 0;
+    do {
+      name = careerPick(id,'first:'+attempt,first)+' '+careerPick(id,'last:'+attempt,last);
+      attempt++;
+    } while (usedRiders.has(name));
+    usedRiders.add(name);
+    const stage = age < 13 ? i%2 : i%4;
+    const skill = [34,49,66,81][stage] + careerRoll(id,'skill')*9;
+    const rider = {id,name,country,stage,skill,potential:Math.min(100,skill+14),professional:false,
+      birth:{year:year-age,month:1+i%12,day:1+i%30},specialty:careerPick(id,'specialty',DISCIPLINES),
+      travelWillingness:careerRoll(id,'travel'),horses:[],starts:0,lastStart:null,training:[]};
+    rider.horses.push(careerNpcHorse(rider,'sport',year,usedHorses));
+    if (age <= 16) rider.horses.push(careerNpcHorse(rider,'pony',year,usedHorses));
+    roster.push(rider);
+  }
+  cohorts[year] = true;
+}
+
+function careerSeedRankedHistory(hour) {
+  const world = careerState();
+  if (world.openingHistory || !careerActive() || !world.settings.background) return;
+  world.openingHistory = true;
+  if (Object.values(world.meets).some(meet=>meet.ranking && meet.ranking!=='none')) return;
+  const from = Math.max(0,hour - CAREER_HOURS_PER_YEAR/2);
+  const roster = careerRoster();
+  careerAddYouthCohort(pastureDate(hour).year,roster);
+  for (const event of careerSchedule(from,hour-24,false,false)) {
+    if (event.tier < 3 || event.team || event.final || event.horseAge || event.major ||
+      !['junior','senior'].includes(event.division)) continue;
+    if (!world.meets[event.id]) careerResolveNpcMeet(event).openingHistory = true;
+  }
+  careerPublish(hour);
+}
+
 function careerRefreshPartnerships(year) {
   const world = careerState();
   if (world.partnershipYear === year) return;
   const roster = careerRoster();
+  careerAddYouthCohort(year,roster);
   const used = new Set(roster.flatMap(rider => rider.horses.map(horse => horseNameKey(horse.name))));
   for (const rider of roster) {
     if (year - rider.birth.year >= 68) {
@@ -206,7 +258,7 @@ function careerSchedule(from, to, includeGames = careerState().settings.games, i
   const events = [];
   for (let year = pastureDate(from).year; year <= pastureDate(to).year; year++) {
     for (const row of CAREER_SERIES) {
-      if (row.foregroundOnly && !includeForeground || (row.games || row.gamesTrial) && !includeGames || row.cycle && year % row.cycle !== row.edition) continue;
+      if ((row.foregroundOnly || row.calendarOnly) && !includeForeground || (row.games || row.gamesTrial) && !includeGames || row.cycle && year % row.cycle !== row.edition) continue;
       const hour = pastureCalendarHour(year, row.month, row.day, 12);
       if (hour >= from && hour <= to) events.push(careerEvent(row, year));
     }
@@ -224,10 +276,11 @@ function careerBusy(spans, event) {
 
 function careerResults({ riderId, horseId, discipline, from = -Infinity, until = Infinity } = {}) {
   return Object.values(app.career?.meets || {}).flatMap(meet =>
-    meet.hour < from || meet.hour > until || discipline && meet.discipline !== discipline ? [] :
-      meet.results.filter(row => (!riderId || riderId === row.riderId) && (!horseId || horseId === row.horseId))
+    meet.hour < from || meet.hour > until || meet.sandbox || discipline && meet.discipline !== discipline ? [] :
+      meet.results.filter(row => row.started !== false && (!riderId || riderId === row.riderId) && (!horseId || horseId === row.horseId))
         .map(row => ({ ...row, hour: meet.hour, eventId: meet.id, event: meet.name, discipline: meet.discipline,
-          tier: meet.tier, series: meet.series, division: meet.division, ranking: meet.ranking, horseAge: meet.horseAge, major: meet.major })));
+          tier: meet.tier, series: meet.series, division: meet.division, ranking: meet.ranking,
+          horseAge: meet.horseAge, major: meet.major, custom: meet.custom })));
 }
 function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
   if (!rider) return 'Choose a rider.';
@@ -300,7 +353,9 @@ function careerPoints(event, row, starters, fieldFactor = 1) {
 }
 
 function careerNpcField(event, limit, player = null, selectionPool = false) {
+  if (!limit && !selectionPool) return [];
   const roster = careerRoster(), matches = [];
+  careerAddYouthCohort(pastureDate(careerState().cursor).year,roster);
   const histories = new Map();
   if (event.games || event.team || event.tier >= 10 || event.final) {
     for (const row of careerResults({ discipline: event.discipline, until: event.at - 1, from: event.at - CAREER_HOURS_PER_YEAR * 2 })) {
@@ -308,12 +363,16 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
       histories.get(row.riderId).push(row);
     }
   }
+  const [minimumAge,maximumAge] = event.ages || CAREER_AGE_DIVISIONS[event.division].ages;
+  const year = event.date?.year ?? pastureDate(event.at).year;
+  const booked = app.activeShow;
+  const conflict = booked?.eventSnapshot?.careerEvent && booked.eventId !== event.id &&
+    careerBusy([{start:booked.eventSnapshot.at,end:careerEventEnd(booked.eventSnapshot)}],event)
+    ? new Set(booked.competitors.filter(row=>!row.player).map(row=>row.riderId)) : null;
   for (const rider of roster) {
-    if (rider.retired || careerBusy(rider.recentStarts || [], event)) continue;
-    const booked = app.activeShow;
-    if (booked?.eventSnapshot?.careerEvent && booked.eventId !== event.id &&
-      careerBusy([{ start: booked.eventSnapshot.at, end: careerEventEnd(booked.eventSnapshot) }],event) &&
-      booked.competitors?.some(row => !row.player && row.riderId === rider.id)) continue;
+    const age = year-rider.birth?.year;
+    if (rider.retired || age < minimumAge || age > maximumAge || conflict?.has(rider.id) ||
+      careerBusy(rider.recentStarts || [],event)) continue;
     const candidates = rider.horses.filter(horse => !careerEligibility(event, rider, horse,
       { npc: true, history: histories.get(rider.id) || [] }));
     if (!candidates.length) continue;
@@ -395,50 +454,68 @@ function careerTeamScores(event, results) {
     .map((team,index) => ({ ...team, placing: index + 1, medal: event.games ? ['Gold','Silver','Bronze'][index] || null : null,
       points: event.ranking === 'team' ? careerPoints(event, { placing: index + 1, score: team.score / event.count }, teams.length * event.team) : 0 }));
 }
-function careerRecordMeet(event, standings, player = null) {
+function careerParticipationStatus(row) {
+  if (row.status) return row.status;
+  const reason = row.result?.eliminationReason || Object.values(row.scores || {}).find(score => score.eliminationReason)?.eliminationReason;
+  if (reason === 'Retired') return 'Retired';
+  return row.eliminated || row.result?.eliminated || Object.values(row.scores || {}).some(score=>score.eliminated)
+    ? 'Eliminated' : row.rank ? 'Completed' : 'Did Not Start';
+}
+
+function careerRecordMeet(event, standings, player = null, { recovery = false, ranked = careerActive() || (event.customShowId && event.official) } = {}) {
   const world = careerState();
   if (world.meets[event.id]) return world.meets[event.id];
   const mean = standings.reduce((sum,row) => sum + (row.skills?.discipline ?? 60), 0) / Math.max(1, standings.length);
   const field = clamp(.85 + mean * .003, .85, 1.15);
-  const counted = careerActive();
+  const counted = ranked && !event.sandbox;
+  const progressing = careerActive();
+  const starters = standings.filter(row => row.started !== false).length;
   const results = standings.map(row => {
     const identity = row.player ? player : row;
-    const score = Number(row.total);
+    const status = careerParticipationStatus(row);
+    const started = ['Completed','Eliminated','Retired'].includes(status);
+    const placing = status === 'Completed' ? row.rank : null;
     const result = {
-      riderId: row.player ? identity.id : row.riderId, riderName: row.player ? identity.name : row.riderName,
-      horseId: row.horseId, horseName: row.horseName || row.name, player: Boolean(row.player), country: identity.country,
-      placing: row.rank || null, score: Number.isFinite(score) ? score : null, eliminated: Boolean(row.eliminated || !row.rank),
-      clear: event.discipline === 'jumping' && row.scores?.showjumping?.faults === 0 && !row.eliminated
+      riderId: row.player ? identity?.id : row.riderId, riderName: row.player ? identity?.name : row.riderName,
+      horseId: row.horseId, horseName: row.horseName || row.name, player: Boolean(row.player), country: identity?.country,
+      ...(row.entryId ? {entryId:row.entryId} : {}), status, started, placing,
+      score: Number.isFinite(row.total) ? row.total : null, eliminated: status === 'Eliminated' || status === 'Retired',
+      clear: Boolean(placing && event.discipline === 'jumping' && row.scores?.showjumping?.faults === 0),
+      ...(row.player ? {showPoints:!event.sandbox && placing ? Math.max(0,30-placing) : 0} : {})
     };
-    return { ...result, points: counted ? careerPoints(event, result, standings.length, field) : 0,
+    return { ...result, points: counted && started ? careerPoints(event, result, starters, field) : 0,
       medal: event.games && result.placing ? ['Gold','Silver','Bronze'][result.placing - 1] || null : null };
   });
   const meet = {
-    id: event.id, hour: careerEventEnd(event), name: event.name, venue: event.barnName, discipline: event.discipline, level: event.level,
-    tier: event.tier, prestige: event.prestige, ranking: event.ranking, series: event.series, division: event.division,
+    id: event.id, classId: event.classId || event.id, at:event.at, hour: careerEventEnd(event), name: event.name,
+    venue: event.barnName, discipline: event.discipline, level: event.level,
+    tier: event.tier, prestige: event.prestige, ranking: event.ranking, series: event.series, division: event.division, divisionScope:event.divisionScope,
+    official: Boolean(event.official), sandbox: Boolean(event.sandbox), custom: Boolean(event.customShowId || event.userHosted),
+    customId: event.customShowId, starters,
     horseAge: event.horseAge, major: Boolean(event.major), games: Boolean(event.games), final: Boolean(event.final),
     results, teams: careerTeamScores(event, results)
   };
   if (!counted) for (const team of meet.teams) team.points = 0;
   world.meets[event.id] = meet;
+  if (event.sandbox || recovery) return meet;
   const byId = new Map(careerRoster().map(rider => [rider.id, rider]));
   for (const row of results) {
-    if (row.player) continue;
+    if (row.player || !row.started) continue;
     const rider = byId.get(row.riderId);
     if (!rider) continue;
     rider.starts++;
     rider.lastStart = Math.max(rider.lastStart ?? 0, event.at);
     rider.recentStarts = [...(rider.recentStarts || []),{ start:event.at, end:careerEventEnd(event) }]
       .sort((a,b) => a.start-b.start).slice(-32);
-    if (counted && world.settings.background) {
+    if (progressing && world.settings.background) {
       careerDevelopNpc(rider, event, row);
       careerNpcSponsors(rider,event,row);
     }
   }
   if (player) {
     const result = results.find(row => row.player);
-    if (result?.placing && counted) careerPractice(player.id, event.discipline, event.level, event.id, event.at);
-    careerSponsorBonus(player, event, result);
+    if (result?.placing && progressing) careerPractice(player.id, event.discipline, event.level, event.id, event.at);
+    if (result?.placing) careerSponsorBonus(player, event, result);
     const slam = event.major ? careerMajorStreak(event.series) : null;
     if (slam?.eventId === event.id && slam.riderId === player.id && slam.length === 3) {
       if (careerCredit('career-slam:' + event.id,2500,event.at,'Elite Majors three-win award')) meet.slamBonus = 2500;
@@ -491,6 +568,7 @@ function careerAdvance(hour = pastureCalendarHour()) {
   if (!app.career) return;
   const world = careerState();
   if (hour <= world.cursor) return;
+  careerSeedRankedHistory(world.cursor);
   const from = world.cursor + 1;
   const firstMonth = Math.floor(world.cursor / CAREER_HOURS_PER_MONTH);
   const lastMonth = Math.floor(hour / CAREER_HOURS_PER_MONTH);

@@ -1,9 +1,13 @@
 const CAREER_BOARD_LABELS = {
   world: 'World riders', horse: 'World horses', combination: 'Rider–horse combinations',
-  national: 'National riders', division: 'Age divisions', 'youth-national': 'National age divisions', 'young-horse': 'Young horses',
+  national: 'National riders', division: 'Age divisions', 'youth-national': 'National age divisions', 'youth-international': 'International age divisions', 'young-horse': 'Young horses',
   tour: 'Season tour standings', team: 'National teams'
 };
 const CAREER_DISCIPLINE_LABELS = { jumping: 'Showjumping', dressage: 'Dressage', eventing: 'Eventing', hunter: 'Hunters' };
+const CAREER_SERIES_LABELS = new Map(CAREER_SERIES.filter(event=>event.series)
+  .map(event=>[event.series,event.series.endsWith('-ladder') ? CAREER_DISCIPLINE_LABELS[event.discipline]+' Competition Ladder' :
+    event.name.split(' · Leg ')[0].replace(/ Final$/,'')]));
+
 
 function careerOptions(options, selected) {
   return options.map(([value,label]) =>
@@ -170,20 +174,12 @@ function careerRivals(rider, discipline) {
   return [...rivals.values()].filter(rival => rival.meetings >= 2).sort((a,b) => b.meetings-a.meetings || a.name.localeCompare(b.name)).slice(0,8);
 }
 function careerHistoryMarkup(rider, discipline) {
-  const history = careerResults({ riderId: rider.id, discipline }).sort((a,b) => b.hour - a.hour);
   const medals = careerMedals();
   const rivals = careerRivals(rider,discipline);
-  const won = history.filter(row => row.placing === 1);
-  const best = careerState().rankHistory[careerBoardKey('world',discipline)]?.[rider.id]?.best;
   const streak = careerMajorStreak('elite-majors');
-  const current = (careerState().rankings[careerBoardKey('world',discipline)] || []).find(row => row.id === rider.id);
-  return `<details class="shop-drawer"><summary>${csEscape(rider.name)} · Career history</summary><div class="shop-drawer-body">
-    <p>${history.length} starts · ${won.length} wins · ${won.filter(row => row.major).length} major victories
-      · World rank ${current ? '#' + current.rank : 'unranked'} · Best ${best ? '#' + best : 'unranked'}</p>
+  return `${riderParticipationMarkup(rider,discipline)}
+    <details class="shop-drawer"><summary>Career highlights</summary><div class="shop-drawer-body">
     ${streak?.riderId === rider.id && streak.length >= 2 ? '<p>Elite Majors streak · ' + streak.length + ' consecutive wins</p>' : ''}
-    ${history.slice(0,24).map(row => `<p>${csEscape(pastureDateLabel(row.hour))} · ${csEscape(row.event)} ·
-      ${csEscape(row.horseName)} · ${row.placing ? '#' + row.placing : 'Unclassified'}${row.medal ? ' · ' + row.medal : ''}
-      ${row.points ? ' · ' + row.points + ' earned points' : ''}</p>`).join('') || '<p>No recorded career starts.</p>'}
     ${rivals.length ? '<h3>Recurring rivals</h3>' + rivals.map(rival =>
       `<p>${csEscape(rival.name)} / ${csEscape(rival.horse)} · ${rival.meetings} meetings ·
       ${rival.ahead} finishes ahead, ${rival.behind} behind</p>`).join('') : ''}
@@ -243,9 +239,9 @@ function renderCareerRankings() {
   const type = CAREER_BOARD_TYPES.includes(selected.board) ? selected.board : 'world';
   const discipline = CAREER_DISCIPLINE_LABELS[selected.discipline] ? selected.discipline : 'jumping';
   const series = [...new Map(CAREER_SERIES.filter(event => event.discipline === discipline && event.series &&
-    (type === 'team' ? event.team : !event.team)).map(event => [event.series,event.name.split(' · Leg ')[0].replace(/ Final$/,'')])).entries()];
+    (type === 'team' ? event.team : !event.team)).map(event => [event.series,CAREER_SERIES_LABELS.get(event.series)])).entries()];
   const options = type === 'national' ? Object.entries(CAREER_COUNTRIES).map(([code,[name]]) => [code,name])
-    : type === 'division' ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior').map(([key,row]) => [key,row.label])
+    : ['division','youth-international'].includes(type) ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior').map(([key,row]) => [key,row.label])
     : type === 'youth-national' ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior')
       .map(([key,row]) => [key + '|' + rider.country, row.label + ' · ' + CAREER_COUNTRIES[rider.country][0]])
     : type === 'young-horse' ? [4,5,6,7,8].map(age => [age,age + '-year-olds'])
@@ -273,7 +269,7 @@ function renderCareerRankings() {
       <summary><span>Rankings list</span><span class="shop-count">${rows.length}</span></summary>
       <div class="shop-drawer-body career-board"></div>
     </details>
-    ${typeof riderShowPointsMarkup==='function' ? '<div class="sales-shop-body">' + riderShowPointsMarkup(rider) + '</div>' : ''}
+    ${typeof riderShowPointsMarkup==='function' ? '<div class="sales-shop-body">' + riderShowPointsMarkup(rider,discipline) + '</div>' : ''}
     ${careerHistoryMarkup(rider,discipline)}
     ${careerSponsorMarkup(rider)}
     ${careerGuide()}</section>`;
@@ -335,6 +331,7 @@ renderSettings = function () {
   const rider = careerRider();
   const world = careerState();
   const age = careerAge(rider);
+  const divisions = careerProfileDivisions(rider);
   const countryOptions = Object.entries(CAREER_COUNTRIES).map(([code,[name]]) => [code,name]);
   const section = document.createElement('section');
   section.className = 'career-profile-settings';
@@ -342,6 +339,7 @@ renderSettings = function () {
     <label>${age == null ? 'Starting age for this rider' : 'Starting age for a new rider'}<input type="number" min="6" max="60" value="18" data-career-age></label>
     <label>Sporting nationality<select data-career-country>${careerOptions(countryOptions,rider.country)}</select></label>
     ${age == null ? '<button type="button" data-career-profile-save>Set this rider’s age and nationality</button>' : ''}
+    <label>Active ranking division<select data-career-division>${careerOptions([['','Automatic'],...divisions.map(key=>[key,CAREER_AGE_DIVISIONS[key].label])],rider.activeDivision || '')}</select></label>
     <details data-ui-key="career-settings"><summary>Career settings</summary>
       ${[['progression','Rider Career Progression & Rankings'],['background','Background NPC Career Simulation'],
         ['games','International Championship Calendar'],['sponsors','Sponsor Offers'],['federations','National Team Applications']].map(([key,label]) =>
@@ -383,8 +381,14 @@ renderSettings = function () {
   section.querySelectorAll('[data-career-setting]').forEach(input => input.onchange = () => {
     careerAdvance();
     world.settings[input.dataset.careerSetting] = input.checked;
+    careerSeedRankedHistory(pastureCalendarHour());
     saveGame(false);
   });
+  section.querySelector('[data-career-division]').onchange = event => {
+    rrStoreCurrentProfile().career.activeDivision = event.target.value;
+    saveGame(false);
+    renderSettings();
+  };
   const standard = section.querySelector('[data-career-welsh]');
   if (standard) standard.onchange = () => {
     app.settings.welshStandard = standard.value;
@@ -397,6 +401,18 @@ const CAREER_HORSE_CARD = createHorseCard;
 createHorseCard = function (horse,...args) {
   const card = CAREER_HORSE_CARD(horse,...args);
   const record = careerHorseRecord(horse);
+  if (app.horses.some(row=>row.id===horse.id)) {
+    const participation = document.createElement('details');
+    participation.className = 'shop-drawer career-horse-record';
+    participation.innerHTML = '<summary>Competition history and points</summary><div class="shop-drawer-body"></div>';
+    participation.ontoggle = () => {
+      if (!participation.open) return;
+      const rows = careerParticipationRows({horseId:horse.id});
+      participation.querySelector('.shop-drawer-body').innerHTML =
+        rows.slice(0,24).map(showParticipationLine).join('') || '<p>No linked competition participation yet.</p>';
+    };
+    card.append(participation);
+  }
   if (record.starts) {
     const details = document.createElement('details');
     const bestRank = Object.keys(CAREER_WORLD_POINTS).map(discipline =>

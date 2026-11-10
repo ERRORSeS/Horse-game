@@ -74,7 +74,7 @@ function show82Card(event,blocker) {
   return `<article class="box sales-horse-card career-event-card">
     <p class="shop-eyebrow">${CAREER_DISCIPLINE_LABELS[event.discipline]} · ${csEscape(event.level)}</p>
     <h3>${csEscape(event.name)}</h3>
-    <div class="career-chips"><span>Prestige ${event.prestige}</span><span>${event.sandbox ? 'Sandbox' : CAREER_TIERS[event.tier].label}</span>
+    <div class="career-chips"><span>Prestige ${event.prestige}</span><span>${event.sandbox ? 'Sandbox · Unofficial' : event.customShowId ? 'Career-sanctioned · Official' : CAREER_TIERS[event.tier].label}</span>
       ${event.base ? '<span>Ranking eligible</span>' : ''}${event.team ? '<span>Team</span>' : ''}</div>
     <p>${csEscape(pastureDateLabel(event.at))} · ${csEscape(event.barnName || event.city || 'Stable arena')}${event.country ? ' · '+csEscape(event.country) : ''}</p>
     <p>Entry ${money(event.entryFee || 0)} · Purse ${money(event.displayPrize ?? event.prizeMoney ?? 0)}${event.sandbox ? ' simulated' : ''}</p>
@@ -208,7 +208,7 @@ function show82CreatorMarkup() {
       <label>Show name<input data-show-value="name" maxlength="90"></label>
       <label>Venue<input data-show-value="venue" maxlength="90" value="${csEscape(app.currentBarn?.name || '')}"></label>
       <label>Country<select data-show-value="country">${careerOptions(Object.entries(CAREER_COUNTRIES).map(([code,row])=>[code,row[0]]),careerCountry(app.currentBarn?.country))}</select></label>
-      <label>Mode<select data-show-value="mode">${careerOptions([['sandbox','Sandbox'],['sanctioned','Apply for career recognition']],'sandbox')}</select></label>
+      <label>Mode<select data-show-value="mode">${careerOptions([['sandbox','Sandbox · Unofficial'],['sanctioned','Career-sanctioned · Official if approved']],'sandbox')}</select></label>
       <label>Year<input type="number" min="${app.year}" max="${app.year+5}" value="${app.year}" data-show-value="year"></label>
       <label>Month<input type="number" min="1" max="12" value="${app.month}" data-show-value="month"></label>
       <label>Day<input type="number" min="1" max="30" value="${Math.min(30,app.day+7)}" data-show-value="day"></label>

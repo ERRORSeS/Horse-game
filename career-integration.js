@@ -1,40 +1,51 @@
 // Rank releases use compact results written by the live show and background scoring paths.
-const CAREER_BOARD_TYPES = ['world','horse','combination','national','division','youth-national','young-horse','tour','team'];
+const CAREER_BOARD_TYPES = ['world','horse','combination','national','division','youth-national','youth-international','young-horse','tour','team'];
 function careerBoardKey(type, discipline, filter = '') {
   return [type, discipline, filter].join('|');
+}
+// The same destinations drive published standings and the result breakdown.
+function careerPointCredits(meet,row) {
+  if (!row.points || meet.sandbox) return [];
+  const {riderId,riderName,horseId,horseName,country,points} = row;
+  const credits = [];
+  function add(type,filter = '',seasonal = false,id = riderId,name = riderName,amount = points) {
+    if (id) credits.push({type,filter,seasonal,id,name,country,points:amount});
+  }
+  if (meet.ranking === 'world') {
+    add('world');
+    add('horse','',false,horseId,horseName,Math.round(points*(.94+(meet.prestige || 0)*.0012)*(row.clear ? 1.04 : 1)));
+    if (riderId && horseId) add('combination','',false,riderId+'|'+horseId,riderName+' / '+horseName);
+  }
+  if (['national','world'].includes(meet.ranking)) add('national',country,true);
+  if (meet.ranking === 'division' || meet.custom && meet.ranking === 'national' && meet.division !== 'senior') {
+    add('division',meet.division);
+    if (meet.divisionScope !== 'international') add('youth-national',meet.division+'|'+country,true);
+    if (meet.divisionScope === 'international' || meet.tier >= 5) add('youth-international',meet.division);
+    if (meet.division === 'pony') add('horse','pony',false,horseId,horseName);
+  }
+  if (meet.ranking === 'young-horse') add('young-horse',meet.horseAge,false,horseId,horseName);
+  if (meet.series && meet.ranking !== 'team') add('tour',meet.series,true);
+  return credits;
 }
 function careerComputeBoards(hour) {
   const boards = {};
   const year = pastureDate(hour).year;
-  function add(type, meet, filter, id, name, country, points) {
+  function add(discipline,{type,filter,id,name,country,points}) {
     if (!points) return;
-    const key = careerBoardKey(type, meet.discipline, filter);
+    const key = careerBoardKey(type,discipline,filter);
     const rows = boards[key] ||= new Map();
-    if (!rows.has(id)) rows.set(id, { id, name, country, scores: [] });
+    if (!rows.has(id)) rows.set(id,{id,name,country,scores:[]});
     rows.get(id).scores.push(points);
   }
   for (const meet of Object.values(careerState().meets)) {
-    if (meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
+    if (meet.sandbox || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
     const seasonal = pastureDate(meet.hour).year === year;
-    for (const row of meet.results) {
-      const { riderId, riderName, horseId, horseName, country, points } = row;
-      if (meet.ranking === 'world') {
-        add('world', meet, '', riderId, riderName, country, points);
-        const horsePoints = Math.round(points * (.94 + (meet.prestige || 0) * .0012) * (row.clear ? 1.04 : 1));
-        add('horse', meet, '', horseId, horseName, country, horsePoints);
-        add('combination', meet, '', riderId + '|' + horseId, riderName + ' / ' + horseName, country, points);
-      }
-      if (seasonal && ['national','world'].includes(meet.ranking)) add('national', meet, country, riderId, riderName, country, points);
-      if (meet.ranking === 'division') {
-        add('division', meet, meet.division, riderId, riderName, country, points);
-        if (seasonal) add('youth-national', meet, meet.division + '|' + country, riderId, riderName, country, points);
-        if (meet.division === 'pony') add('horse', meet, 'pony', horseId, horseName, country, points);
-      }
-      if (meet.ranking === 'young-horse') add('young-horse', meet, meet.horseAge, horseId, horseName, country, points);
-      if (seasonal && meet.series && meet.ranking !== 'team') add('tour', meet, meet.series, riderId, riderName, country, points);
+    for (const row of meet.results) for (const credit of careerPointCredits(meet,row)) {
+      if (!credit.seasonal || seasonal) add(meet.discipline,credit);
     }
-    if (seasonal && meet.series) for (const row of meet.teams) {
-      add('team', meet, meet.series, row.country, CAREER_COUNTRIES[row.country]?.[0] || row.country, row.country, row.points);
+    if (seasonal && meet.series) for (const row of meet.teams || []) {
+      add(meet.discipline,{type:'team',filter:meet.series,id:row.country,
+        name:CAREER_COUNTRIES[row.country]?.[0] || row.country,country:row.country,points:row.points});
     }
   }
   return Object.fromEntries(Object.entries(boards).map(([key, rows]) => {
@@ -44,20 +55,23 @@ function careerComputeBoards(hour) {
     return [key, standings.map(({ starts, ...row }, index) => ({ ...row, rank: index + 1 }))];
   }));
 }
-function careerPublish(hour) {
+function careerPublish(hour,{repair = false} = {}) {
   const world = careerState();
   const boards = careerComputeBoards(hour);
   const playerIds = new Set(rrSettings().profiles.map(profile => profile.id));
   for (const [key, rows] of Object.entries(boards)) {
-    const prior = new Map((world.rankings[key] || []).map(row => [row.id, row.rank]));
+    const prior = new Map((world.rankings[key] || []).map(row => [row.id,row]));
     const history = world.rankHistory[key] ||= {};
     for (const row of rows) {
-      row.previous = prior.get(row.id) ?? null;
+      const oldRow = prior.get(row.id);
+      row.previous = repair ? oldRow?.previous ?? null : oldRow?.rank ?? null;
       const record = history[row.id] ||= { best: row.rank, releases: [] };
       record.best = Math.min(record.best, row.rank);
       row.best = record.best;
       if (key.startsWith('world|') && (row.rank <= 100 || playerIds.has(row.id))) {
-        record.releases.push({ hour, rank: row.rank, points: row.points });
+        const release = {hour,rank:row.rank,points:row.points};
+        if (record.releases.at(-1)?.hour === hour) record.releases[record.releases.length-1] = release;
+        else record.releases.push(release);
         if (record.releases.length > 120) record.releases.shift();
       }
     }
@@ -351,7 +365,7 @@ showCreate = function (horse, session, event, entryId) {
   const show = CAREER_CREATE_SHOW(horse,session,event,entryId);
   if (!event?.careerEvent) {
     careerOrdinaryField(show);
-    show.careerRider = careerRider();
+    show.careerRider = event?.registeredEntries?.find(row=>row.entryId===entryId)?.careerRider || careerRider();
     return show;
   }
   const rider = careerRider();
@@ -374,27 +388,44 @@ showCreate = function (horse, session, event, entryId) {
   return show;
 };
 
+function careerShowClass(show) {
+  const event = show.eventSnapshot;
+  if (event?.careerEvent) return event;
+  const classification = event?.careerClassification;
+  return { id:show.id, classId:event?.id || show.id, at:show.classTime ?? pastureCalendarHour(), name:show.name,
+    barnName:show.venue, discipline:show.discipline, level:show.level, tier:classification?.tier || 0,
+    prestige:classification?.prestige ?? CAREER_TIERS[0].prestige, division:classification?.division || 'senior',
+    official:classification?.official === true, userHosted:event?.userHosted === true, sandbox:event?.userHosted === true, ranking:'none' };
+}
+
+function careerBookedRider(show,player) {
+  if (show.careerRider) return show.careerRider;
+  const profiles=rrSettings().profiles;
+  const id=show.profileRiderId || (profiles.some(profile=>profile.id===player?.riderId) ? player.riderId : null);
+  const profile=id ? profiles.find(profile=>profile.id===id) : profiles.length===1 ? profiles[0] : null;
+  return profile && {id:profile.id,name:profile.name,country:profile.career?.country};
+}
+function careerShowStandings(show) {
+  return show.finalStandings.map(row => row.player ? {...row,entryId:show.id} : row);
+}
 const CAREER_PERSIST_SHOW = showPersistResults;
 showPersistResults = function (show) {
-  const result = CAREER_PERSIST_SHOW(show);
-  const event = show.eventSnapshot;
-  const horse = showHorse(show);
-  const player = show.finalStandings?.find(row => row.player);
-  if (!horse || !player) return result;
-  const row = horse.showResults?.find(record => record.entryId === show.id);
-  if (event?.careerEvent && show.careerRider) {
-    const meet = careerRecordMeet(event,show.finalStandings,show.careerRider);
-    if (row) row.career = { official: event.official, tier: event.tier, prestige: event.prestige,
-      division: event.division, series: event.series, clear: meet.results.find(record => record.player)?.clear };
-  } else {
-    if (row && event?.careerClassification?.official) row.career = { ...event.careerClassification, clear: player.scores?.showjumping?.faults === 0 };
-    if (show.careerRider && !app.career?.meets[show.id]) {
-      const classification = event?.careerClassification;
-      const regular = { id: show.id, at: show.classTime ?? pastureCalendarHour(), name: show.name,
-        barnName: show.venue, discipline: show.discipline, level: show.level, tier: classification?.tier || 0,
-        prestige: classification?.prestige || CAREER_TIERS[0].prestige, division: 'senior', ranking: 'none' };
-      careerRecordMeet(regular,show.finalStandings,show.careerRider);
-    }
+  const event = careerShowClass(show);
+  // Sandbox results share the career history but are kept out of the horse's
+  // official result array, which also feeds titles, pricing and achievements.
+  const modernSandbox = event.careerEvent && event.sandbox;
+  const result = modernSandbox || !show.finalStandings?.some(row => row.player) ? undefined : CAREER_PERSIST_SHOW(show);
+  const playerStanding=show.finalStandings?.find(row=>row.player);
+  const rider=playerStanding && careerBookedRider(show,playerStanding);
+  if (!rider) return result;
+  const meet = careerRecordMeet(event,careerShowStandings(show),rider);
+  const row = modernSandbox ? null : showHorse(show)?.showResults?.find(record => record.entryId === show.id);
+  if (row) {
+    const player = meet.results.find(record => record.player);
+    if (player) Object.assign(row,{ riderId:player.riderId,riderName:player.riderName,classId:meet.classId,
+      participationStatus:player.status,showPoints:player.showPoints });
+    row.career = { official:meet.official,tier:meet.tier,prestige:meet.prestige,division:meet.division,
+      series:meet.series,clear:player?.clear };
   }
   return result;
 };
