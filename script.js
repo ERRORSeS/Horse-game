@@ -3144,7 +3144,7 @@ function applyAutoTraining(horse) {
       markTrainingSession(horse);
       trainedSessions += 1;
     }
-    if (horse.requiresBreakingIn && horse.behavior >= 500) {
+    if (horse.requiresBreakingIn && horse.age > 3 && horse.behavior >= 150) {
       horse.requiresBreakingIn = false;
       pushReport(`${horse.name} completed breaking in and can begin regular training.`);
     }
@@ -3838,13 +3838,13 @@ function requiredBehaviorForRiding(horse) {
   if (!horse) return 0;
   // A manual riding override removes the behavior threshold entirely.
   if (horse.ridingEducationOverride === true && horse.age > 3) return -Infinity;
-  if (horse.requiresBreakingIn) return 500;
-  if (horse.bredBy === 'Your Stable') return 500;
+  if (horse.requiresBreakingIn) return 150;
+  if (horse.bredBy === 'Your Stable') return 150;
   return 0;
 }
 
 function canRideUnderSaddle(horse) {
-  if (!horse || horse.deceased) return false;
+  if (!horse || horse.deceased || !(horse.age > 3)) return false;
   const required = requiredBehaviorForRiding(horse);
   return (horse.behavior || 0) >= required;
 }
@@ -4295,7 +4295,7 @@ function applyFoalHandling(horse, exercise) {
     horse.stats.jumping[skill] = clampSkill(horse, 'jumping', horse.stats.jumping[skill] + rnd(1, 2));
   });
   horse.managed.trained = true;
-  if (horse.requiresBreakingIn && horse.behavior >= 500) {
+  if (horse.requiresBreakingIn && horse.age > 3 && horse.behavior >= 150) {
     horse.requiresBreakingIn = false;
     pushReport(`${horse.name} completed breaking in and can begin regular training.`);
   }
@@ -5547,7 +5547,7 @@ function createHorseCard(horse, options = {}) {
   const focusTolerance = Number.isFinite(horse.focusToleranceMonths) ? horse.focusToleranceMonths : randomFocusToleranceMonths();
   horse.focusToleranceMonths = focusTolerance;
   const ringPerformancePercent = clamp(Math.round(horse.ringPerformance || 100), 0, 100);
-  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${Math.round(horse.behavior || 0)} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${HorseSoundness.format(horse)} years.months est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${horse.age < 3 ? 'In-hand/registry only until age 3' : canRideUnderSaddle(horse) ? 'Under saddle eligible' : 'Currently not eligible for ridden work'}`;
+  node.querySelector('.meta').textContent = `${horse.breed} • Personality: ${horse.personality} • Social: ${ensureHorseSocial(horse)}/100 • Behavior: ${Math.round(horse.behavior || 0)} • Mood: ${horse.mood} • Weight: ${horse.weightStatus} • Conformation: ${horse.conformation} • Experience: ${experience.label} • Focus: ${focusTolerance} month tolerance • Ring Performance: ${ringPerformancePercent}% • COI: ${horse.coi}% • Soundness: ${HorseSoundness.format(horse)} years.months est. • Worth: ${money(horseWorth(horse))}${horse.extraPotential ? ' • Extra potential' : ''}${injuryLine} • ${horse.age < 3 ? 'In-hand/registry only until older than 3' : canRideUnderSaddle(horse) ? 'Under saddle eligible' : 'Currently not eligible for ridden work'}`;
 
   const dList = node.querySelector('.dressage-stats');
   Object.entries(horse.stats.dressage).forEach(([k, v]) => { dList.innerHTML += `<li>${k}: ${Number(v).toFixed(0)}</li>`; });
@@ -7073,7 +7073,7 @@ function finalizeCompetitionRpgEntry(horse, session) {
 function registerShowEntry(horse, discipline, level) {
   if (!canCompeteUnderSaddle(horse)) {
     if (horse.unridable) pushReport('This horse is unridable.');
-    else if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) pushReport(`${horse.name} is unbroken/green and needs behavior 500 before under-saddle work.`);
+    else if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) pushReport(`${horse.name} is unbroken/green and needs behavior 150 and must be older than 3 before under-saddle work.`);
     else pushReport(`${horse.name} cannot enter under-saddle shows until age 3.`);
     return;
   }
@@ -7451,7 +7451,7 @@ function renderShows() {
       if (!horse) return alert('No eligible horse selected.');
       if (!canCompeteUnderSaddle(horse)) {
         if (horse.unridable) return alert('This horse is unridable.');
-        if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle work.');
+        if ((horse.behavior || 0) < requiredBehaviorForRiding(horse)) return alert('This horse is unbroken/green and needs behavior 150 and must be older than 3 before under-saddle work.');
         return alert('This horse is in-hand only until age 3.');
       }
       registerShowEntry(horse, d, level);
@@ -8029,7 +8029,7 @@ function renderTraining() {
     if (!h) return;
     if (h.age < 3) return alert('Foals and young horses should use Foal Handling until age 3.');
     if (h.unridable) return alert('This horse is unridable.');
-    if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 500 before under-saddle training.');
+    if (!canRideUnderSaddle(h)) return alert('This horse is unbroken/green and needs behavior 150 and must be older than 3 before under-saddle training.');
     if (h.isLessonHorse && !h.barnAvailable) return alert('This lesson horse is unavailable this month and cannot train.');
     if (h.illnesses.some((i) => i.active)) return alert('This horse is recovering and cannot train until fully healed.');
     const equipmentError=eqTrainingAllowed(h,d);if(equipmentError)return alert(equipmentError);
