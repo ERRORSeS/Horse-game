@@ -96,8 +96,8 @@ function federationRegisterTrial(planId,rider=careerRider()){
 }
 function federationTeamEntries(rider=careerRider(),hour=pastureCalendarHour()){
  if(!federationEnabled())return [];
- const seasons=Object.values(federationState().seasons).filter(season=>season.country===rider.country).sort((a,b)=>b.selectedAt-a.selectedAt);
- const entries=[];
+ const seasons=Object.values(federationState().seasons).filter(season=>season.country===rider.country&&season.members.some(member=>member.riderId===rider.id&&['Selected — National Squad','Selected — Championship Team'].includes(member.status))).sort((a,b)=>b.selectedAt-a.selectedAt);
+ const entries=[];if(!seasons.length)return entries;
  for(const event of careerSchedule(hour+24,hour+90*24).filter(event=>event.team||event.games)){
   const season=seasons.find(season=>season.discipline===event.discipline&&season.division===event.division&&season.selectedAt<=event.at&&season.expires>event.at);
   const member=season?.members.find(row=>row.riderId===rider.id&&['Selected — National Squad','Selected — Championship Team'].includes(row.status));
