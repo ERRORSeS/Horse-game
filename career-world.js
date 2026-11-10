@@ -1,5 +1,6 @@
 const CAREER_HOURS_PER_YEAR = 12 * 30 * 24;
 const CAREER_HOURS_PER_MONTH = 30 * 24;
+const CAREER_HOURS_PER_WEEK = 7 * 24;
 const CAREER_PHASES = {
   jumping: ['showjumping'], dressage: ['dressage'], hunter: ['hunter'],
   eventing: ['dressage', 'cross-country', 'showjumping']
@@ -109,7 +110,7 @@ function careerNpcHorse(rider, suffix, originYear, used, kind = suffix) {
 }
 function careerRoster() {
   const world = careerState();
-  if (world.npcs) return world.npcs;
+  if (world.npcs) {careerExpandCompetitionRoster(world.npcs);return world.npcs;}
   const originYear = pastureDate(world.origin).year;
   const countries = CAREER_ROSTER_COUNTRIES, usedHorses = new Set(), usedRiders = new Set();
   world.npcs = Array.from({ length: 480 }, (_, index) => {
@@ -135,7 +136,24 @@ function careerRoster() {
     if (index % 3 === 0) rider.horses.push(careerNpcHorse(rider, 'prospect', originYear, usedHorses));
     return rider;
   });
+  careerExpandCompetitionRoster(world.npcs);
   return world.npcs;
+}
+
+// A persistent pool in every federation and age band, with one discipline per rider.
+function careerExpandCompetitionRoster(roster) {
+ const world=careerState();if(world.competitionRosterVersion===1)return;
+ const year=pastureDate(world.origin).year,usedHorses=new Set(roster.flatMap(r=>r.horses.map(h=>horseNameKey(h.name)))),usedNames=new Set(roster.map(r=>r.name));
+ for(const country of Object.keys(CAREER_COUNTRIES))for(const specialty of DISCIPLINES)for(const age of [7,9,11,13,15,17,20,24,32,46])for(let slot=0;slot<2;slot++){
+  const id='specialist:'+country+':'+specialty+':'+age+':'+slot;
+  if(roster.some(r=>r.id===id))continue;
+  const [first,last]=CAREER_REGIONAL_NAMES[country]||[CAREER_FIRST_NAMES,CAREER_SURNAMES];let name,attempt=0;
+  do{name=careerPick(id,'first:'+attempt,first)+' '+careerPick(id,'last:'+attempt,last);if(++attempt>60)name+=' '+id;}while(usedNames.has(name));usedNames.add(name);
+  const stage=age<12?slot:age<16?1+slot:age<22?2+slot:slot?4:2,skill=clamp([32,48,65,79,91,97][stage]+careerRoll(id,'skill')*8,20,100);
+  const rider={id,name,country,specialty,stage,skill,potential:Math.min(100,skill+12),professional:age>=18&&slot===1,birth:{year:year-age,month:1+Math.floor(careerRoll(id,'month')*12),day:1},travelWillingness:careerRoll(id,'travel'),horses:[],starts:0,lastStart:null,training:[]};
+  rider.horses.push(careerNpcHorse(rider,'sport',year,usedHorses));if(age<=17)rider.horses.push(careerNpcHorse(rider,'pony',year,usedHorses));roster.push(rider);
+ }
+ world.competitionRosterVersion=1;
 }
 
 function careerAddYouthCohort(year,roster) {
@@ -157,7 +175,7 @@ function careerAddYouthCohort(year,roster) {
     let name, attempt = 0;
     do {
       name = careerPick(id,'first:'+attempt,first)+' '+careerPick(id,'last:'+attempt,last);
-      attempt++;
+      if(++attempt>60)name+=' '+id;
     } while (usedRiders.has(name));
     usedRiders.add(name);
     const stage = age < 13 ? i%2 : i%4;
@@ -181,8 +199,7 @@ function careerSeedRankedHistory(hour) {
   const roster = careerRoster();
   careerAddYouthCohort(pastureDate(hour).year,roster);
   for (const event of careerSchedule(from,hour-24,false,false)) {
-    if (event.tier < 3 || event.team || event.final || event.horseAge || event.major ||
-      !['junior','senior'].includes(event.division)) continue;
+    if (event.tier < 1 || event.team || event.final || event.horseAge || event.major) continue;
     if (!world.meets[event.id]) careerResolveNpcMeet(event).openingHistory = true;
   }
   careerPublish(hour);
@@ -371,7 +388,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
     ? new Set(booked.competitors.filter(row=>!row.player).map(row=>row.riderId)) : null;
   for (const rider of roster) {
     const age = year-rider.birth?.year;
-    if (rider.retired || age < minimumAge || age > maximumAge || conflict?.has(rider.id) ||
+    if (rider.specialty!==event.discipline || rider.retired || age < minimumAge || age > maximumAge || conflict?.has(rider.id) ||
       careerBusy(rider.recentStarts || [],event)) continue;
     const candidates = rider.horses.filter(horse => !careerEligibility(event, rider, horse,
       { npc: true, history: histories.get(rider.id) || [] }));
@@ -383,7 +400,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
     const sameCountry = rider.country === event.federation;
     const sameRegion = CAREER_COUNTRIES[rider.country][1] === event.hostRegion;
     const travel = event.tier <= 4 && !sameCountry ? (sameRegion ? .12 : .35) * (1 - (rider.travelWillingness ?? .5)) : 0;
-    matches.push({ rider, horse, score, selection, draw: careerRoll(event.id, rider.id) + travel });
+    matches.push({ rider, horse, score, selection, draw: careerRoll(event.id, rider.id) + travel + (event.tier<=4&&!sameCountry?1:0) });
   }
   const quotas = {};
   if (player) quotas[player.country] = 1;
@@ -571,31 +588,24 @@ function careerAdvance(hour = pastureCalendarHour()) {
   careerSeedRankedHistory(world.cursor);
   const from = world.cursor + 1;
   const firstMonth = Math.floor(world.cursor / CAREER_HOURS_PER_MONTH);
-  const lastMonth = Math.floor(hour / CAREER_HOURS_PER_MONTH);
   const events = careerActive() && world.settings.background
     ? careerSchedule(from - 72, hour, undefined, false).filter(event => careerEventEnd(event) >= from && careerEventEnd(event) <= hour)
       .sort((a,b) => careerEventEnd(a)-careerEventEnd(b) || a.id.localeCompare(b.id))
     : [];
-  let index = 0;
-  for (let month = firstMonth; month <= lastMonth; month++) {
-    if (month > firstMonth && careerActive()) {
-      const release = month * CAREER_HOURS_PER_MONTH;
-      careerPublish(release);
-      if (month % 12 === 0) for (const profile of rrSettings().profiles) {
-        if (!profile.career?.birth) continue;
-        profile.career.ageHistory ||= {};
-        profile.career.ageHistory[pastureDate(release).year] = careerDivisions({ ...profile.career, professional: profile.level === 'Professional' },release);
-      }
+  let index=0, nextWeek=(Math.floor(world.cursor/CAREER_HOURS_PER_WEEK)+1)*CAREER_HOURS_PER_WEEK;
+  let nextMonth=(firstMonth+1)*CAREER_HOURS_PER_MONTH;
+  for(let tick=Math.min(nextWeek,nextMonth,hour);;tick=Math.min(nextWeek,nextMonth,hour)){
+    while(events[index]&&careerEventEnd(events[index])<=tick){
+      const event=events[index++];
+      if(!world.meets[event.id]&&app.activeShow?.eventId!==event.id){careerRefreshPartnerships(event.date.year);careerResolveNpcMeet(event);}
     }
-    if (month > firstMonth) careerPaySponsors(month);
-    const end = Math.min(hour, (month + 1) * CAREER_HOURS_PER_MONTH - 1);
-    while (events[index] && careerEventEnd(events[index]) <= end) {
-      const event = events[index++];
-      if (!world.meets[event.id] && app.activeShow?.eventId !== event.id) {
-        careerRefreshPartnerships(event.date.year);
-        careerResolveNpcMeet(event);
-      }
+    if(tick===nextWeek){careerPublish(tick);nextWeek+=CAREER_HOURS_PER_WEEK;}
+    if(tick===nextMonth){
+      const month=Math.floor(tick/CAREER_HOURS_PER_MONTH);
+      if(month%12===0&&careerActive())for(const profile of rrSettings().profiles){if(!profile.career?.birth)continue;profile.career.ageHistory||={};profile.career.ageHistory[pastureDate(tick).year]=careerDivisions({...profile.career,professional:profile.level==='Professional'},tick);}
+      careerPaySponsors(month);nextMonth+=CAREER_HOURS_PER_MONTH;
     }
+    if(tick===hour)break;
   }
   world.cursor = hour;
 }

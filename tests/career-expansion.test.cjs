@@ -192,3 +192,41 @@ check('discipline-specific tests and fixed-date course rules configure the exist
   try { bookShowTrip(show,{scope:'country',nights:2}); } catch (error) { rejected = /fixed class time/.test(error.message); }
   if (!rejected) throw Error('itinerary rescheduled official class');
 }`);
+
+check('every federation has persistent specialists across youth and adult age groups', `{
+ resetGame();const roster=careerRoster(),size=roster.length;careerRoster();if(roster.length!==size)throw Error('duplicated pool');
+ for(const country of Object.keys(CAREER_COUNTRIES))for(const discipline of DISCIPLINES){
+  const local=roster.filter(r=>r.country===country&&r.specialty===discipline);
+  for(const division of ['kids','prechildren','children','pony','junior','young','u25','amateur','professional']){
+   if(local.filter(r=>careerDivisions(r).includes(division)).length<2)throw Error('thin field '+country+' '+discipline+' '+division);
+  }
+ }
+ const event=careerEvent(CAREER_SERIES.find(row=>row.discipline==='jumping'&&row.division==='junior'&&row.tier<=3),app.year);
+ const field=careerNpcField(event,30);if(field.length<8||field.some(p=>p.rider.specialty!=='jumping'))throw Error('specialist field');
+ const ids=roster.map(r=>r.id);hydrateFromSave(JSON.parse(serializeAppState()));if(JSON.stringify(careerRoster().map(r=>r.id))!==JSON.stringify(ids))throw Error('roster changed on reload');
+}`);
+check('NPC ranking contenders are discipline specialists while player results remain eligible', `{
+ resetGame();const world=careerState(),rider=careerRoster()[0],other=DISCIPLINES.find(d=>d!==rider.specialty),hour=pastureCalendarHour();
+ for(const discipline of [rider.specialty,other])world.meets[discipline]={id:discipline,hour:hour-1,discipline,ranking:'world',tier:9,teams:[],results:[{riderId:rider.id,riderName:rider.name,country:rider.country,points:100},{riderId:'player-fixture',riderName:'Player',country:'GBR',points:50}]};
+ const boards=careerComputeBoards(hour);
+ if(!boards[careerBoardKey('world',rider.specialty)].some(r=>r.id===rider.id)||boards[careerBoardKey('world',other)].some(r=>r.id===rider.id))throw Error('multi-discipline NPC');
+ if(!boards[careerBoardKey('world',other)].some(r=>r.id==='player-fixture'))throw Error('player removed');
+}`);
+check('rankings release every seven days across skipped months and survive reload', `{
+ resetGame();rrSettings().enabled=true;const world=careerState();world.settings.progression=true;world.settings.background=false;world.openingHistory=true;
+ const start=Math.floor(world.cursor/CAREER_HOURS_PER_WEEK)*CAREER_HOURS_PER_WEEK,next=start+CAREER_HOURS_PER_WEEK;
+ world.meets.weekly={id:'weekly',hour:world.cursor-1,discipline:'jumping',ranking:'world',tier:9,teams:[],results:[{riderId:'weekly-rider',riderName:'Weekly',country:'GBR',points:100}]};
+ careerAdvance(next-1);if(world.rankingHour)throw Error('early release');
+ careerAdvance(next);if(world.rankingHour!==next)throw Error('missing weekly release');
+ careerAdvance(next+5*CAREER_HOURS_PER_WEEK+5);const releases=world.rankHistory[careerBoardKey('world','jumping')]['weekly-rider'].releases;
+ if(releases.length!==6||releases.some((r,i)=>r.hour!==next+i*CAREER_HOURS_PER_WEEK))throw Error('skipped or monthly releases');
+ const before=JSON.stringify(releases);careerAdvance(world.cursor);if(JSON.stringify(releases)!==before)throw Error('duplicate release');
+ hydrateFromSave(JSON.parse(serializeAppState()));if(careerState().rankingHour!==next+5*CAREER_HOURS_PER_WEEK)throw Error('release lost');
+}`);
+
+check('weekly releases also publish official points with career progression disabled', `{
+ resetGame();const w=careerState();w.settings.progression=false;w.settings.background=false;w.openingHistory=true;
+ const next=(Math.floor(w.cursor/CAREER_HOURS_PER_WEEK)+1)*CAREER_HOURS_PER_WEEK;
+ w.meets.official={id:'official',custom:true,official:true,hour:w.cursor+1,discipline:'jumping',ranking:'national',tier:3,division:'senior',teams:[],results:[{riderId:'official-player',riderName:'Player',country:'GBR',points:20}]};
+ careerAdvance(next);if(w.rankingHour!==next||w.rankings[careerBoardKey('national','jumping','GBR')]?.[0]?.points!==20)throw Error('official weekly points stuck');
+}`);

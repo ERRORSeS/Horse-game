@@ -257,7 +257,7 @@ function renderCareerRankings() {
     ${careerHero('Show office · Official results','Competition rankings','Browse world standings, season results, and rider records across the four disciplines.')}
     <div class="shop-meta">
       <span><strong>${careerActive() ? 'Career simulation active' : 'Career progression paused'}</strong></span>
-      <span>${state.rankingHour ? 'Last release · ' + csEscape(pastureDateLabel(state.rankingHour)) : 'No monthly release yet'}</span>
+      <span>${state.rankingHour ? 'Last release · ' + csEscape(pastureDateLabel(state.rankingHour)) + ' · Updates every 7 days' : 'Rankings update every 7 days'}</span>
       <span>${rows.length} ranked ${rows.length === 1 ? 'entry' : 'entries'}</span>
     </div>
     <div class="sales-filter-bar career-filters">
