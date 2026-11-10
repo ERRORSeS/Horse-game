@@ -24,6 +24,7 @@ const SALE_DETAILS_AD=csSaleMarkup;csSaleMarkup=function(l){
 };
 const SALE_DETAILS_TRANSACTION=csTransactionMarkup;csTransactionMarkup=function(tx){
  const l=HorseSales.listing(app,tx),reason=saleEnsureReason(l);let html=SALE_DETAILS_TRANSACTION(tx);if(tx.direction!=='buy')return html;
+ html=html.replace('id="cs-sale-topic">','id="cs-sale-topic"><option value="potential">Does the horse have potential to go higher?</option>');
  const minimum=HorseSales.transports[l.location]||HorseSales.transports.Local,options=Object.keys(HorseSales.transports).filter(route=>HorseSales.transports[route]>=minimum),preferred=options.includes(l.location)?l.location:options[0];
  html=html.replace(/<select id="cs-sale-transport">[\s\S]*?<\/select>/,'<select id="cs-sale-transport">'+csOptions(options,preferred)+'</select>');
  return html.replace('<p class="small">Inquiry opened','<p>Location: '+csEscape(l.location)+' · Transport from '+money(minimum)+'</p><p>Reason for sale: '+csEscape(reason.text)+'</p><p class="small">Inquiry opened');
@@ -32,4 +33,15 @@ const SALE_DETAILS_HYDRATE=hydrateFromSave;hydrateFromSave=function(data,...args
  const result=SALE_DETAILS_HYDRATE(data,...args);for(const l of HorseSales.state(app).listings)saleEnsureReason(l);
  const session=t2state().session;if(session?.saleTrial&&!session.finished){session.length=50;delete session.saleTrial.maxHeight;}
  return result;
+};
+
+const SALE_POTENTIAL_SAY=HorseSales.say;
+HorseSales.say=function(app,tx,topic,day){
+ if(topic!=='potential')return SALE_POTENTIAL_SAY(app,tx,topic,day);
+ if(!HorseSales.active(app,tx))return {ok:false,message:'This inquiry is closed.'};
+ const listing=HorseSales.listing(app,tx),h=HorseHealth.copy(listing.horse),d=listing.mainDiscipline||'jumping';
+ const unstarted=h.age<=3||h.requiresBreakingIn,current=unstarted?-1:highestAllowedLevelIndex(h,d),potential=auctionPotentialIndex(h,d);
+ const higher=potential>current,currentLabel=unstarted?'Unstarted':SHOW_LEVELS[d][current],upper=SHOW_LEVELS[d][potential];
+ const text=(higher?'Yes, there is potential to progress above the current level. ':'No, the current schooling is already at the estimated potential ceiling. ')+auctionDisciplineName(d)+': current schooling '+currentLabel+'; estimated potential '+upper+(d==='jumping'?' m':'')+'. Progress depends on training, soundness and the horse’s development; the estimate is not a promised competition result.';
+ tx.conversation.push({day,topic,text});if(tx.status==='Inquiry Open')tx.status='Seller Contacted';return {ok:true,message:text};
 };
