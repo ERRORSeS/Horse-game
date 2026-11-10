@@ -243,20 +243,20 @@ function renderCareerRankings() {
   const options = type === 'national' ? Object.entries(CAREER_COUNTRIES).map(([code,[name]]) => [code,name])
     : ['division','youth-international'].includes(type) ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior').map(([key,row]) => [key,row.label])
     : type === 'youth-national' ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior')
-      .map(([key,row]) => [key + '|' + rider.country, row.label + ' · ' + CAREER_COUNTRIES[rider.country][0]])
+      .flatMap(([key,row]) => Object.entries(CAREER_COUNTRIES).map(([code,country])=>[key+'|'+code,row.label+' · '+country[0]]))
     : type === 'young-horse' ? [4,5,6,7,8].map(age => [age,age + '-year-olds'])
     : ['team','tour'].includes(type) ? series : type === 'horse' ? [['','World horses'],['pony','Pony horses']] : [];
   const choice = selected['boardFilter:' + type];
   const filter = options.some(([value]) => String(value) === String(choice)) ? choice
     : type === 'national' ? rider.country : options[0]?.[0] ?? '';
-  const rows = state.rankings[careerBoardKey(type,discipline,filter)] || [];
+  const rows = careerRankingRows(type,discipline,filter);
   const top = rows.slice(0,100);
   const own = rows.find(row => row.id === rider.id);
   if (own && !top.includes(own)) top.push(own);
   panel.innerHTML = `<section class="tack-shop horse-sales-shop career-shell">
-    ${careerHero('Show office · Official results','Competition rankings','Browse world standings, season results, and rider records across the four disciplines.')}
+    ${careerHero('Show office · Official results','Competition rankings','Weekly circuits and official show results keep every age group and national board competitive.')}
     <div class="shop-meta">
-      <span><strong>${careerActive() ? 'Career simulation active' : 'Career progression paused'}</strong></span>
+      <span><strong>${careerActive() ? 'Career simulation active' : 'Career progression paused · Weekly ranking circuits active'}</strong></span>
       <span>${state.rankingHour ? 'Last release · ' + csEscape(pastureDateLabel(state.rankingHour)) + ' · Updates every 7 days' : 'Rankings update every 7 days'}</span>
       <span>${rows.length} ranked ${rows.length === 1 ? 'entry' : 'entries'}</span>
     </div>
