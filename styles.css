@@ -406,7 +406,10 @@ details[open] > summary { margin-bottom:.8rem; }
 
 .rider-show-profile { background: linear-gradient(145deg,#203942,#1a2b32); border-color:#3a5b5c; }
 .rider-show-profile h3 { margin:.25rem 0 .75rem; }
-.rider-show-profile dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin:0; }
+.rider-show-profile dl { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; margin:0 0 .8rem; }
+@media (max-width: 560px) {
+  .rider-show-profile dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 .rider-show-profile dl div { background:#172b31; border-radius:.65rem; padding:.65rem; }
 .rider-show-profile dt { font-size:.75rem; color:#adc6c6; }
 .rider-show-profile dd { margin:.25rem 0 0; font-size:1.25rem; color:#b0d8bb; font-variant-numeric:tabular-nums; }
