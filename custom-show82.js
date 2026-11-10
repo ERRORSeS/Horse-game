@@ -28,18 +28,6 @@ function customShowCreate(input) {
     classes.push({...raw,name:String(raw.name || '').trim().slice(0,60),format});
   }
   const rider = careerRider(), sanctioned = input.mode==='sanctioned';
-  if (sanctioned) {
-    const known = [app.currentBarn,...(app.barnCatalog || [])].find(barn=>barn?.name===venue && careerCountry(barn.country)===country);
-    const results = careerResults({riderId:rider.id,from:start-CAREER_HOURS_PER_YEAR,until:pastureCalendarHour()});
-    if (!careerActive() || tier<1 || tier>3 || !known || results.filter(row=>row.tier>=2 && row.placing<=10 && row.placing).length<3 ||
-      classes.some(row=>row.capacity<8 || !row.npcs || row.prize<100 || row.prize>2500 || row.format!=='Standard')) {
-      return {ok:false,message:'Recognition requires three regional top-ten results, a known local-to-national venue, and fields of eight or more with standard rules and funded purses of 100–2,500.'};
-    }
-    if (input.annual) return {ok:false,message:'Apply each year to renew recognition and fund the new prizes.'};
-    const funding = classes.reduce((total,row)=>total+row.prize,0);
-    if (funding>app.money) return {ok:false,message:'The prize fund must be paid before the federation approves the show.'};
-    app.money-=funding;
-  }
   const state=customShowState(), id='custom-'+ ++state.sequence;
   const show={id,name,venue,country,year,month,day,duration,prestige,tier,sanctioned,weather,
     annual:input.annual===true,organizer:rider.id,classes,registrations:{},approved:sanctioned ? pastureCalendarHour() : null};

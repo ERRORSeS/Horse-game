@@ -61,3 +61,19 @@ check('federation applications are gated, idempotent and selected on scheduled m
   federationReview(plan,plan.selection);
   if(JSON.stringify(federationState())!==snapshot) throw Error('duplicate decision');
 }`);
+
+check('career-sanctioned custom shows need no approval qualifications or upfront funding', `{
+  resetGame();app.money=0;careerState().settings.progression=false;
+  const country=careerCountry(app.currentBarn?.country);
+  for(const tier of [0,1,4,11]){
+    const made=customShowCreate({name:'Open Custom',venue:'Any New Venue',country,year:app.year,month:app.month,day:12,duration:1,prestige:100,tier,annual:true,mode:'sanctioned',
+      classes:[{name:'Open',discipline:'jumping',level:'0.70',division:'senior',horseAge:0,offset:0,capacity:1,fee:0,prize:25000,npcs:false}]});
+    if(!made.ok||!made.show.sanctioned)throw Error(made.message||'not sanctioned');
+    if(app.money!==0)throw Error('prize fund charged');
+    const events=customShowEvents(pastureCalendarHour(app.year,1,1,0),pastureCalendarHour(app.year+1,12,30,23)).filter(e=>e.customShowId===made.show.id);
+    if(events.length!==2||events.some(e=>!e.official||e.sandbox||e.tier!==tier||e.prizeMoney!==25000||e.npcCount!==0))throw Error('official recurrence or settings lost');
+    const id=made.show.id;hydrateFromSave(JSON.parse(serializeAppState()));
+    if(!customShowState().shows[id].sanctioned||app.money!==0)throw Error('sanction lost on reload');
+  }
+  const markup=show82CreatorMarkup();if(markup.includes('Official if approved')||markup.includes('require organizer results'))throw Error('outdated approval copy');
+}`);
