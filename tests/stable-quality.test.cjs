@@ -14,6 +14,21 @@ check('the manual riding override survives reload and ignores changing behavior'
   if(canRideUnderSaddle(loaded)) throw Error('medical exclusion bypassed');
 }`);
 
+check('Make Ridable bypasses every behavior score for adult unbroken horses', `{
+  resetGame();
+  for(const behavior of [-1000,-1,0,1,499,500]){
+    const h=app.horses[0];h.age=4;h.behavior=behavior;h.requiresBreakingIn=true;
+    h.bredBy='Your Stable';h.auctionUnbroken=true;delete h.ridingEducationOverride;
+    const skills=JSON.stringify(h.stats),potential=JSON.stringify(h.potential);
+    if(!makeHorseRidable(h.id).ok||!canRideUnderSaddle(h)||h.requiresBreakingIn)throw Error('blocked at '+behavior);
+    if(h.behavior!==behavior||JSON.stringify(h.stats)!==skills||JSON.stringify(h.potential)!==potential)throw Error('horse scores changed');
+    if(h.behavior<requiredBehaviorForRiding(h)||careTrainingStatus(h)==='Young / Unbroken')throw Error('work still blocked');
+    const id=h.id;hydrateFromSave(JSON.parse(serializeAppState()));
+    const loaded=app.horses.find(row=>row.id===id);
+    if(!canRideUnderSaddle(loaded)||loaded.behavior!==behavior)throw Error('override lost at '+behavior);
+  }
+}`);
+
 check('show points belong to the booked rider and are credited once', `{
   resetGame();
   const h=app.horses[0], first=rrSettings().riderId;
