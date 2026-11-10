@@ -2,7 +2,7 @@ const {check}=require('./behavior5-harness.cjs');
 
 check('the manual riding override survives reload and ignores changing behavior', `{
   resetGame();
-  const horse=app.horses[0]; horse.age=3; horse.bredBy='Your Stable'; horse.behavior=7; horse.requiresBreakingIn=true;
+  const horse=app.horses[0]; horse.age=2; horse.bredBy='Your Stable'; horse.behavior=7; horse.requiresBreakingIn=true;
   if(makeHorseRidable(horse.id).ok) throw Error('age boundary');
   horse.age=4;
   if(!makeHorseRidable(horse.id).ok || horse.behavior!==7) throw Error('rideability changed behavior');
@@ -118,6 +118,16 @@ check('Make Ridable overrides lifelong and legacy unridable states but never you
  if(!kissingSpines(h)||kissingSpines(h).resolved||h.behavior!==-20)throw Error('history or behavior rewritten');
  const id=h.id;hydrateFromSave(JSON.parse(serializeAppState()));const loaded=app.horses.find(x=>x.id===id);
  if(!canRideUnderSaddle(loaded)||loaded.unridable)throw Error('override did not persist');
- for(const age of [2,3]){loaded.age=age;if(makeHorseRidable(id).ok||canRideUnderSaddle(loaded))throw Error('age bypass');}
+ for(const age of [1,2,2.99]){loaded.age=age;if(makeHorseRidable(id).ok||canRideUnderSaddle(loaded))throw Error('age bypass');}
  loaded.age=4;loaded.deceased=true;if(makeHorseRidable(id).ok||canRideUnderSaddle(loaded))throw Error('deceased horse revived');
+}`);
+
+check('Make Ridable accepts exactly age three and clears all riding status gates', `{
+ resetGame();const h=app.horses[0];h.age=3;h.behavior=-100;h.requiresBreakingIn=true;h.bredBy='Your Stable';h.unridable=true;
+ HorseHealth.add(h,'legacy',csDay(),{legacyName:'Kissing Spines',known:true,confirmed:true});
+ if(canRideUnderSaddle(h))throw Error('unbroken three-year-old already ridable');
+ if(!makeHorseRidable(h.id).ok||!canRideUnderSaddle(h)||h.unridable||h.requiresBreakingIn)throw Error('three-year-old blocked');
+ if(h.behavior<requiredBehaviorForRiding(h)||careTrainingStatus(h)!=='Active Competition Horse'||eqTrainingAllowed(h,'flatwork'))throw Error('remaining riding gate');
+ const id=h.id;hydrateFromSave(JSON.parse(serializeAppState()));const loaded=app.horses.find(x=>x.id===id);
+ if(!canRideUnderSaddle(loaded)||loaded.age!==3||loaded.behavior!==-100)throw Error('override lost on reload');
 }`);
