@@ -203,12 +203,12 @@ function show82CustomClass(index) {
 function show82CreatorMarkup() {
   return `<details class="shop-drawer" data-ui-key="show82-create"><summary>Create custom show</summary>
   <div class="shop-drawer-body">
-    <p>Sandbox purses are simulated. Recognized local-to-national shows require organizer results, an approved venue, and a funded purse.</p>
+    <p>Sandbox purses are simulated. Career-sanctioned custom shows are official immediately, with no organizer qualifications or upfront prize funding.</p>
     <div class="shop-option-grid">
       <label>Show name<input data-show-value="name" maxlength="90"></label>
       <label>Venue<input data-show-value="venue" maxlength="90" value="${csEscape(app.currentBarn?.name || '')}"></label>
       <label>Country<select data-show-value="country">${careerOptions(Object.entries(CAREER_COUNTRIES).map(([code,row])=>[code,row[0]]),careerCountry(app.currentBarn?.country))}</select></label>
-      <label>Mode<select data-show-value="mode">${careerOptions([['sandbox','Sandbox · Unofficial'],['sanctioned','Career-sanctioned · Official if approved']],'sandbox')}</select></label>
+      <label>Mode<select data-show-value="mode">${careerOptions([['sandbox','Sandbox · Unofficial'],['sanctioned','Career-sanctioned · Official']],'sandbox')}</select></label>
       <label>Year<input type="number" min="${app.year}" max="${app.year+5}" value="${app.year}" data-show-value="year"></label>
       <label>Month<input type="number" min="1" max="12" value="${app.month}" data-show-value="month"></label>
       <label>Day<input type="number" min="1" max="30" value="${Math.min(30,app.day+7)}" data-show-value="day"></label>
