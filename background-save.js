@@ -12,3 +12,14 @@ function serializeAppStateInBackground(){
   try{worker.postMessage(app);}catch(error){finish(error.message);}
  });
 }
+
+// Avoid starting a large autosave snapshot in the middle of a burst of player input.
+let saveLastInputAt=0;
+for(const event of ['pointerdown','keydown','input','change'])document.addEventListener(event,()=>saveLastInputAt=performance.now(),true);
+function scheduleAutomaticSave(callback){
+ let cancelled=false,timer=null,idle=null;
+ const blocked=()=>typeof timeSkipTask!=='undefined'&&timeSkipTask||performance.now()-saveLastInputAt<1000||globalThis.navigator?.scheduling?.isInputPending?.({includeContinuous:true});
+ const run=()=>{if(cancelled)return;if(blocked()){timer=setTimeout(run,100);return;}if(typeof requestIdleCallback==='function')idle=requestIdleCallback(()=>{idle=null;if(blocked())timer=setTimeout(run,100);else if(!cancelled)callback();},{timeout:2000});else callback();};
+ timer=setTimeout(run,600);
+ return ()=>{cancelled=true;if(timer!==null)clearTimeout(timer);if(idle!==null&&typeof cancelIdleCallback==='function')cancelIdleCallback(idle);};
+}

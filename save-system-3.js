@@ -90,11 +90,11 @@ const Save3=(()=>{
  }
  function enqueue(){
   identity();dirty=true;saveFeedback('Saving on this device…');
-  if(timer!==null)clearTimeout(timer);
-  timer=setTimeout(()=>{timer=null;flush().catch(()=>{});},600);return true;
+  if(timer!==null){if(typeof timer==='function')timer();else clearTimeout(timer);}
+  const run=()=>{timer=null;flush().catch(()=>{});};timer=typeof scheduleAutomaticSave==='function'?scheduleAutomaticSave(run):setTimeout(run,600);return true;
  }
  function flush(){
-  if(timer!==null){clearTimeout(timer);timer=null;}
+  if(timer!==null){if(typeof timer==='function')timer();else clearTimeout(timer);timer=null;}
   if(pending)return pending;
   if(!dirty)return Promise.resolve();
   // One write at a time. Changes during a write become one fresh follow-up snapshot.
