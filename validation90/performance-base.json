@@ -1,0 +1,94 @@
+{
+  "revision": "2e9bc90c758e99ca52d324ab5714fd428d993dc7",
+  "measurements": [
+    {
+      "year": 1,
+      "payloadBytes": 14264049,
+      "saveError": null,
+      "horses": 4,
+      "meets": 729,
+      "npcs": 6669,
+      "simulationAndRenderMs": 4587.4000000003725,
+      "totalWithSaveMs": 7888.100000000559,
+      "beats": 289,
+      "maxGap": 821.2000000001863,
+      "result": {
+        "ok": true,
+        "simulationMs": 3306.199999999255,
+        "timings": {
+          "inputMs": 215.5,
+          "prepareMs": 320,
+          "returnMs": 681.999755859375,
+          "applyMs": 15.900146484375
+        }
+      }
+    },
+    {
+      "year": 1,
+      "payloadBytes": 14457369,
+      "saveError": null,
+      "horses": 30,
+      "meets": 729,
+      "npcs": 6669,
+      "simulationAndRenderMs": 2595.399999999441,
+      "totalWithSaveMs": 5448.5999999996275,
+      "beats": 190,
+      "maxGap": 714.0999999996275,
+      "result": {
+        "ok": true,
+        "simulationMs": 1710.2000000001863,
+        "timings": {
+          "inputMs": 120.69999999925494,
+          "prepareMs": 201.80000000074506,
+          "returnMs": 514.199951171875,
+          "applyMs": 3.2001953125
+        }
+      }
+    },
+    {
+      "year": 5,
+      "payloadBytes": 141245870,
+      "saveError": "Writing device storage failed.",
+      "horses": 4,
+      "meets": 15455,
+      "npcs": 7091,
+      "simulationAndRenderMs": 16857.39999999944,
+      "totalWithSaveMs": 26755.39999999944,
+      "beats": 891,
+      "maxGap": 3960.2000000001863,
+      "result": {
+        "ok": true,
+        "simulationMs": 5633.800000000745,
+        "timings": {
+          "inputMs": 1897.1000000005588,
+          "prepareMs": 5527.599951171316,
+          "returnMs": 3679.89990234375,
+          "applyMs": 57.699951171875
+        }
+      }
+    },
+    {
+      "year": 5,
+      "payloadBytes": 141439482,
+      "saveError": "Writing device storage failed.",
+      "horses": 30,
+      "meets": 15455,
+      "npcs": 7091,
+      "simulationAndRenderMs": 8307.599999999627,
+      "totalWithSaveMs": 16087.399999999441,
+      "beats": 676,
+      "maxGap": 1997.7000000001863,
+      "result": {
+        "ok": true,
+        "simulationMs": 1592.2999999998137,
+        "timings": {
+          "inputMs": 1136.199999999255,
+          "prepareMs": 3588.199902344495,
+          "returnMs": 1955.400146484375,
+          "applyMs": 12.89990234375
+        }
+      }
+    }
+  ],
+  "year10Failure": "Chromium target crashed after generating Year 10 (32,862 meets, 7,502 NPCs), before a month/save timing could complete. Year 5 device writes failed."
+}

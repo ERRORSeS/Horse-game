@@ -220,7 +220,7 @@ function careerSeedRankedHistory(hour) {
   careerAddYouthCohort(pastureDate(hour).year,roster);
   for (const event of careerSchedule(from,hour-24,false,false)) {
     if (event.tier < 1 || event.team || event.final || event.horseAge || event.major) continue;
-    if (!world.meets[event.id]) careerResolveNpcMeet(event).openingHistory = true;
+    if (!world.meets[event.id]) {const meet=careerResolveNpcMeet(event);if(meet)meet.openingHistory=true;}
   }
   careerPublish(hour);
 }
@@ -531,7 +531,7 @@ function careerRecordMeet(event, standings, player = null, { recovery = false, r
     id: event.id, classId: event.classId || event.id, at:event.at, hour: careerEventEnd(event), name: event.name,
     venue: event.barnName, discipline: event.discipline, level: event.level,
     tier: event.tier, prestige: event.prestige, ranking: event.ranking, series: event.series, division: event.division, divisionScope:event.divisionScope,
-    official: Boolean(event.official), sandbox: Boolean(event.sandbox), custom: Boolean(event.customShowId || event.userHosted),
+    federationTrial:event.federationTrial,federationTrialRound:event.federationTrialRound,federationProgram:event.federationProgram,fieldStrength:mean, official: Boolean(event.official), sandbox: Boolean(event.sandbox), custom: Boolean(event.customShowId || event.userHosted),
     customId: event.customShowId, starters,
     horseAge: event.horseAge, major: Boolean(event.major), games: Boolean(event.games), final: Boolean(event.final),
     results, teams: careerTeamScores(event, results)
@@ -618,11 +618,14 @@ function careerAdvance(hour = pastureCalendarHour()) {
     : [];
   let index=0, nextWeek=(Math.floor(world.cursor/CAREER_HOURS_PER_WEEK)+1)*CAREER_HOURS_PER_WEEK;
   let nextMonth=(firstMonth+1)*CAREER_HOURS_PER_MONTH;
-  for(let tick=Math.min(nextWeek,nextMonth,hour);;tick=Math.min(nextWeek,nextMonth,hour)){
+  let nextFederation=typeof federationNextDecision==='function'?federationNextDecision(world.cursor,hour):Infinity;
+  for(let tick=Math.min(nextWeek,nextMonth,nextFederation,hour);;tick=Math.min(nextWeek,nextMonth,nextFederation,hour)){
     while(events[index]&&careerEventEnd(events[index])<=tick){
       const event=events[index++];
-      if(!world.meets[event.id]&&app.activeShow?.eventId!==event.id){careerRefreshPartnerships(event.date.year);careerResolveNpcMeet(event);}
+      if(!world.meets[event.id]&&app.activeShow?.eventId!==event.id){world.cursor=Math.max(world.cursor,event.at);careerRefreshPartnerships(event.date.year);if(typeof federationBeforeEvent==='function')federationBeforeEvent(event);careerResolveNpcMeet(event);}
     }
+    world.cursor=tick;
+    if(tick===nextFederation){federationAdvance(tick);nextFederation=federationNextDecision(tick,hour);}
     if(tick===nextWeek){careerPublish(tick);nextWeek+=CAREER_HOURS_PER_WEEK;}
     if(tick===nextMonth){
       const month=Math.floor(tick/CAREER_HOURS_PER_MONTH);

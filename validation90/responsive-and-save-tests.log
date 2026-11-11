@@ -1,0 +1,12 @@
+{"unit":"hour","result":{"ok":true,"simulationMs":744.4000000003725,"timings":{"inputMs":69.3999999994412,"prepareMs":100.8998046880588,"returnMs":202.10009765625,"applyMs":2.800048828125}},"equal":true,"diffs":[],"beats":58,"maxGap":77.8999999994412,"elapsedMs":3065.7000000001863}
+{"unit":"day","result":{"ok":true,"simulationMs":112.29999999981374,"timings":{"inputMs":97.30000000074506,"prepareMs":112.79985351487994,"returnMs":161.30029296875,"applyMs":3.39990234375}},"equal":true,"diffs":[],"beats":19,"maxGap":107.40000000037253,"elapsedMs":2515.699999999255}
+{"unit":"month","result":{"ok":true,"simulationMs":461.09999999962747,"timings":{"inputMs":70.20000000018626,"prepareMs":95.49995117168874,"returnMs":228.80029296875,"applyMs":3.5}},"equal":true,"diffs":[],"beats":40,"maxGap":83.29999999981374,"elapsedMs":2123.4000000003725}
+{"unit":"year-rollover","result":{"ok":true,"simulationMs":2914.100000000559,"timings":{"inputMs":91.40000000037253,"prepareMs":121.69985351525247,"returnMs":521,"applyMs":4.5}},"equal":true,"diffs":[],"beats":206,"maxGap":96.8999999994412,"elapsedMs":7745.100000000559}
+PASS cancellation and duplicate clicks preserve original state
+PASS inline advance allows navigation, preserves its selection and guards conflicting gameplay changes
+PASS worker failure preserves original state
+PASS background save codec is byte-compatible with delivered horses, queued catalogs and auction seller references
+PASS edits during background saving persist: {"money":202,"calls":2,"beats":143,"maxGap":436.59999999962747,"dirty":false}
+PASS save failure retains previous verified save and retry persists progress
+PASS loading waits for in-flight saves and retains the latest snapshot
+PASS verified saving and reload

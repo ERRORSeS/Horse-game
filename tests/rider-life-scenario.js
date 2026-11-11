@@ -10,7 +10,7 @@ function simulateRiderLife(startAge=22,stopAtFirstTeam=false){
  const realSave=saveGame;saveGame=()=>true;const log=[],blocked=[];let entered=0,games=false,checkpoint=false,teamStarts=0;
  function now(to){if(to<=careerState().cursor)return;const date=pastureDate(to);app.year=date.year;app.month=date.month;app.day=date.day;app.hour=date.hour||0;app.horses.find(h=>h.id===horseId).age=date.year-horse.birthYear;careerAdvance(to);}
  function ride(event){
-  const mount=app.horses.find(h=>h.id===horseId);mount.fatigue=0;const entry=event.federationTrial?federationRegisterTrial(event.federationTrial):event.team||event.games?federationRegisterTeam(event.id):careerEnter(event,mount);if(!entry.ok){blocked.push({year:event.date.year,event:event.name,reason:entry.message});return false;}
+  const mount=app.horses.find(h=>h.id===horseId);mount.fatigue=0;const entry=event.federationTrial?federationRegisterTrial(event.federationTrial,careerRider(),event.id):event.team||event.games?federationRegisterTeam(event.id):careerEnter(event,mount);if(!entry.ok){blocked.push({year:event.date.year,event:event.name,reason:entry.message});return false;}
   const show=entry.show;now(careerEventEnd(event));
   for(const phase of CAREER_PHASES[event.discipline])for(const competitor of show.competitors)competitor.scores[phase]=showScore(show,competitor,phase,competitor.player?Array.from({length:8},(_,i)=>({quality:1,title:'Fence '+i,faults:0,time:6})):undefined);
   show.round=event.discipline==='eventing'?2:0;showCompletePhase(show);
@@ -22,7 +22,7 @@ function simulateRiderLife(startAge=22,stopAtFirstTeam=false){
    const division=startAge+year-1<=18?'junior':'senior';
    const plan=federationPlan(year,'GBR','jumping',division);
    let events=careerSchedule(pastureCalendarHour(year,1,1,0),pastureCalendarHour(year,12,30,23)).filter(e=>e.discipline==='jumping'&&(e.division==='senior'||e.division===division)&&!e.final&&!e.horseAge&&!e.gamesTrial&&!e.federationTrial&&e.tier>=2&&e.tier<=9);
-   events.push(plan.trial);if(year%4===0)events.push(careerEvent(CAREER_SERIES.find(e=>e.id==='world-games-jumping'),year));events.sort((a,b)=>a.at-b.at);const priorities=events.filter(e=>e.federationTrial||e.games);events=events.filter(e=>e.federationTrial||e.games||!priorities.some(p=>Math.abs(p.at-e.at)<120));
+   events.push(...plan.trials);if(year%4===0)events.push(careerEvent(CAREER_SERIES.find(e=>e.id==='world-games-jumping'),year));events.sort((a,b)=>a.at-b.at);const priorities=events.filter(e=>e.federationTrial||e.games);events=events.filter(e=>e.federationTrial||e.games||!priorities.some(p=>Math.abs(p.at-e.at)<120));
    for(const e of events){
     if(e.at<=careerState().cursor+72)continue;now(e.at-72);
     if(pastureCalendarHour()<=plan.closes&&!federationState().applications[plan.id+':'+careerRider().id]){const applied=federationApply(plan,app.horses.find(h=>h.id===horseId));if(applied.ok)log.push({year,type:'application',status:applied.application.status});}

@@ -1,0 +1,18 @@
+✔ ledger transfer retains unchanged records and includes nested repairs, additions and deletions (2.495682ms)
+✔ no-career games and unchanged ledgers transfer without invented history (0.298241ms)
+✔ inventory reads avoid repeated scans and resale stays correct after wear, repair and reload (19.227426ms)
+✔ automatic saves wait for quiet input and active skips, and cancellation prevents stale jobs (1.472269ms)
+✔ real compressed storage at quota consolidates atomically and resumes in a fresh runtime (923.469676ms)
+✔ a quota failure preserves the previous raw record byte for byte across reload (351.131209ms)
+✔ a pre-care legacy stable can load at full capacity without requiring a duplicate backup (234.528326ms)
+✔ single Save UI has no slot picker, load/delete menu or duplicate-save controls (0.929842ms)
+✔ a corrupt compressed duplicate cannot block a valid legacy stable from loading or saving (412.282144ms)
+✔ quota retry frees duplicate records while retaining a validated stable (465.572175ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2619.806368

@@ -26,7 +26,19 @@ const Save3=(()=>{
   }).then(connection=>{database=connection;connection.onversionchange=()=>{connection.close();if(database===connection)database=null;};connection.onclose=()=>{if(database===connection)database=null;};return connection;}).finally(()=>{opening=null;});
   return opening;
  }
- async function get(key){
+ // Keep large career ledgers below browser single-value limits without dropping history.
+ async function packRecord(record){
+  if(!record.payload||record.payload.length<32000000||(typeof CompressionStream==='undefined'||typeof DecompressionStream==='undefined'))return record;
+  const payloadGzip=await new Response(new Blob([record.payload]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  return {...record,payload:null,payloadEncoding:'gzip',payloadGzip};
+ }
+ async function unpackRecord(record){
+  if(record?.payloadEncoding!=='gzip')return record;
+  if(typeof DecompressionStream==='undefined')throw Error('This save requires gzip decompression support. Open it in a current browser.');
+  const payload=await new Response(record.payloadGzip.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  const {payloadEncoding,payloadGzip,...meta}=record;return {...meta,payload};
+ }
+ async function getStored(key){
   const d=await db();
   if(!d){const raw=localStorage.getItem('horse_game_save3_'+key);return raw?JSON.parse(raw):null;}
   return storageOperation('Reading device storage',(resolve,reject,setAbort)=>{
@@ -34,24 +46,32 @@ const Save3=(()=>{
    setAbort(()=>transaction.abort());request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);transaction.onabort=()=>reject(transaction.error||Error('Save read aborted.'));
   });
  }
+ async function get(key){return unpackRecord(await getStored(key));}
+ async function sameStored(a,b){
+  if(a?.snapshotId!==b.snapshotId||a?.payloadEncoding!==b.payloadEncoding)return false;
+  if(b.payloadEncoding!=='gzip')return a.payload===b.payload;
+  if(a.payloadGzip?.size!==b.payloadGzip.size)return false;
+  const [left,right]=await Promise.all([a.payloadGzip.arrayBuffer(),b.payloadGzip.arrayBuffer()]);
+  const x=new Uint8Array(left),y=new Uint8Array(right);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true;
+ }
  async function put(record,active=true){
-  const d=await db();
+  const d=await db();let stored=record;
   if(!d){localStorage.setItem('horse_game_save3_'+record.id,JSON.stringify(record));if(active)localStorage.setItem('horse_game_save3___active__',JSON.stringify({id:'__active__',saveId:record.id}));}
-  else await storageOperation('Writing device storage',(resolve,reject,setAbort)=>{
+  else {stored=await packRecord(record);await storageOperation('Writing device storage',(resolve,reject,setAbort)=>{
    const transaction=d.transaction('saves','readwrite'),store=transaction.objectStore('saves');
-   setAbort(()=>transaction.abort());transaction.oncomplete=()=>resolve();transaction.onerror=()=>reject(transaction.error);transaction.onabort=()=>reject(transaction.error||Error('Save transaction aborted.'));
-   store.put(record);if(active)store.put({id:'__active__',saveId:record.id});
-  });
-  const verified=await get(record.id);
-  if(verified?.snapshotId!==record.snapshotId||verified?.payload!==record.payload)throw Error('Save readback verification failed.');
+   setAbort(()=>transaction.abort());transaction.oncomplete=()=>resolve();transaction.onerror=event=>reject(event.target?.error||transaction.error);transaction.onabort=()=>reject(transaction.error||Error('Save transaction aborted.'));
+   store.put(stored);if(active)store.put({id:'__active__',saveId:record.id});
+  });}
+  const verified=await getStored(record.id);
+  if(!await sameStored(verified,stored))throw Error('Save readback verification failed.');
  }
  async function list(){
   const d=await db();
   if(!d){const rows=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('horse_game_save3_')&&!key.endsWith('__active__'))try{rows.push(JSON.parse(localStorage.getItem(key)));}catch(error){}}return rows;}
-  return storageOperation('Listing device saves',(resolve,reject,setAbort)=>{
+  return Promise.all(await storageOperation('Listing device saves',(resolve,reject,setAbort)=>{
    const transaction=d.transaction('saves','readonly'),request=transaction.objectStore('saves').getAll();
    setAbort(()=>transaction.abort());request.onsuccess=()=>resolve(request.result.filter(row=>row.id!=='__active__'));request.onerror=()=>reject(request.error);transaction.onabort=()=>reject(transaction.error||Error('Save listing aborted.'));
-  });
+  }).then(rows=>rows.map(unpackRecord)));
  }
  function validate(data){
   validatePersistentState(data);
@@ -84,9 +104,9 @@ const Save3=(()=>{
   cleanTransferFields();const meta=identity(),updatedAt=new Date().toISOString(),previous=meta.updatedAt,lastSaved=app.lastSuccessfulSave;
   meta.updatedAt=updatedAt;app.lastSuccessfulSave=updatedAt;
   const header={...meta,snapshotId:id()};let payload;
-  try{payload=typeof serializeAppStateInBackground==='function'?serializeAppStateInBackground():serializeAppState();}
+  try{payload=typeof serializeAppStateInBackground==='function'&&supported?serializeAppStateInBackground({storage:true}):serializeAppState();}
   finally{meta.updatedAt=previous;app.lastSuccessfulSave=lastSaved;}
-  return {...header,payload:await payload};
+  const encoded=await payload;return {...header,...(typeof encoded==='string'?{payload:encoded}:encoded)};
  }
  function enqueue(){
   identity();dirty=true;saveFeedback('Saving on this device…');
@@ -103,7 +123,7 @@ const Save3=(()=>{
     const saveId=identity().id;
     try{
      validate(app);dirty=false;const current=await record();
-     const existing=await get(current.id);
+     const existing=await getStored(current.id);
      if(existing&&existing.createdAt!==current.createdAt)throw Error('Save ID collision detected. Export this stable before retrying.');
      await put(current);lastError=null;
      if(app.saveIdentity?.id===current.id){app.saveIdentity.updatedAt=current.updatedAt;app.lastSuccessfulSave=current.updatedAt;if(!dirty)saveFeedback('Saved on this device · '+current.id);}
@@ -116,7 +136,7 @@ const Save3=(()=>{
   }).finally(()=>{if(pending===operation)pending=null;});
   pending=operation;return operation;
  }
- async function load(saveId,{preserve=true}={}){if((dirty||pending)&&preserve)await flush();const r=await get(String(saveId).trim().toUpperCase());if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await put(r);dirty=false;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;await flush();}render();saveFeedback('Loaded '+r.name+' · '+r.id);return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
+ async function load(saveId,{preserve=true}={}){if((dirty||pending)&&preserve)await flush();const stored=await getStored(String(saveId).trim().toUpperCase()),r=await unpackRecord(stored);if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await put(stored);dirty=false;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;await flush();}render();saveFeedback('Loaded '+r.name+' · '+r.id);return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
  async function create(name='My Stable'){if(dirty||pending)await flush();let meta;do{meta={id:id(),name,stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}while(await get(meta.id));app.saveIdentity=meta;dirty=true;await flush();return meta;}
  function exportFile(){cleanTransferFields();identity();return JSON.stringify({format:'oxer-to-oxer',version:3,exportedAt:new Date().toISOString(),state:JSON.parse(serializeAppState())});}
  async function importFile(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer'||file.version&&![1,3].includes(file.version))throw Error('Unsupported save file.');const data=validate(file.state||file);if(dirty||pending)await flush();const before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity=data.saveIdentity||null;identity();dirty=true;await flush();render();return app.saveIdentity.id;}catch(error){hydrateFromSave(JSON.parse(before));dirty=false;throw error;}}

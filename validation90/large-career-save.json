@@ -1,0 +1,31 @@
+{
+  "fixture": "synthetic load fixture: distinct copies of actual generated competition records, preserving real persistent rider/horse IDs; not a new qualification simulation",
+  "results": [
+    {
+      "mode": "before",
+      "bytes": 218184937,
+      "meets": 45153,
+      "npcs": 6659,
+      "samplesMs": [
+        16288.299999999814,
+        17045.599999999627
+      ],
+      "beats": 773,
+      "maxGap": 3109.100000000559,
+      "verified": true
+    },
+    {
+      "mode": "after",
+      "bytes": 218184937,
+      "meets": 45153,
+      "npcs": 6659,
+      "samplesMs": [
+        13868.799999999814,
+        11839.399999999441
+      ],
+      "beats": 1418,
+      "maxGap": 1154.2000000001863,
+      "verified": true
+    }
+  ]
+}

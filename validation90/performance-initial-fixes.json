@@ -1,0 +1,132 @@
+{
+  "url": "http://localhost:8093",
+  "measurements": [
+    {
+      "year": 1,
+      "payloadBytes": 14275870,
+      "horses": 4,
+      "meets": 774,
+      "npcs": 6668,
+      "simulationAndRenderMs": 1781.7000000001863,
+      "totalWithSaveMs": 3855.800000000745,
+      "beats": 149,
+      "maxGap": 372.20000000018626,
+      "result": {
+        "ok": true,
+        "simulationMs": 1318.7000000001863,
+        "timings": {
+          "inputMs": 57.30000000074506,
+          "prepareMs": 88.09965820237994,
+          "returnMs": 309.400146484375,
+          "applyMs": 5.699951171875
+        }
+      }
+    },
+    {
+      "year": 1,
+      "payloadBytes": 14469934,
+      "horses": 30,
+      "meets": 774,
+      "npcs": 6668,
+      "simulationAndRenderMs": 2394.5999999996275,
+      "totalWithSaveMs": 4383.5999999996275,
+      "beats": 187,
+      "maxGap": 427.1000000005588,
+      "result": {
+        "ok": true,
+        "simulationMs": 1779.2999999998137,
+        "timings": {
+          "inputMs": 64.40000000037253,
+          "prepareMs": 85.29995117150247,
+          "returnMs": 460.100341796875,
+          "applyMs": 4
+        }
+      }
+    },
+    {
+      "year": 5,
+      "payloadBytes": 155522213,
+      "horses": 4,
+      "meets": 16653,
+      "npcs": 7034,
+      "simulationAndRenderMs": 12970.700000000186,
+      "totalWithSaveMs": 27970,
+      "beats": 742,
+      "maxGap": 6465.399999999441,
+      "result": {
+        "ok": true,
+        "simulationMs": 2758.100000000559,
+        "timings": {
+          "inputMs": 2124.7999999998137,
+          "prepareMs": 3144.5999023439363,
+          "returnMs": 4523.80029296875,
+          "applyMs": 411
+        }
+      }
+    },
+    {
+      "year": 5,
+      "payloadBytes": 155715744,
+      "horses": 30,
+      "meets": 16653,
+      "npcs": 7034,
+      "simulationAndRenderMs": 7057,
+      "totalWithSaveMs": 19071,
+      "beats": 610,
+      "maxGap": 1864.7000000001863,
+      "result": {
+        "ok": true,
+        "simulationMs": 1440.8999999994412,
+        "timings": {
+          "inputMs": 775.3999999994412,
+          "prepareMs": 3199.099755859934,
+          "returnMs": 1631,
+          "applyMs": 9.900146484375
+        }
+      }
+    },
+    {
+      "year": 10,
+      "payloadBytes": 309613402,
+      "horses": 4,
+      "meets": 37081,
+      "npcs": 7488,
+      "simulationAndRenderMs": 21154.39999999944,
+      "totalWithSaveMs": 61560.5,
+      "beats": 1642,
+      "maxGap": 9055.900000000373,
+      "result": {
+        "ok": true,
+        "simulationMs": 9861.200000000186,
+        "timings": {
+          "inputMs": 2234.5,
+          "prepareMs": 3718,
+          "returnMs": 5264.60009765625,
+          "applyMs": 69.099853515625
+        }
+      }
+    },
+    {
+      "year": 10,
+      "payloadBytes": 309807603,
+      "horses": 30,
+      "meets": 37081,
+      "npcs": 7488,
+      "simulationAndRenderMs": 21689.89999999944,
+      "totalWithSaveMs": 53225.59999999963,
+      "beats": 1548,
+      "maxGap": 7763,
+      "result": {
+        "ok": true,
+        "simulationMs": 8535.600000000559,
+        "timings": {
+          "inputMs": 2506.600000000559,
+          "prepareMs": 5813.099951171316,
+          "returnMs": 4614.800048828125,
+          "applyMs": 215.699951171875
+        }
+      }
+    }
+  ],
+  "pageErrors": []
+}
