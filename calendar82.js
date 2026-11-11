@@ -35,7 +35,7 @@ function show82Blocker(event,rider,horse,historyFor) {
     const nomination=federationNomination(event,rider,horse);
     if (!nomination || !['Selected — National Squad','Selected — Championship Team'].includes(nomination.status)) return 'Federation nomination required.';
   }
-  const earliest=event.country===app.currentBarn?.country ? 24 : 60;
+  const earliest=typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):event.country===app.currentBarn?.country?24:60;
   const now=pastureCalendarHour();
   if (event.at < now+earliest || event.at > now+90*24) return 'Outside the booking window.';
   const history=event.tier>=5 || event.youngFinal || event.final ? historyFor?.(event.discipline) : undefined;
@@ -259,7 +259,8 @@ function show82BindCreator(panel) {
 function federationMarkup82(rider,horses) {
   if (!federationEnabled()) return `<details class="shop-drawer" data-ui-key="show82-federation"><summary>National teams</summary><div class="shop-drawer-body"><p>Enable Rider Realism, Career Progression and National Team Applications in Settings.</p></div></details>`;
   const state=federationState(), now=pastureCalendarHour();
-  const plans=federationPlans(app.year,rider.country).filter(plan=>careerDivisions(rider,plan.trial.at).includes(plan.division));
+  const availablePlans=federationPlans(app.year,rider.country),eligiblePlans=availablePlans.filter(plan=>careerAge(rider,plan.trial.at,true)!==null&&careerDivisions(rider,plan.trial.at).includes(plan.division));
+  const plans=eligiblePlans.length?availablePlans.filter(plan=>eligiblePlans.includes(plan)||state.applications[plan.id+':'+rider.id]):availablePlans;
   const teamEntries=federationTeamEntries(rider,now);
   const previous=Object.values(state.seasons).filter(season=>season.country===rider.country).sort((a,b)=>b.year-a.year);
   return `<details class="shop-drawer" data-ui-key="show82-federation"${Object.values(state.applications).some(row=>row.riderId===rider.id&&row.status==='Trial Invited') ? ' open' : ''}><summary>National team applications</summary><div class="shop-drawer-body">
@@ -270,10 +271,10 @@ function federationMarkup82(rider,horses) {
     ${teamEntries.length ? teamEntries.map(({event,horse})=>{const blocker=show82Blocker(event,rider,horse),registered=app.activeShow?.eventId===event.id;return `<article class="box"><strong>${csEscape(event.name)}</strong><p>${csEscape(pastureDateLabel(event.at))} · ${csEscape(horse.name)}</p>${registered ? '<button type="button" data-federation-open-trial>Open registered team show</button>' : `<button type="button" data-federation-team-enter="${event.id}"${blocker ? ' disabled' : ''}>Enter for ${csEscape(CAREER_COUNTRIES[rider.country][0])}</button>${blocker ? '<p>'+csEscape(blocker)+'</p>' : ''}`}</article>`;}).join('') : '<p>Upcoming team entries appear here after national or championship squad selection, within the 90-day booking window.</p>'}
     <p>Compete for show prizes and your country’s team ranking points. Games results can earn individual and team medals.</p></details>
     <div class="cards sales-listings">${plans.map(plan=>{
-      const id=plan.id+':'+rider.id, row=state.applications[id], invitation=state.invitations[id];
+      const id=plan.id+':'+rider.id, row=state.applications[id], invitation=state.invitations[id],ageIssue=careerAge(rider,plan.trial.at,true)===null?'Set your rider age to apply.':!careerDivisions(rider,plan.trial.at).includes(plan.division)?'This division accepts competition-year ages '+CAREER_AGE_DIVISIONS[plan.division].ages.join('–')+'.':'';
       const registered=app.activeShow?.eventId===plan.trial.id,trialBlocker=row?.status==='Trial Invited' ? show82Blocker(plan.trial,rider,calendarHorseById(row.horseId)) : '';
       return `<article class="box sales-horse-card"><p class="shop-eyebrow">${CAREER_DISCIPLINE_LABELS[plan.discipline]}</p>
-      <h3>${CAREER_AGE_DIVISIONS[plan.division].label}</h3>
+      <h3>${CAREER_AGE_DIVISIONS[plan.division].label}</h3>${ageIssue?'<p>'+csEscape(ageIssue)+'</p>':''}
       <p>${csEscape(row?.status || (now<plan.opens ? 'Not Open' : now<=plan.closes ? 'Open' : 'Expired'))}</p>
       ${invitation && !row && now<=invitation.expires ? `<p>${csEscape(invitation.type)} · Recent verified results</p>` : ''}
       ${row ? `<p>${csEscape(row.horseName)}${row.reason ? ' · '+csEscape(row.reason) : ''}</p>
@@ -283,9 +284,9 @@ function federationMarkup82(rider,horses) {
         ${['Submitted','Under Review','Shortlisted','Trial Invited'].includes(row.status) ? `<button type="button" data-federation-withdraw="${id}">Withdraw application</button>` : ''}`
       : now<=plan.closes ? `<p>Requires a verified top-ten regional or higher result with this horse.</p>
         <label>Horse<select data-federation-mount>${careerOptions(horses.map(horse=>[horse.id,horse.name]),invitation?.horseId)}</select></label>
-        <button type="button" data-federation-apply="${plan.id}">${invitation ? 'Accept invitation and apply' : 'Apply'}</button>` : ''}
+        <button type="button" data-federation-apply="${plan.id}"${ageIssue?' disabled':''}>${invitation ? 'Accept invitation and apply' : 'Apply'}</button>` : ''}
       </article>`;
-    }).join('') || '<p class="shop-empty">Set a rider age and country to see available divisions.</p>'}</div>
+    }).join('') || '<p class="shop-empty">No selection plans are configured for this federation.</p>'}</div>
     <details><summary>Squads and selection history</summary>${previous.slice(0,24).map(season=>`<details>
       <summary>Year ${season.year} · ${CAREER_DISCIPLINE_LABELS[season.discipline]} · ${CAREER_AGE_DIVISIONS[season.division].label}</summary>
       <p>Federation selection panel · ${csEscape(pastureDateLabel(season.selectedAt))}</p>

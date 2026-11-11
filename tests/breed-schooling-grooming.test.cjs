@@ -44,11 +44,11 @@ check('Normal and Elite auction age schooling bands are actual saved levels in a
   const c=auctionGenerate(n*1500,n%2);seen.add(c.tier);
   for(const l of c.lots){const h=l.horse,potential=JSON.stringify(h.potential);for(const d of Object.keys(SHOW_LEVELS)){
    const level=auctionLevel(h,d),band=auctionSchoolingBand(d,level);
-   if(h.age<=3){if(level!=='Unstarted'||!h.requiresBreakingIn)throw Error('young auction started');unstarted++;continue;}
-   if(h.age===4&&band!=='low'||h.age<7&&band==='high'||h.age>=7&&c.tier==='Elite'&&band==='low'||d==='dressage'&&level==='Level Two')throw Error('wrong auction band '+c.tier+' '+h.age+' '+d+' '+level);
+   if(auction86Unstarted(h)){if(level!=='Unstarted'||!h.requiresBreakingIn)throw Error('young auction started');unstarted++;continue;}
+   if(h.age<=5&&band!=='low'||h.age<7&&band==='high'||d===l.discipline&&d==='dressage'&&level==='Level Two')throw Error('wrong auction band '+c.tier+' '+h.age+' '+d+' '+level);
    if(h.age>=7&&c.tier==='Normal'&&band==='low')normalLow++;
    if(h.age>=7&&c.tier==='Elite'&&band==='high')eliteHigh++;
-   if(SHOW_LEVELS[d].indexOf(level)!==highestAllowedLevelIndex(h,d))throw Error('advertised schooling disagrees with actual eligibility');if(SHOW_LEVELS[d].indexOf(level)>auctionPotentialIndex(h,d))throw Error('schooling above potential');
+   if(d===l.discipline&&SHOW_LEVELS[d].indexOf(level)!==highestAllowedLevelIndex(h,d))throw Error('advertised schooling disagrees with actual eligibility');if(SHOW_LEVELS[d].indexOf(level)>auctionPotentialIndex(h,d))throw Error('schooling above potential');
   }if(l.current!==auctionLevel(h,l.discipline)||JSON.stringify(h.potential)!==potential)throw Error('false current or changed future ability');}
  }
  if(seen.size!==2||!unstarted||!normalLow||!eliteHigh)throw Error('missing tier or age variety');

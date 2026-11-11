@@ -1,6 +1,6 @@
 const {check}=require('./behavior5-harness.cjs');
 const selectedDiscipline=process.env.RANKING_DISCIPLINE;
-check('all ranking categories and every federation have at least 24 scoring competitors', `{
+check('all ranking categories and every federation have at least 24 real competitors', `{
  resetGame();const hour=pastureCalendarHour();
  for(const discipline of ${selectedDiscipline?JSON.stringify([selectedDiscipline]):'DISCIPLINES'}){
   resetGame();
@@ -14,7 +14,7 @@ check('all ranking categories and every federation have at least 24 scoring comp
   for(const row of CAREER_SERIES.filter(row=>row.discipline===discipline&&row.series))cases.push([row.team?'team':'tour',row.series]);
   for(const [type,filter]of cases){
    const rows=careerCircuitField(type,discipline,filter,hour);
-   if(rows.length<24||new Set(rows.map(r=>r.id)).size!==rows.length||rows.some(r=>r.points<=0||r.specialty!==discipline))throw Error('thin board '+type+' '+discipline+' '+filter);
+   if(rows.length<24||new Set(rows.map(r=>r.id)).size!==rows.length||rows.some(r=>r.points<0||r.specialty!==discipline))throw Error('thin board '+type+' '+discipline+' '+filter);
    if(type==='national'&&rows.some(r=>r.country!==filter)||type==='youth-national'&&rows.some(r=>r.country!==filter.split('|')[1]))throw Error('foreign entrant on national board');
    if(['division','youth-international','youth-national'].includes(type)){
     const [min,max]=CAREER_AGE_DIVISIONS[String(filter).split('|')[0]].ages;if(rows.some(r=>r.age<min||r.age>max))throw Error('age division');

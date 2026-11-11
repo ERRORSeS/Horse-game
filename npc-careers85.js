@@ -2,12 +2,12 @@
 const NPC85_INDEX=new WeakMap();
 function npc85State(){const w=careerState();w.npcArchive85 ||= {};w.npcDiagnostics85 ||= {missing:[],duplicateNames:[]};return w;}
 function npc85Registry(force=false){
- const w=npc85State(),roster=w.npcs||[],size=roster.length+(app.horses?.length||0)+(app.saleBarn?.length||0)+(app.npcSales?.length||0)+(app.rescueHorses?.length||0)+(app.rescueBarn?.length||0)+(app.npcStuds?.length||0)+(app.auctions3?.contracts?.length||0)+(app.sales2?.listings?.length||0)+Object.keys(w.npcArchive85).length;
+ const w=npc85State(),roster=w.npcs||[],size=roster.length+(app.horses?.length||0)+(app.saleBarn?.length||0)+(app.npcSales?.length||0)+(app.rescueHorses?.length||0)+(app.rescueBarn?.length||0)+(app.npcStuds?.length||0)+(app.auctions3?.contracts?.length||0)+(app.auctions3?.sequence||0)+(app.sales2?.listings?.length||0)+Object.keys(w.npcArchive85).length;
  let index=NPC85_INDEX.get(w);if(!force&&index?.size===size&&index.roster===roster)return index;
  index={size,roster,riders:new Map(roster.map(r=>[r.id,r])),horses:new Map()};
  const playerIds=new Set((app.horses||[]).map(h=>h.id));
  const add=h=>{if(!h?.id||!(h.skills||h.stats))return;const old=index.horses.get(h.id),latest=horse=>Math.max(horse.retiredAt85||-1,...(horse.ownershipHistory||[]).map(row=>row.day??-1));if(!old||!playerIds.has(h.id)&&latest(h)>latest(old))index.horses.set(h.id,h);};
- for(const h of app.horses||[])add(h);for(const pool of [app.saleBarn,app.npcSales,app.rescueHorses,app.rescueBarn,app.npcStuds])for(const h of pool||[])add(h);for(const c of app.auctions3?.contracts||[])add(c.horse);for(const r of roster){for(const h of r.horses||[])add(h);for(const h of r.retiredHorses||[])add(h);}for(const h of Object.values(w.npcArchive85))add(h);for(const l of app.sales2?.listings||[])add(l.horse);
+ for(const h of app.horses||[])add(h);for(const pool of [app.saleBarn,app.npcSales,app.rescueHorses,app.rescueBarn,app.npcStuds])for(const h of pool||[])add(h);for(const c of app.auctions3?.contracts||[])add(c.horse);for(const c of app.auctions3?.collections||[])for(const lot of c.lots||[])add(lot.horse);for(const r of roster){for(const h of r.horses||[])add(h);for(const h of r.retiredHorses||[])add(h);}for(const h of Object.values(w.npcArchive85))add(h);for(const l of app.sales2?.listings||[])add(l.horse);
  NPC85_INDEX.set(w,index);return index;
 }
 function npc85Nationality(rider){return rider?.country||'GBR';}
@@ -55,7 +55,7 @@ function npc85HorseEligible(rider,h,event){
  if((h.medicalConditions||[]).some(c=>!c.resolved&&(c.severity==='major'||HorseHealth.definition(c).restriction)))return false;
  if((h.illnesses||[]).some(c=>c.active)||h.fatigue>=70)return false;
  const age=npc85HorseAge(h,event.at);if(age<4||age>24)return false;
- if(event.discipline==='jumping'&&(age<5&&Number(event.level)>1||age===5&&Number(event.level)>1.1||age===6&&Number(event.level)>1.3))return false;
+ if(!rankingSchoolingAge86(h,event.discipline,event.level,event.at))return false;
  if(careerBusy(h.recentStarts85||[],event))return false;
  return npc85HorseSkill(h,event.discipline)>=(event.minimumSkill??requiredSkillBand(event.discipline,event.level)[0]);
 }
@@ -71,15 +71,18 @@ const NPC85_FIELD=careerNpcField;
 careerNpcField=function(event,limit,player=null,selectionPool=false){
  const field=NPC85_FIELD(event,limit,player,selectionPool).map(pair=>{if(event.allocated&&!selectionPool&&pair.horse.id===event.id+':allocated:'+pair.rider.id){const archive=npc85State().npcArchive85;let h=archive[pair.horse.id];if(!h){const source=pair.horse;h={id:source.id,name:source.name,birthYear:source.birthYear,age:source.age,height:source.height,breed:source.breed,personality:source.personality,skills:{...source.skills}};h.owner='Event schoolmaster pool';h.ownerId='event-pool:'+event.id;h.assignedRiderId=pair.rider.id;archive[h.id]=h;}pair={...pair,horse:h};}return pair;}).filter(pair=>npc85HorseEligible(pair.rider,pair.horse,event));
  if(selectionPool||event.allocated||event.team||event.games||!(event.maxHorsesPerRider>1))return field;
- const expanded=[];for(const pair of field){expanded.push(pair);const used=new Set([pair.horse.id]);while(used.size<event.maxHorsesPerRider){const candidates=pair.rider.horses.filter(h=>!used.has(h.id)&&!careerEligibility(event,pair.rider,h,{npc:true})),horse=npc85ChooseHorse(pair.rider,candidates,event);if(!horse)break;used.add(horse.id);expanded.push({...pair,horse,score:(pair.rider.skill+npc85HorseSkill(horse,event.discipline))/2});}}
- return expanded.slice(0,limit);
+ const expanded=[],counts=new Map(),mounts=new Map(),cap=event.quota||(event.tier>=5?3:Infinity),baseCount=Math.max(1,Math.ceil(limit*.82));if(player)counts.set(player.country,1);
+ const add=pair=>{const country=npc85Nationality(pair.rider);if(expanded.length>=limit||(counts.get(country)||0)>=cap||expanded.some(p=>p.horse.id===pair.horse.id))return false;expanded.push(pair);counts.set(country,(counts.get(country)||0)+1);mounts.set(pair.rider.id,(mounts.get(pair.rider.id)||0)+1);return true;};
+ for(const pair of field.slice(0,baseCount))add(pair);
+ for(const pair of [...expanded].sort((a,b)=>careerRoll(event.id,a.rider.id)-careerRoll(event.id,b.rider.id))){while((mounts.get(pair.rider.id)||0)<event.maxHorsesPerRider&&expanded.length<limit){const candidates=pair.rider.horses.filter(h=>!expanded.some(p=>p.horse.id===h.id)&&!careerEligibility(event,pair.rider,h,{npc:true,history:[]})),horse=npc85ChooseHorse(pair.rider,candidates,event);if(!horse||!add({...pair,horse,score:(pair.rider.skill+npc85HorseSkill(horse,event.discipline))/2}))break;}}
+ for(const pair of field.slice(baseCount))if(expanded.length<limit)add(pair);return expanded;
 };
 const NPC85_RECORD=careerRecordMeet;
 careerRecordMeet=function(event,standings,player=null,...args){
  const prior=app.career?.meets[event.id],result=NPC85_RECORD(event,standings,player,...args);if(prior||event.sandbox||args[0]?.recovery)return result;
  const index=npc85Registry();for(const row of result.results){if(row.player)continue;const rider=index.riders.get(row.riderId),h=index.horses.get(row.horseId);if(!rider||!h)continue;
   const development85=h.stats?Math.max(0,(h.skills?.[event.discipline]||0)-effectiveDisciplineSkill(h,event.discipline)):0;npc85Initialize(rider,h);h.competitionHistory85.push({eventId:event.id,day:Math.floor(event.at/24),discipline:event.discipline,level:event.level,riderId:rider.id,placing:row.placing,score:row.score});h.competitionHistory85=h.competitionHistory85.slice(-100);
-  h.recentStarts85=[...(h.recentStarts85||[]),{start:event.at,end:careerEventEnd(event)}].sort((a,b)=>a.start-b.start).slice(-32);
+  h.recentStarts85=[...(h.recentStarts85||[]),{start:event.at,end:careerEventEnd(event),country:event.federation||careerCountry(event.country)}].sort((a,b)=>a.start-b.start).slice(-32);
   if(row.placing){const prize=row.placing<=6?Math.round((event.prizeMoney||0)/row.placing):0;rider.resources85+=prize;
    if(h.stats){for(const group of ['jumping','dressage'].filter(group=>!['jumping','dressage'].includes(event.discipline)||group===event.discipline))for(const skill of Object.keys(h.stats[group]||{})){const ceiling=h.potential?.[group]??100;if(h.stats[group][skill]<ceiling)h.stats[group][skill]=Math.min(ceiling,h.stats[group][skill]+development85+.08);}h.skills=Object.fromEntries(DISCIPLINES.map(d=>[d,effectiveDisciplineSkill(h,d)]));}
    else if(h.skills){const ceiling=h.potential?.[event.discipline]??rider.potential;h.skills[event.discipline]=Math.min(ceiling,h.skills[event.discipline]+.08);}
@@ -131,7 +134,7 @@ function npc85HorseSections(rider,discipline){
  npc85Initialize(rider);for(const h of rider.horses||[])npc85Initialize(rider,h);
  const index=npc85Registry(),current=(rider.horses||[]).filter(h=>!h.retiredForever&&h.assignedRiderId===rider.id),former=new Map();
  for(const h of rider.retiredHorses||[])former.set(h.id,h);for(const row of rider.partnershipHistory85||[]){const h=index.horses.get(row.horseId);if(!current.some(c=>c.id===row.horseId))former.set(row.horseId,h||row);}
- const markup=h=>{const age=npc85HorseAge(h,pastureCalendarHour()),score=npc85HorseSkill(h,discipline);let level=h.stats||h.skills?SHOW_LEVELS[discipline][0]:'Level unrecorded';if(h.stats||h.skills)SHOW_LEVELS[discipline].forEach(l=>{if(requiredSkillBand(discipline,l)[0]<=score)level=l;});const results=careerResults({horseId:h.id||h.horseId,riderId:rider.id,discipline}).sort((a,b)=>b.hour-a.hour).slice(0,3);return `<p><strong>${csEscape(h.name)}</strong> · ${Number.isFinite(age)?age+' years':'Historical horse'} · ${csEscape(h.breed||'Breed unrecorded')} · ${csEscape(level)} · ${h.ownerId===rider.id?'Owned':h.assignedRiderId===rider.id?'Assigned rider':'Former partnership'} · Owner: ${csEscape(h.owner||'Unrecorded')} · ${h.retiredForever||h.year?'Retired':h.skills||h.stats?'Active':'Historical record'}</p>${results.map(r=>`<p>${csEscape(r.event)}: ${r.placing?'#'+r.placing:r.eliminated?'Eliminated':'Recorded'}</p>`).join('')}`;};
+ const markup=h=>{const age=npc85HorseAge(h,pastureCalendarHour()),score=npc85HorseSkill(h,discipline);let level=h.stats||h.skills?SHOW_LEVELS[discipline][0]:'Level unrecorded';if(h.stats||h.skills)SHOW_LEVELS[discipline].forEach(l=>{if(requiredSkillBand(discipline,l)[0]<=score&&rankingSchoolingAge86(h,discipline,l,pastureCalendarHour()))level=l;});const results=careerResults({horseId:h.id||h.horseId,riderId:rider.id,discipline}).sort((a,b)=>b.hour-a.hour).slice(0,3);return `<p><strong>${csEscape(h.name)}</strong> · ${Number.isFinite(age)?age+' years':'Historical horse'} · ${csEscape(h.breed||'Breed unrecorded')} · ${csEscape(level)} · ${h.ownerId===rider.id?'Owned':h.assignedRiderId===rider.id?'Assigned rider':'Former partnership'} · Owner: ${csEscape(h.owner||'Unrecorded')} · ${h.retiredForever||h.year?'Retired':h.skills||h.stats?'Active':'Historical record'}</p>${results.map(r=>`<p>${csEscape(r.event)}: ${r.placing?'#'+r.placing:r.eliminated?'Eliminated':'Recorded'}</p>`).join('')}`;};
  return `<section data-npc85-horses><h4>Current Horses</h4>${current.map(markup).join('')||'<p>No current eligible partnership.</p>'}<details><summary>Former Horses</summary>${[...former.values()].map(markup).join('')||'<p>No former partnerships recorded.</p>'}</details></section>`;
 }
 const NPC85_DETAILS=careerLeaderboardDetails;
@@ -167,18 +170,18 @@ function npc85CircuitPool(event,type,filter){
  const roster=careerRoster(),w=npc85State(),country=type==='national'?filter:type==='youth-national'?String(filter).split('|')[1]:null;
  const valid=r=>!r.retired&&!careerBusy(r.recentStarts||[],event)&&r.specialty===event.discipline&&(!country||npc85Nationality(r)===country)&&careerDivisions(r,event.at).includes(event.division);
  const choose=r=>{npc85Initialize(r);const candidates=r.horses.filter(h=>{npc85Initialize(r,h);return !careerEligibility(event,r,h,{npc:true,history:[]});});return npc85ChooseHorse(r,candidates,event);};
- const countries=Object.keys(CAREER_COUNTRIES).slice(0,event.team?40:32),matches=[],counts=new Map();
- const add=(r,h)=>{if(event.team&&(!countries.includes(npc85Nationality(r))||(counts.get(npc85Nationality(r))||0)>=event.team))return;if(matches.some(p=>p.rider.id===r.id))return;matches.push({rider:r,horse:h,score:(r.skill+npc85HorseSkill(h,event.discipline))/2});counts.set(npc85Nationality(r),(counts.get(npc85Nationality(r))||0)+1);};
+ const countries=Object.keys(CAREER_COUNTRIES).sort((a,b)=>careerRoll(event.id,'country:'+a)-careerRoll(event.id,'country:'+b)).slice(0,event.team?40:74),matches=[],counts=new Map();
+ const add=(r,h)=>{if(event.team&&(!countries.includes(npc85Nationality(r))||(counts.get(npc85Nationality(r))||0)>=event.team)||!event.team&&!country&&(counts.get(npc85Nationality(r))||0)>=2)return;if(matches.some(p=>p.rider.id===r.id))return;matches.push({rider:r,horse:h,score:(r.skill+npc85HorseSkill(h,event.discipline))/2});counts.set(npc85Nationality(r),(counts.get(npc85Nationality(r))||0)+1);};
  for(const r of (careerRosterIndex(roster).byDiscipline.get(event.discipline)||[]).filter(valid).sort((a,b)=>b.skill-a.skill||a.id.localeCompare(b.id))){const h=choose(r);if(h)add(r,h);}
  const target=event.team?countries.length*event.team:32;if(matches.length>=target)return matches.slice(0,target);
  const usedNames=new Set(roster.map(r=>r.name)),usedHorses=new Set();for(const h of npc85Registry().horses.values())usedHorses.add(horseNameKey(h.name));
  let count=0;
  while(matches.length<target&&count<target*5){
-  const index=count++,home=country||(event.team?countries.find(c=>(counts.get(c)||0)<event.team):countries[index%countries.length]),seed=event.circuitBoard85+':'+home+':'+pastureDate(event.at).year+':'+index,id='npc85-circuit:'+seed;
+  const index=count++,home=country||(event.team?countries.find(c=>(counts.get(c)||0)<event.team):countries.find(c=>(counts.get(c)||0)<2)||countries[index%countries.length]),seed=event.circuitBoard85+':'+home+':'+pastureDate(event.at).year+':'+index,id='npc85-circuit:'+seed;
   let r=roster.find(r=>r.id===id);
-  if(!r){const ages=CAREER_AGE_DIVISIONS[event.division].ages,age=Math.min(ages[1],Math.max(ages[0],event.division==='senior'?24:Math.round((ages[0]+ages[1])/2))),year=event.date.year;
-   let name=careerPick(id,'first',CAREER_FIRST_NAMES)+' '+careerPick(id,'last',CAREER_SURNAMES);if(usedNames.has(name))name+=' '+(roster.length+1);usedNames.add(name);
-   r={id,name,country:home,specialty:event.discipline,stage:3,skill:68+careerRoll(id,'skill')*25,potential:100,professional:event.division==='professional',birth:{year:year-age,month:1,day:1},horses:[],retiredHorses:[],starts:0,training:[],resources85:90000};
+  if(!r){const ages=CAREER_AGE_DIVISIONS[event.division].ages,age=ages[0]+Math.floor(careerRoll(id,'rider-age86')*(Math.min(ages[1],60)-ages[0]+1)),year=event.date.year;
+   const name=careerUniqueRiderName(id,home,usedNames);
+   r={id,name,rankingDebutHour86:Math.max(pastureCalendarHour(),careerState().cursor||0,careerState().rankingHour||0)+1,country:home,specialty:event.discipline,stage:3,skill:68+careerRoll(id,'skill')*25,potential:100,professional:event.division==='professional',birth:{year:year-age,month:1,day:1},horses:[],retiredHorses:[],starts:0,training:[],resources85:90000};
    const h=careerNpcHorse(r,event.ponyCm?'pony':'sport',year,usedHorses,event.ponyCm?'pony':'sport');if(event.horseAge){h.birthYear=year-event.horseAge;h.age=event.horseAge;}h.skills[event.discipline]=Math.max(h.skills[event.discipline],event.minimumSkill+5);r.horses.push(h);npc85Initialize(r,h);roster.push(r);
   }
   const h=valid(r)&&choose(r);if(h)add(r,h);
@@ -189,10 +192,10 @@ function npc85CircuitPool(event,type,filter){
 function npc85EnsureCircuit(type,discipline,filter,hour){
  if(type==='combination'||type==='horse'&&!filter)return npc85EnsureCircuit('world',discipline,'',hour);
  if(type==='horse'&&filter==='pony')return npc85EnsureCircuit('division',discipline,'pony',hour);
- const w=npc85State(),seasonal=['national','youth-national','tour','team'].includes(type),ids=[];
- for(let round=3;round>=0;round--){const event=npc85CircuitEvent(type,discipline,filter,hour,round);if(event.at<0||seasonal&&event.date.year!==pastureDate(hour).year)continue;ids.push(event.id);if(w.meets[event.id])continue;
+ const w=npc85State();w.rankingLaunch86 ||= {};const launchKey=careerBoardKey(type,discipline,filter),launch=w.rankingLaunch86[launchKey]??=hour;const seasonal=['national','youth-national','tour','team'].includes(type),ids=[];
+ for(let round=3;round>=0;round--){const event=npc85CircuitEvent(type,discipline,filter,hour,round);if(event.at<0||seasonal&&event.date.year!==pastureDate(hour).year)continue;ids.push(event.id);if(w.meets[event.id])continue;if(round!==0)continue;
   if(event.phaseSchedule)event.phaseSchedule={dressage:event.at,'cross-country':event.at,showjumping:event.at};
-  const field=npc85CircuitPool(event,type,filter);if(!field.length)continue;
+  const field=npc85CircuitPool(event,type,filter);if(event.at<=launch||!field.length)continue;
   const competitors=field.map((pair,i)=>careerNpcEntry(event,pair,i)),show={id:event.id,discipline,level:event.level,round:0,competitors};
   for(const entry of competitors)for(const phase of CAREER_PHASES[discipline])entry.scores[phase]=showScore(show,entry,phase);
   const meet=careerRecordMeet(event,showStandings(show),null,{ranked:true});meet.hour=event.at;meet.circuit85=true;meet.circuitBoard85=event.circuitBoard85;

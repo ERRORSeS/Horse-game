@@ -58,7 +58,7 @@ const Save3=(()=>{
   if(data.auctions3){
    const a=data.auctions3,collections=a.collections||[a.collection].filter(Boolean);
    if(a.version!==1||!Array.isArray(a.contracts)||!Array.isArray(a.history)||!Array.isArray(a.watchlist))throw Error('Invalid auction state.');
-   if(!Array.isArray(collections)||collections.length>3||collections.some(c=>!Array.isArray(c.lots)||c.lots.length>35))throw Error('Invalid auction collection.');
+   if(!Array.isArray(collections)||collections.length>8||collections.some(c=>!Array.isArray(c.lots)||c.lots.length>35))throw Error('Invalid auction collection.');
    const lots=new Map();
    for(const lot of collections.flatMap(c=>c.lots)){
     if(lots.has(lot.id)||lot.horseId!==lot.horse?.id||!Number.isFinite(lot.bid)||lot.bid<0||!Array.isArray(lot.schedule)||lot.schedule.length>8)throw Error('Invalid auction lot references.');
