@@ -1,0 +1,3 @@
+/* Every country in the boarding selector supplies actual listings, including its All cities view. */
+function barnCountryListings86(country){const locations=barnLocationChoices();if(country==='OTHER'){return Object.keys(locations).filter(c=>c!==app.currentBarn?.country).flatMap(c=>locations[c]?.length?barnLocationListings(c,locations[c][0]).slice(0,1):[]);}
+ const existing=app.barnCatalog.filter(b=>b.country===country),generated=(locations[country]||[]).slice(0,3).flatMap(city=>barnLocationListings(country,city)),all=new Map([...existing,...generated].map(b=>[b.id,b]));return [...all.values()];}

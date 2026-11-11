@@ -130,6 +130,10 @@ function careerNpcHorse(rider, suffix, originYear, used, kind = suffix) {
     }))
   };
 }
+function careerUniqueRiderName(id,country,used=new Set()){
+ const [first,last]=CAREER_REGIONAL_NAMES[country]||[CAREER_FIRST_NAMES,CAREER_SURNAMES];
+ for(let attempt=0;;attempt++){const middle=attempt<40?'':' '+careerPick(id,'middle:'+attempt,CAREER_FIRST_NAMES),extra=attempt<400?'':' '+careerPick(id,'surname:'+attempt,CAREER_SURNAMES),name=careerPick(id,'first:'+attempt,first)+middle+' '+careerPick(id,'last:'+attempt,last)+extra;if(!used.has(name)){used.add(name);return name;}}
+}
 function careerRoster() {
   const world = careerState();
   if (world.npcs) {careerExpandCompetitionRoster(world.npcs);return world.npcs;}
@@ -139,12 +143,7 @@ function careerRoster() {
     const id = 'world-rider-' + (index + 1);
     const country = countries[index % countries.length];
     const [first, last] = CAREER_REGIONAL_NAMES[country] || [CAREER_FIRST_NAMES, CAREER_SURNAMES];
-    let name, attempt = 0;
-    do {
-      name = careerPick(id, 'first:' + attempt, first) + ' ' + careerPick(id, 'last:' + attempt, last);
-      if (++attempt > 60) name += ' ' + (index + 1);
-    } while (usedRiders.has(name));
-    usedRiders.add(name);
+    const name=careerUniqueRiderName(id,country,usedRiders);
     const chance = careerRoll(id, 'career');
     const stage = [.30, .55, .73, .88, .97, 1].findIndex(limit => chance < limit);
     const age = index % 4 === 0 ? 6 + Math.floor(careerRoll(id, 'age') * 20) : 19 + Math.floor(careerRoll(id, 'age') * 43);
@@ -169,8 +168,7 @@ function careerExpandCompetitionRoster(roster) {
  for(const country of Object.keys(CAREER_COUNTRIES))for(const specialty of DISCIPLINES)for(const age of [7,9,11,13,15,17,20,24,32,46])for(let slot=0;slot<2;slot++){
   const id='specialist:'+country+':'+specialty+':'+age+':'+slot;
   if(roster.some(r=>r.id===id))continue;
-  const [first,last]=CAREER_REGIONAL_NAMES[country]||[CAREER_FIRST_NAMES,CAREER_SURNAMES];let name,attempt=0;
-  do{name=careerPick(id,'first:'+attempt,first)+' '+careerPick(id,'last:'+attempt,last);if(++attempt>60)name+=' '+id;}while(usedNames.has(name));usedNames.add(name);
+  const name=careerUniqueRiderName(id,country,usedNames);
   const stage=age<12?slot:age<16?1+slot:age<22?2+slot:slot?4:2,skill=clamp([32,48,65,79,91,97][stage]+careerRoll(id,'skill')*8,20,100);
   const rider={id,name,country,specialty,stage,skill,potential:Math.min(100,skill+12),professional:age>=18&&slot===1,birth:{year:year-age,month:1+Math.floor(careerRoll(id,'month')*12),day:1},travelWillingness:careerRoll(id,'travel'),horses:[],starts:0,lastStart:null,training:[]};
   rider.horses.push(careerNpcHorse(rider,'sport',year,usedHorses));if(age<=17)rider.horses.push(careerNpcHorse(rider,'pony',year,usedHorses));roster.push(rider);
@@ -194,12 +192,7 @@ function careerAddYouthCohort(year,roster) {
     const age = initial ? 7+i%15 : 7+i%2;
     const country = countriesPerCohort[(i + Math.floor(i/15) + year-originYear + countriesPerCohort.length) % countriesPerCohort.length];
     const [first,last] = CAREER_REGIONAL_NAMES[country] || [CAREER_FIRST_NAMES,CAREER_SURNAMES];
-    let name, attempt = 0;
-    do {
-      name = careerPick(id,'first:'+attempt,first)+' '+careerPick(id,'last:'+attempt,last);
-      if(++attempt>60)name+=' '+id;
-    } while (usedRiders.has(name));
-    usedRiders.add(name);
+    const name=careerUniqueRiderName(id,country,usedRiders);
     const stage = age < 13 ? i%2 : i%4;
     const skill = [34,49,66,81][stage] + careerRoll(id,'skill')*9;
     const rider = {id,name,country,stage,skill,potential:Math.min(100,skill+14),professional:false,
@@ -337,6 +330,7 @@ function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
     event.division === 'senior' && !event.horseAge && event.tier <= 2 && rider.stage > event.tier + 1)) return 'The rider is outside the career field for this class.';
   if (horse) {
     const horseAge = careerHorseAge(horse, event.at);
+    if(typeof rankingSchoolingAge86==='function'&&!rankingSchoolingAge86(horse,event.discipline,event.level,event.at))return 'The horse is too young for this schooling level.';
     if (event.horseAge && horseAge !== event.horseAge) return 'The horse must be ' + event.horseAge + ' in the competition year.';
     if (event.horseMinAge && horseAge < event.horseMinAge || npc && horseAge > 21) return 'The horse is outside the event age limits.';
     if (event.ponyCm) {
@@ -446,7 +440,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
     return field;
   }
   const selected = matches.filter(({ rider }) => {
-    const maximum = event.quota || event.team || Infinity;
+    const maximum = event.quota || event.team || (event.tier>=5?3:Infinity);
     const entered = quotas[rider.country] || 0;
     if (entered >= maximum) return false;
     quotas[rider.country] = entered + 1;
@@ -464,7 +458,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
 }
 function careerNpcEntry(event, { rider, horse, score }, index) {
   return {
-    id: event.id + ':' + rider.id, horseId: horse.id, name: horse.name, horseName: horse.name,
+    id: event.id + ':' + rider.id + (event.maxHorsesPerRider>1?':'+horse.id:''), horseId: horse.id, name: horse.name, horseName: horse.name,
     riderId: rider.id, riderName: rider.name, country: rider.country, riderLevel: rider.stage >= 4 ? 'Professional' :
       rider.stage >= 2 ? 'Advanced' : rider.stage === 1 ? 'Intermediate' : 'Novice',
     riderAbilities: Object.fromEntries(RR_ABILITIES.map(skill => [skill, clamp(rider.skill + (careerRoll(rider.id, skill) - .5) * 12, 0, 100)])),
@@ -547,7 +541,7 @@ function careerRecordMeet(event, standings, player = null, { recovery = false, r
     if (!rider) continue;
     rider.starts++;
     rider.lastStart = Math.max(rider.lastStart ?? 0, event.at);
-    rider.recentStarts = [...(rider.recentStarts || []),{ start:event.at, end:careerEventEnd(event) }]
+    rider.recentStarts = [...(rider.recentStarts || []),{ start:event.at, end:careerEventEnd(event),country:event.federation||careerCountry(event.country) }]
       .sort((a,b) => a.start-b.start).slice(-32);
     if (progressing && world.settings.background) {
       careerDevelopNpc(rider, event, row);

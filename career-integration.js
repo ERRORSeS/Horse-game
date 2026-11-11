@@ -461,9 +461,9 @@ showFinish = function (show) {
 };
 function careerEnter(event, horse) {
   const world = careerState(), rider = careerRider();
-  if (!event || (event.games || event.gamesTrial) && !world.settings.games || event.at < pastureCalendarHour() + 24 || event.at > pastureCalendarHour() + 90 * 24 ||
+  if (!event || (event.games || event.gamesTrial) && !world.settings.games || event.at < pastureCalendarHour() + (typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):24) || event.at > pastureCalendarHour() + 90 * 24 ||
     world.meets[event.id] || event.registeredEntries?.length) return { ok: false, message: 'This class is closed.' };
-  const earliest = event.country === app.currentBarn?.country ? 24 : 60;
+  const earliest = typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):event.country===app.currentBarn?.country?24:60;
   if (event.at < pastureCalendarHour() + earliest) return { ok: false, message: 'There is too little time to reach this fixed-date class.' };
   if (app.activeShow || app.competitionRpg) return { ok: false, message: 'Finish the active show before entering another class.' };
   const problem = careerEligibility(event, rider, event.allocated ? null : horse);

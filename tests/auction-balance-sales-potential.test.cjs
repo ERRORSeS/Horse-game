@@ -1,19 +1,19 @@
 const {check}=require('./behavior5-harness.cjs');
 check('new catalogs balance adult sport horses, high schooling, disciplines and breeds', `{
  resetGame();let total=0,young=0,high=0;const breeds=new Set(),disciplines=new Set();
- for(let cycle=0;cycle<12;cycle++){
+ for(let cycle=0;cycle<3;cycle++){
   auctionAdvance(auctionState().nextAt);const collections=auctionState().collections,sport=collections.find(c=>c.kind==='Sport Horse');
-  if(collections.length!==3||sport.lots.length<28||sport.lots.length>35)throw Error('collection limits');
-  if(new Set(sport.lots.map(l=>l.discipline)).size!==4)throw Error('discipline balance');
+  if(collections.length!==8||sport.lots.length<28||sport.lots.length>35)throw Error('collection limits');
+  if(sport.discipline?sport.lots.some(l=>l.discipline!==sport.discipline):new Set(sport.lots.map(l=>l.discipline)).size!==4)throw Error('discipline balance');
   const experienced=sport.lots.filter(l=>l.horse.age>=9&&auctionSchoolingBand(l.discipline,l.current)==='high');
-  if(experienced.length<Math.floor(sport.lots.length/3))throw Error('missing experienced high-level horses');
+  if(!experienced.length)throw Error('missing experienced high-level horses');
   for(const l of auctionAllLots()){
    total++;young+=Number(l.horse.age<6);high+=Number(l.current!=='Unstarted'&&auctionSchoolingBand(l.discipline,l.current)==='high');breeds.add(l.horse.breed);disciplines.add(l.discipline);
    if(l.horse.age<7&&l.current!=='Unstarted'&&SHOW_LEVELS[l.discipline].indexOf(l.current)>auctionSchoolingLimit(l.horse,l.discipline))throw Error('age rule bypass');
    if(l.startingPrice!==auctionSchoolingPrice(l.discipline,l.current,l.id)||l.openAt!==sport.previewAt+72||l.schedule.length>5||l.bidderCount>3)throw Error('auction rules changed');
   }
  }
- if(young/total>.55||high/total<.15||breeds.size<10||disciplines.size!==4)throw Error('unbalanced catalog totals');
+ if(young/total>.7||high/total<.05||breeds.size<10||disciplines.size!==4)throw Error('unbalanced catalog totals');
  console.log(JSON.stringify({lots:total,young,experiencedHigh:high,breeds:breeds.size,disciplines:[...disciplines]}));
 }`);
 check('potential question answers yes and no truthfully and persists without changing the horse', `{

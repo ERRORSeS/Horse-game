@@ -8309,7 +8309,7 @@ function renderBarn() {
     cityControl.disabled = filter === 'OTHER';
     if (locations[filter]?.includes(previousCity)) cityControl.value = previousCity;
     const city = cityControl.value;
-    const list = city ? barnLocationListings(filter,city) : app.barnCatalog.filter(barn =>
+    const list = city ? barnLocationListings(filter,city) : typeof barnCountryListings86==='function'?barnCountryListings86(filter):app.barnCatalog.filter(barn =>
       filter === 'OTHER' ? barn.country !== currentCountry : barn.country === filter);
     const wrap = document.getElementById('barn-catalog-list');
     if (!wrap) return;
@@ -8374,9 +8374,9 @@ function renderBarn() {
   bindPastureControls(panel);
   document.getElementById('barn-filter-country').onchange = () => {
     document.getElementById('barn-filter-city').value = '';
-    renderCatalogList();
+    renderCatalogList();saveGame(false);
   };
-  document.getElementById('barn-filter-city').onchange = renderCatalogList;
+  document.getElementById('barn-filter-city').onchange = () => {renderCatalogList();saveGame(false);};
   document.getElementById('barn-refresh-list').onclick = () => {
     const refreshed = refreshBarnCatalog(true);
     if (refreshed) pushReport('Barn catalog refreshed manually.');
