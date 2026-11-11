@@ -80,11 +80,13 @@ const Save3=(()=>{
   return data;
  }
  function cleanTransferFields(){for(const key of Object.keys(app.uiSelections||{}))if(key.includes("data-save3-code:"))delete app.uiSelections[key];}
- function record(){
+ async function record(){
   cleanTransferFields();const meta=identity(),updatedAt=new Date().toISOString(),previous=meta.updatedAt,lastSaved=app.lastSuccessfulSave;
   meta.updatedAt=updatedAt;app.lastSuccessfulSave=updatedAt;
-  try{return {...meta,snapshotId:id(),payload:serializeAppState()};}
+  const header={...meta,snapshotId:id()};let payload;
+  try{payload=typeof serializeAppStateInBackground==='function'?serializeAppStateInBackground():serializeAppState();}
   finally{meta.updatedAt=previous;app.lastSuccessfulSave=lastSaved;}
+  return {...header,payload:await payload};
  }
  function enqueue(){
   identity();dirty=true;saveFeedback('Saving on this device…');
@@ -100,7 +102,7 @@ const Save3=(()=>{
    while(dirty){
     const saveId=identity().id;
     try{
-     validate(app);const current=record();dirty=false;
+     validate(app);dirty=false;const current=await record();
      const existing=await get(current.id);
      if(existing&&existing.createdAt!==current.createdAt)throw Error('Save ID collision detected. Export this stable before retrying.');
      await put(current);lastError=null;
@@ -114,14 +116,14 @@ const Save3=(()=>{
   }).finally(()=>{if(pending===operation)pending=null;});
   pending=operation;return operation;
  }
- async function load(saveId,{preserve=true}={}){if(dirty&&preserve)await flush();const r=await get(String(saveId).trim().toUpperCase());if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await put(r);dirty=false;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;await flush();}render();saveFeedback('Loaded '+r.name+' · '+r.id);return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
- async function create(name='My Stable'){if(dirty)await flush();let meta;do{meta={id:id(),name,stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}while(await get(meta.id));app.saveIdentity=meta;dirty=true;await flush();return meta;}
+ async function load(saveId,{preserve=true}={}){if((dirty||pending)&&preserve)await flush();const r=await get(String(saveId).trim().toUpperCase());if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await put(r);dirty=false;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;await flush();}render();saveFeedback('Loaded '+r.name+' · '+r.id);return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
+ async function create(name='My Stable'){if(dirty||pending)await flush();let meta;do{meta={id:id(),name,stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}while(await get(meta.id));app.saveIdentity=meta;dirty=true;await flush();return meta;}
  function exportFile(){cleanTransferFields();identity();return JSON.stringify({format:'oxer-to-oxer',version:3,exportedAt:new Date().toISOString(),state:JSON.parse(serializeAppState())});}
- async function importFile(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer'||file.version&&![1,3].includes(file.version))throw Error('Unsupported save file.');const data=validate(file.state||file);if(dirty)await flush();const before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity=data.saveIdentity||null;identity();dirty=true;await flush();render();return app.saveIdentity.id;}catch(error){hydrateFromSave(JSON.parse(before));dirty=false;throw error;}}
+ async function importFile(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer'||file.version&&![1,3].includes(file.version))throw Error('Unsupported save file.');const data=validate(file.state||file);if(dirty||pending)await flush();const before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity=data.saveIdentity||null;identity();dirty=true;await flush();render();return app.saveIdentity.id;}catch(error){hydrateFromSave(JSON.parse(before));dirty=false;throw error;}}
  async function portableCode(){const text=exportFile(),raw=new TextEncoder().encode(text);let data=raw,mode='RAW';if(typeof CompressionStream!=='undefined'){data=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());mode='GZ';}const chunks=[];for(let i=0;i<data.length;i+=8192)chunks.push(String.fromCharCode(...data.subarray(i,i+8192)));return 'OXER3.'+mode+'.'+HorseHealth.hash(text).toString(16)+'.'+btoa(chunks.join('')).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');}
  async function importCode(code){const parts=String(code).trim().split('.');if(parts.length!==4||parts[0]!=='OXER3'||!['RAW','GZ'].includes(parts[1]))throw Error('Paste the full Portable Save Code, not the short local Save ID.');if(parts[3].length>100000000)throw Error('Portable code is too large. Use Import Save File instead.');let encoded=parts[3].replaceAll('-','+').replaceAll('_','/');encoded+='='.repeat((4-encoded.length%4)%4);let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(parts[1]==='GZ'){if(typeof DecompressionStream==='undefined')throw Error('This browser cannot decompress the code. Use an exported JSON save file instead.');bytes=new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());}const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(HorseHealth.hash(text).toString(16)!==parts[2])throw Error('Portable Save Code is incomplete or damaged. Copy the complete code again.');return importFile(text);}
  async function start(){try{const active=await get('__active__');if(active?.saveId)await load(active.saveId,{preserve:false});else{SAVE3_LEGACY_LOAD(false);if(typeof singleSaveLoadBlocked!=='undefined'&&singleSaveLoadBlocked)throw Error('The existing legacy save could not be restored. Export/recover it before starting a new stable.');identity();dirty=true;await flush();}ready=true;}catch(error){lastError=error;saveFeedback('Local save database unavailable: '+error.message+'. Existing saves have not been deleted.',true);}finally{document.querySelector('[data-save3-loading]')?.remove();}}
- return {supported,identity,get,list,load,create,flush,enqueue,exportFile,importFile,portableCode,importCode,validate,start,get dirty(){return dirty;},get ready(){return ready;},get error(){return lastError;}};
+ return {supported,identity,get,list,load,create,flush,enqueue,exportFile,importFile,portableCode,importCode,validate,start,get dirty(){return dirty||Boolean(pending);},get ready(){return ready;},get error(){return lastError;}};
 })();
 const SAVE3_HYDRATE=hydrateFromSave;
 hydrateFromSave=function(data){const r=SAVE3_HYDRATE(data);app.saveIdentity=data.saveIdentity?HorseHealth.copy(data.saveIdentity):null;return r;};
