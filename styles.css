@@ -419,3 +419,9 @@ details[open] > summary { margin-bottom:.8rem; }
 .career-result-line { padding: .65rem 0; border-bottom: 1px solid var(--shop-line, #294644); }
 .career-result-line p { margin: .3rem 0; }
 .career-point-breakdown { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; margin: .45rem 0; padding-inline-start: 1.1rem; }
+
+.time-skip-dialog { max-width: 28rem; border: 1px solid #b8b19e; border-radius: 12px; padding: 1.5rem; }
+.time-skip-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.time-skip-spinner { width: 1.5rem; height: 1.5rem; border: 3px solid #ded9ce; border-top-color: #42664a; border-radius: 50%; animation: time-skip-spin .8s linear infinite; }
+@keyframes time-skip-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .time-skip-spinner { animation: none; } }

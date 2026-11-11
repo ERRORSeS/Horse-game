@@ -19,6 +19,7 @@
     "test:auction-variety": "node tests/auction-variety86.test.cjs",
     "test:riders-travel": "node tests/riders-travel86.test.cjs",
     "test:month-performance": "node tests/month-performance.test.cjs && node tests/auction-cap87.test.cjs",
-    "benchmark:month-skip": "node tests/month-skip-benchmark.cjs"
+    "benchmark:month-skip": "node tests/month-skip-benchmark.cjs",
+    "test:responsive-time-browser": "node tests/responsive-time-browser.cjs"
   }
 }
