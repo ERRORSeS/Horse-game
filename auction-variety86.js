@@ -1,5 +1,16 @@
 /* Expanded catalogs use the existing bidding, contract and transport engine. */
 const AUCTION86_KINDS=['Sport Horse','Developing','Green Horse','Foal','Breeding','Warmblood','Pony','Exotic'];
+// Three catalogs per cycle; rotate through the complete theme list over time.
+function auctionCycleKinds87(cycle=auctionState().catalogCycle||0){return Array.from({length:3},(_,i)=>AUCTION86_KINDS[(cycle*3+i)%AUCTION86_KINDS.length]);}
+function auctionLimitCatalogs87(s){if(s.collections.length<=3)return;
+ const ranked=[...s.collections].sort((a,b)=>Number(b.lots.some(l=>l.leader==='player'))-Number(a.lots.some(l=>l.leader==='player'))),keep=new Set(ranked.slice(0,3).map(c=>c.id));
+ s.deferredCollections87 ||= [];for(const c of s.collections.filter(c=>!keep.has(c.id))){if(c.status==='Closed'){s.history.push({id:c.id,name:c.name,country:c.country,closeAt:c.closeAt,lots:c.lots.map(l=>({id:l.id,number:l.number,name:l.horse.name,bid:l.bid,status:l.status}))});}else s.deferredCollections87.push(c);}
+ s.collections=s.collections.filter(c=>keep.has(c.id));if(!keep.has(s.selectedCollection))s.selectedCollection=s.collections[0]?.id;
+}
+function auctionDeferred87(s,at){const c=s.deferredCollections87?.shift();if(!c)return null;const shift=at-c.previewAt;c.previewAt=at;c.openAt+=shift;c.closeAt+=shift;c.status='Preview';
+ for(const lot of c.lots){lot.openAt+=shift;lot.closeAt+=shift;if(['Preview','Open'].includes(lot.status))lot.status='Preview';for(const event of lot.schedule)event.at+=shift;}
+ s.collections.push(c);if(!s.collection)s.collection=c;s.nextAt=at+720;return c;
+}
 const AUCTION86_STAGES=['Schoolmaster','Developing','Green','Foal','Breeding'];
 const AUCTION86_LEVELS={jumping:{low:['0.70','0.80','0.90','1.00'],medium:['1.10','1.20','1.30'],high:['1.40','1.50','1.60','1.70','1.80']},dressage:{low:['Introductory','Training','Level One'],medium:['Level Three','Level Four','Prix St Georges'],high:['Intermediate','Grand Prix']},eventing:{low:['Starter','Pre-Entry','Entry'],medium:['Pre-Training','Training','Preliminary'],high:['Intermediate','Advanced','Four Star']},hunter:{low:['Poles and Crosspoles','Novice','Pre-Green'],medium:['Green','Low','Medium'],high:['Modified','Regular','Working','Open']}};
 function auction86Group(breed){return /pony|welsh|connemara|haflinger|fjord/i.test(breed)?'Pony':/warmblood|baden|hessen|gelderlander|zweibrucker|hanoverian|holstein|oldenburg|trakehner|westphal|rhineland|selle|belgian sport|irish sport|zangersheide|kwpn/i.test(breed)?'Warmblood':/arabian|thoroughbred|friesian|andalusian|lusitano|iberian|lipizzan|draft|draught|shire|clydesdale|percheron|belgian|suffolk|arden|brabant|boulonnais|comtois/i.test(breed)?'Exotic':'Other';}
@@ -36,7 +47,7 @@ function auction86Rivals(event,owner){const world=careerState();let cache=AUCTIO
  for(let i=0;i<pool.length&&field.length<7;i++){const pair=pool[(offset+i)%pool.length],r=pair.rider;if(r.id===owner.id||careerBusy(r.recentStarts||[],event))continue;const horse=npc85ChooseHorse(r,r.horses.filter(h=>!careerEligibility(event,r,h,{npc:true,history:[]})),event);if(horse)field.push({rider:r,horse,score:(r.skill+npc85HorseSkill(horse,event.discipline))/2});}return field;
 }
 function auction86History(h,lot,collection){
- if(lot.lifeStage==='Foal')return;const count=lot.lifeStage==='Green'?(h.age===3?0:Math.floor(auctionRoll(lot.id+':starts')*3)):lot.lifeStage==='Developing'?3+Math.floor(auctionRoll(lot.id+':starts')*5):8+Math.floor(auctionRoll(lot.id+':starts')*9),rider=auction86Seller(collection,lot.discipline);h.owner=rider.name;h.ownerId=rider.id;npc85Initialize(rider,h);rider.horses.push(h);npc85Registry(true);lot.seller=rider.name;h.showResults=[];h.competitionResults=[];h.competitionEarnings=0;
+ if(lot.lifeStage==='Foal')return;const count=lot.lifeStage==='Green'?(h.age===3?0:Math.floor(auctionRoll(lot.id+':starts')*3)):lot.lifeStage==='Developing'?3+Math.floor(auctionRoll(lot.id+':starts')*5):8+Math.floor(auctionRoll(lot.id+':starts')*9),rider=auction86Seller(collection,lot.discipline);h.owner=rider.name;h.ownerId=rider.id;npc85Initialize(rider,h);rider.horses.push(h);npc85Registry().horses.set(h.id,h);lot.seller=rider.name;h.showResults=[];h.competitionResults=[];h.competitionEarnings=0;
  for(let i=0;i<count;i++){
   let at=collection.previewAt-(count-i)*72-lot.number*24;const event={...careerEvent({id:lot.id+':prior-start:'+i,name:'Seller Competition · '+auctionDisciplineName(lot.discipline),discipline:lot.discipline,level:lot.current,division:'senior',tier:3,official:true,ranking:'none',base:0,minField:8,cutoff:24,month:pastureDate(at).month,day:pastureDate(at).day,country:rider.country},pastureDate(at).year),at,prizeMoney:lot.lifeStage==='Breeding'?3000:1200};
   if(event.phaseSchedule)event.phaseSchedule={dressage:at,'cross-country':at+4,showjumping:at+6};
@@ -53,7 +64,8 @@ function auction86History(h,lot,collection){
  h.auctionListed86=true;lot.recordedStarts=h.showResults.length;auctionLimitTraining(h);
 }
 auctionGenerate=function(at,slot=0,kind='Sport Horse',tier=slot%2?'Elite':'Normal'){
- const s=auctionState(),id='collection:'+ ++s.sequence,breedGroup=['Warmblood','Pony','Exotic'].includes(kind)?kind:null,stage=breedGroup?AUCTION86_STAGES[Math.floor(auctionRoll(id+':stage')*5)]:({ 'Sport Horse':'Schoolmaster','Green Horse':'Green',Foal:'Foal',Developing:'Developing',Breeding:'Breeding'}[kind]||'Schoolmaster'),discipline=auctionRoll(id+':mixed')<.45?null:DISCIPLINES[Math.floor(auctionRoll(id+':discipline')*4)],country=AUCTION_COUNTRIES[Math.floor(auctionRoll(id+'country')*AUCTION_COUNTRIES.length)][0],size=kind==='Sport Horse'?28+Math.floor(auctionRoll(id+'size')*8):8+Math.floor(auctionRoll(id+'size')*5),theme=(breedGroup?breedGroup+' · ':'')+(stage==='Breeding'?'Broodmares & Studs':stage==='Foal'?'Foals & Youngstock':stage+' Horses')+' · '+(discipline?auctionDisciplineName(discipline):'Mixed Disciplines'),c={id,kind,lifeStage:stage,breedGroup,discipline,theme,country,tier,name:tier+' · '+theme,previewAt:at,openAt:at+72,closeAt:at+192+slot*6,status:'Preview',lots:[],varietyVersion86:1};
+ const state=auctionState();if(state.collections.length>=3)return null;const deferred=auctionDeferred87(state,at);if(deferred)return deferred;
+ const s=state,id='collection:'+ ++s.sequence,breedGroup=['Warmblood','Pony','Exotic'].includes(kind)?kind:null,stage=breedGroup?AUCTION86_STAGES[Math.floor(auctionRoll(id+':stage')*5)]:({ 'Sport Horse':'Schoolmaster','Green Horse':'Green',Foal:'Foal',Developing:'Developing',Breeding:'Breeding'}[kind]||'Schoolmaster'),discipline=auctionRoll(id+':mixed')<.45?null:DISCIPLINES[Math.floor(auctionRoll(id+':discipline')*4)],country=AUCTION_COUNTRIES[Math.floor(auctionRoll(id+'country')*AUCTION_COUNTRIES.length)][0],size=kind==='Sport Horse'?28+Math.floor(auctionRoll(id+'size')*8):8+Math.floor(auctionRoll(id+'size')*5),theme=(breedGroup?breedGroup+' · ':'')+(stage==='Breeding'?'Broodmares & Studs':stage==='Foal'?'Foals & Youngstock':stage+' Horses')+' · '+(discipline?auctionDisciplineName(discipline):'Mixed Disciplines'),c={id,kind,lifeStage:stage,breedGroup,discipline,theme,country,tier,name:tier+' · '+theme,previewAt:at,openAt:at+72,closeAt:at+192+slot*6,status:'Preview',lots:[],varietyVersion86:1};
  const mixedOrder=[...DISCIPLINES].sort((a,b)=>auctionRoll(id+':order:'+a)-auctionRoll(id+':order:'+b));auction86GenerationHour=at;
  for(let n=1;n<=size;n++){
   const key=id+':lot:'+n,d=discipline||(n<=4?mixedOrder[n-1]:DISCIPLINES[Math.floor(auctionRoll(key+':discipline')*4)]),range={Schoolmaster:[8,19],Developing:[6,9],Green:[3,5],Foal:[0,3],Breeding:[10,20]}[stage],age=range[0]+Math.floor(auctionRoll(key+':age')*(range[1]-range[0]+1)),h=auction86Horse(key,age,breedGroup,stage,d);
@@ -66,12 +78,12 @@ auctionGenerate=function(at,slot=0,kind='Sport Horse',tier=slot%2?'Elite':'Norma
  }
  s.collections.push(c);if(!s.collection)s.collection=c;s.nextAt=at+720;return c;
 };
-// Existing catalogs and bids are retained. New cycles use eight collections every game month.
+// Existing catalogs and bids are retained. New cycles show three collections, rotating through all eight themes.
 const AUCTION86_ADVANCE=auctionAdvance;
-auctionAdvance=function(target){const s=auctionState();if(s.processing)return;if(s.collections.length&&s.nextAt>s.collections[0].previewAt+720)s.nextAt=Math.max(...s.collections.map(c=>c.closeAt),s.collections[0].previewAt+720);
+auctionAdvance=function(target){const s=auctionState();if(s.processing)return;auctionLimitCatalogs87(s);if(s.collections.length&&s.nextAt>s.collections[0].previewAt+720)s.nextAt=Math.max(...s.collections.map(c=>c.closeAt),s.collections[0].previewAt+720);
  // Let the established clock process bids and transport, then fill the cycle with additional collections.
  const result=AUCTION86_ADVANCE(target);const current=s.collections;
- if(current.length&&current.some(c=>c.varietyVersion86===1))for(const kind of AUCTION86_KINDS)if(!current.some(c=>c.kind===kind))auctionGenerate(current[0].previewAt,current.length,kind,auctionRoll(current[0].id+':tier:'+kind)<.5?'Normal':'Elite');
+ if(current.length&&current.some(c=>c.varietyVersion86===1))for(const kind of auctionCycleKinds87(Math.max(0,(s.catalogCycle||1)-1)))if(!current.some(c=>c.kind===kind))auctionGenerate(current[0].previewAt,current.length,kind,auctionRoll(current[0].id+':tier:'+kind)<.5?'Normal':'Elite');
  return result;
 };
 const AUCTION86_UPGRADE=auctionUpgradeSchooling;
@@ -82,16 +94,17 @@ const AUCTION86_CONTRACT=auctionContract;
 auctionContract=function(id,action,...args){const prior=auctionState().contracts.find(c=>c.id===id),wasDelivered=prior?.delivered,result=AUCTION86_CONTRACT(id,action,...args);if(prior?.delivered&&!wasDelivered){prior.horse.auctionListed86=false;(prior.horse.ownershipHistory ||= []).push({day:csDay(),from:prior.seller,to:'Your Stable',transactionId:prior.id,price:prior.bid});npc85PlayerTransfer(app,{direction:'buy'},null,prior.horse,csDay());}return result;};
 const AUCTION86_CLOSE=auctionClose;
 auctionClose=function(collection){const wasClosed=collection.status==='Closed',result=AUCTION86_CLOSE(collection);if(wasClosed||collection.status!=='Closed')return result;
+ const registry=npc85Registry();
  for(const lot of collection.lots){if(!collection.varietyVersion86)continue;const h=lot.horse;if(lot.status==='Won')continue;h.auctionListed86=false;
-  if(lot.status==='Lost'){const rider=npc85Registry().riders.get(h.ownerId);if(rider){rider.resources85+=lot.bid;rider.horses=rider.horses.filter(row=>row.id!==h.id);npc85Remember(rider,h,Math.floor(collection.closeAt/24),'Sold at auction');}if(h.assignedRiderId)(h.formerRiderIds ||= []).push(h.assignedRiderId);(h.ownershipHistory ||= []).push({day:Math.floor(collection.closeAt/24),from:h.owner,to:lot.leader,price:lot.bid,auctionLotId:lot.id});h.owner='Auction buyer '+lot.leader;h.ownerId='auction-buyer:'+lot.id+':'+lot.leader;h.assignedRiderId=null;}
-  if((h.showResults||[]).length&&!npc85Registry().riders.get(h.ownerId)?.horses.some(row=>row.id===h.id))npc85State().npcArchive85[h.id]=h;
+  if(lot.status==='Lost'){const rider=registry.riders.get(h.ownerId);if(rider){rider.resources85+=lot.bid;rider.horses=rider.horses.filter(row=>row.id!==h.id);npc85Remember(rider,h,Math.floor(collection.closeAt/24),'Sold at auction');}if(h.assignedRiderId)(h.formerRiderIds ||= []).push(h.assignedRiderId);(h.ownershipHistory ||= []).push({day:Math.floor(collection.closeAt/24),from:h.owner,to:lot.leader,price:lot.bid,auctionLotId:lot.id});h.owner='Auction buyer '+lot.leader;h.ownerId='auction-buyer:'+lot.id+':'+lot.leader;h.assignedRiderId=null;}
+  if((h.showResults||[]).length&&!registry.riders.get(h.ownerId)?.horses.some(row=>row.id===h.id))npc85State().npcArchive85[h.id]=h;
  }npc85Registry(true);return result;
 };
 const AUCTION86_FUNDED_CONTRACT=auctionContract;
 auctionContract=function(id,action,...args){const c=auctionState().contracts.find(c=>c.id===id),wasPaid=c?.paid,result=AUCTION86_FUNDED_CONTRACT(id,action,...args);if(c?.paid&&!wasPaid&&!c.sellerPaid86){const rider=npc85Registry().riders.get(c.horse.ownerId);if(rider)rider.resources85+=c.bid;c.sellerPaid86=true;}return result;};
 // Auction lots hold the full record; seller rosters serialize references and recover by ID.
 const AUCTION86_SERIALIZE=serializeAppState;
-serializeAppState=function(...args){if(!app.auctions3?.collections?.length)return AUCTION86_SERIALIZE(...args);const current=new Set(auctionAllLots().map(l=>l.horseId)),restored=[];
+serializeAppState=function(...args){if(!app.auctions3?.collections?.length)return AUCTION86_SERIALIZE(...args);const current=new Set([...auctionAllLots(),...(app.auctions3.deferredCollections87||[]).flatMap(c=>c.lots)].map(l=>l.horseId)),restored=[];
  for(const rider of app.career?.npcs||[])if(rider.horses?.some(h=>current.has(h.id))){restored.push([rider,rider.horses]);rider.horses=rider.horses.map(h=>current.has(h.id)?{id:h.id}:h);}
  try{return AUCTION86_SERIALIZE(...args);}finally{for(const [rider,horses]of restored)rider.horses=horses;}
 };

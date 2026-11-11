@@ -7,7 +7,7 @@ function npc85Registry(force=false){
  index={size,roster,riders:new Map(roster.map(r=>[r.id,r])),horses:new Map()};
  const playerIds=new Set((app.horses||[]).map(h=>h.id));
  const add=h=>{if(!h?.id||!(h.skills||h.stats))return;const old=index.horses.get(h.id),latest=horse=>Math.max(horse.retiredAt85||-1,...(horse.ownershipHistory||[]).map(row=>row.day??-1));if(!old||!playerIds.has(h.id)&&latest(h)>latest(old))index.horses.set(h.id,h);};
- for(const h of app.horses||[])add(h);for(const pool of [app.saleBarn,app.npcSales,app.rescueHorses,app.rescueBarn,app.npcStuds])for(const h of pool||[])add(h);for(const c of app.auctions3?.contracts||[])add(c.horse);for(const c of app.auctions3?.collections||[])for(const lot of c.lots||[])add(lot.horse);for(const r of roster){for(const h of r.horses||[])add(h);for(const h of r.retiredHorses||[])add(h);}for(const h of Object.values(w.npcArchive85))add(h);for(const l of app.sales2?.listings||[])add(l.horse);
+ for(const h of app.horses||[])add(h);for(const pool of [app.saleBarn,app.npcSales,app.rescueHorses,app.rescueBarn,app.npcStuds])for(const h of pool||[])add(h);for(const c of app.auctions3?.contracts||[])add(c.horse);for(const c of [...(app.auctions3?.collections||[]),...(app.auctions3?.deferredCollections87||[])])for(const lot of c.lots||[])add(lot.horse);for(const r of roster){for(const h of r.horses||[])add(h);for(const h of r.retiredHorses||[])add(h);}for(const h of Object.values(w.npcArchive85))add(h);for(const l of app.sales2?.listings||[])add(l.horse);
  NPC85_INDEX.set(w,index);return index;
 }
 function npc85Nationality(rider){return rider?.country||'GBR';}

@@ -3,7 +3,15 @@
   'use strict';
   const copy = value => JSON.parse(JSON.stringify(value));
   const bounded = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
-  function hash(text) { let n = 2166136261; for (const c of String(text)) n = Math.imul(n ^ c.charCodeAt(0), 16777619); return n >>> 0; }
+  function hash(text) {
+    const value=String(text);let n=2166136261;
+    for(let i=0;i<value.length;i++){
+      const code=value.charCodeAt(i);n=Math.imul(n^code,16777619);
+      // Match string iteration: supplementary characters contribute their high surrogate once.
+      if(code>=0xD800&&code<=0xDBFF&&i+1<value.length){const next=value.charCodeAt(i+1);if(next>=0xDC00&&next<=0xDFFF)i++;}
+    }
+    return n>>>0;
+  }
   // Independent, reproducible opportunities. Opening a menu cannot advance this stream.
   const roll = (seed, key) => { let n = hash(`${seed}|${key}`); n ^= n << 13; n ^= n >>> 17; n ^= n << 5; return (n >>> 0) / 4294967296; };
   function weighted(rows, value) { const total = rows.reduce((n, r) => n + r.weight, 0); let cursor = value * total; return rows.find(r => (cursor -= r.weight) < 0) || rows.at(-1); }
