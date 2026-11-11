@@ -51,8 +51,13 @@ function careerResultIndex(meets){
 function careerActive() {
   return Boolean(app.riderRealism?.enabled && app.career?.settings.progression);
 }
+// Stable IDs recur in field sorting, ability generation and scoring. Keep only a bounded
+// cache of their pure hashes; random draws still use the same seed and key.
+const CAREER_SEED_CACHE=new Map();
 function careerRoll(id, key) {
-  return HorseHealth.roll(HorseHealth.hash(id), key);
+  const text=String(id);let seed=CAREER_SEED_CACHE.get(text);
+  if(seed===undefined){seed=HorseHealth.hash(text);if(CAREER_SEED_CACHE.size>=16384)CAREER_SEED_CACHE.clear();CAREER_SEED_CACHE.set(text,seed);}
+  return HorseHealth.roll(seed, key);
 }
 function careerPick(id, key, values) {
   return values[Math.floor(careerRoll(id, key) * values.length)];

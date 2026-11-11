@@ -42,7 +42,7 @@ function normalizeCompetitionRpgSession(session) {
 
 function showClockLabel(hour){const minutes=Math.max(0,Math.round(Number(hour)*60)),wholeHour=Math.floor(minutes/60),minute=minutes%60;return pastureDateLabel(wholeHour).replace(/\d{2}:00$/,String(wholeHour%24).padStart(2,'0')+':'+String(minute).padStart(2,'0'));}
 /* Persistent show workflow. Scene, competitor and calendar clocks are independent. */
-function showRoll(show,key){return HorseHealth.roll(HorseHealth.hash(show.id),key);}
+function showRoll(show,key){return typeof careerRoll==='function'?careerRoll(show.id,key):HorseHealth.roll(HorseHealth.hash(show.id),key);}
 function showWeighted(show,key,weights){const r=showRoll(show,key)*weights.reduce((a,b)=>a+b,0);let n=0;return weights.findIndex(w=>(n+=w)>r);}
 function showNote(show,text){
   const templates={planning:['Travel-planning narrative',2],journey:['Journey quotes',0],'arrival-queue':['Journey quotes',18],'check-in':['Arrival narrative',2],'stall-allocation':['Arrival narrative',3],unloading:['Arrival narrative',4],'stable-walk':['Arrival narrative',9],'stall-inspection':['Arrival narrative',15],settling:['Settling narrative',0],results:show.discipline==='dressage'?['Dressage result quotes',6]:show.discipline==='hunter'?['Hunter result quotes',5]:['Live result narrative',1],final:['Live result narrative',17],return:['Return-home quotes',0]};

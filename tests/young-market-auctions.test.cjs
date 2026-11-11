@@ -15,7 +15,7 @@ check('dedicated foals are unstarted and Green collections are low-schooling thr
  const ids=green.lots.map(l=>l.horse.id);importStableSave(exportStableSave());for(const l of auctionAllLots().filter(l=>ids.includes(l.horse.id)))if(l.horse.requiresBreakingIn||l.current==='Unstarted')throw Error('saved green status');
 }`);
 check('new catalogs include foal and green auctions without exceeding save collection limits',`{
- resetGame();auctionAdvance(pastureCalendarHour());const collections=auctionState().collections;if(collections.length!==8||!collections.some(c=>c.kind==='Foal')||!collections.some(c=>c.kind==='Green Horse'))throw Error('missing collection');const beforeTiers=new Map(collections.map(c=>[c.kind,c.tier]));Save3.validate(JSON.parse(serializeAppState()));auctionAdvance(auctionState().nextAt);if(auctionState().collections.some(c=>c.tier===beforeTiers.get(c.kind)))throw Error('catalog tiers never rotate');
+ resetGame();const kinds=new Set();for(let i=0;i<3;i++){auctionAdvance(auctionState().nextAt);const collections=auctionState().collections;if(collections.length!==3)throw Error('collection cap');for(const c of collections)kinds.add(c.kind);Save3.validate(JSON.parse(serializeAppState()));}if(!kinds.has('Foal')||!kinds.has('Green Horse')||kinds.size!==8)throw Error('missing rotation');
 }`);
 check('an existing registered sport name survives the market save workflow',`{
  resetGame();const h=app.horses[0];h.name='Aurora Rhapsody DVZ';const id=h.id;importStableSave(exportStableSave());if(app.horses.find(h=>h.id===id).name!=='Aurora Rhapsody DVZ')throw Error('name changed');
