@@ -1,0 +1,353 @@
+{
+  "styles": [
+    {
+      "style": "Conservative",
+      "rounds": 500,
+      "cleanRounds": 290,
+      "cleanMean": 58.119929523272916,
+      "cleanMedian": 58.12020553718979,
+      "completedMean": 59.2236451754469,
+      "technicalErrorRate": 0.039909067946451125,
+      "refusalRate": 0.028037383177570093,
+      "energyPerEffort": 0.8747663551402445,
+      "eliminations": 17,
+      "loggedEfforts": 3959
+    },
+    {
+      "style": "Balanced",
+      "rounds": 500,
+      "cleanRounds": 269,
+      "cleanMean": 55.35207628106385,
+      "cleanMedian": 55.349757799380264,
+      "completedMean": 56.47780857683298,
+      "technicalErrorRate": 0.04874968426370296,
+      "refusalRate": 0.028037383177570093,
+      "energyPerEffort": 0.9719626168224299,
+      "eliminations": 17,
+      "loggedEfforts": 3959
+    },
+    {
+      "style": "Competitive",
+      "rounds": 500,
+      "cleanRounds": 251,
+      "cleanMean": 53.139355890528705,
+      "cleanMedian": 53.137905687198675,
+      "completedMean": 54.26685358365616,
+      "technicalErrorRate": 0.05481182116696135,
+      "refusalRate": 0.028037383177570093,
+      "energyPerEffort": 1.069158878504624,
+      "eliminations": 17,
+      "loggedEfforts": 3959
+    },
+    {
+      "style": "Aggressive",
+      "rounds": 500,
+      "cleanRounds": 233,
+      "cleanMean": 52.03243799985136,
+      "cleanMedian": 52.030865985382036,
+      "completedMean": 53.172245652285135,
+      "technicalErrorRate": 0.06592573882293508,
+      "refusalRate": 0.028037383177570093,
+      "energyPerEffort": 1.1663551401868315,
+      "eliminations": 17,
+      "loggedEfforts": 3959
+    }
+  ],
+  "classes": {
+    "kids": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.30": 2,
+        "0.40": 3,
+        "0.50": 3,
+        "0.60": 6,
+        "0.70": 7,
+        "0.80": 5,
+        "0.90": 3,
+        "1.00": 3,
+        "1.05": 1
+      }
+    },
+    "prechildren": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.40": 4,
+        "0.50": 4,
+        "0.60": 4,
+        "0.70": 4,
+        "0.80": 5,
+        "0.90": 3,
+        "1.00": 3,
+        "1.05": 3,
+        "1.10": 3
+      }
+    },
+    "children": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.50": 4,
+        "0.60": 4,
+        "0.70": 4,
+        "0.80": 4,
+        "0.90": 5,
+        "1.00": 3,
+        "1.10": 3,
+        "1.20": 3,
+        "1.30": 3
+      }
+    },
+    "pony": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.50": 3,
+        "0.60": 3,
+        "0.70": 3,
+        "0.80": 7,
+        "0.90": 2,
+        "1.00": 7,
+        "1.10": 2,
+        "1.20": 2,
+        "1.30": 2,
+        "1.35": 2
+      }
+    },
+    "junior": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.70": 3,
+        "0.80": 3,
+        "0.90": 5,
+        "1.00": 6,
+        "1.10": 7,
+        "1.20": 8,
+        "1.30": 2,
+        "1.40": 2
+      }
+    },
+    "young": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.80": 4,
+        "0.90": 4,
+        "1.00": 4,
+        "1.10": 6,
+        "1.20": 4,
+        "1.30": 4,
+        "1.40": 4,
+        "1.50": 3
+      }
+    },
+    "u25": {
+      "ordinaryByMonth": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "jumpingByHeight": {
+        "0.90": 4,
+        "1.00": 4,
+        "1.10": 4,
+        "1.20": 6,
+        "1.30": 4,
+        "1.40": 4,
+        "1.50": 4,
+        "1.60": 3
+      }
+    },
+    "senior": {
+      "ordinaryByMonth": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "jumpingByHeight": {
+        "0.50": 4,
+        "0.60": 4,
+        "0.70": 5,
+        "0.80": 5,
+        "0.90": 4,
+        "1.00": 3,
+        "1.10": 4,
+        "1.20": 4,
+        "1.30": 3,
+        "1.40": 3,
+        "1.50": 3,
+        "1.60": 3
+      }
+    }
+  },
+  "browserBenchmark": {
+    "before": [
+      {
+        "advanceWeekMs": 994.6000000005588,
+        "rankingFirstMs": 2.7000000001862645,
+        "rankingCached100Ms": 0.2999999998137355,
+        "serializeMs": 282.20000000018626,
+        "saveBytes": 9622868,
+        "meets": 119,
+        "hydrateMs": 517.5999999996275
+      },
+      {
+        "advanceWeekMs": 910.1000000005588,
+        "rankingFirstMs": 6.2000000001862645,
+        "rankingCached100Ms": 0.40000000037252903,
+        "serializeMs": 246.09999999962747,
+        "saveBytes": 9622868,
+        "meets": 119,
+        "hydrateMs": 361
+      },
+      {
+        "advanceWeekMs": 1085.0999999996275,
+        "rankingFirstMs": 2.2999999998137355,
+        "rankingCached100Ms": 0.2999999998137355,
+        "serializeMs": 361.6000000005588,
+        "saveBytes": 9622868,
+        "meets": 119,
+        "hydrateMs": 505.70000000018626
+      }
+    ],
+    "after": [
+      {
+        "advanceWeekMs": 1310.3999999994412,
+        "rankingFirstMs": 93.5,
+        "rankingCached100Ms": 0.20000000018626451,
+        "serializeMs": 243.79999999981374,
+        "saveBytes": 13100923,
+        "meets": 120,
+        "hydrateMs": 596.5999999996275
+      },
+      {
+        "advanceWeekMs": 795.5,
+        "rankingFirstMs": 75.79999999981374,
+        "rankingCached100Ms": 0.5,
+        "serializeMs": 214.1000000005588,
+        "saveBytes": 13100923,
+        "meets": 120,
+        "hydrateMs": 492.69999999925494
+      },
+      {
+        "advanceWeekMs": 1028.7000000001863,
+        "rankingFirstMs": 105.3999999994412,
+        "rankingCached100Ms": 0.40000000037252903,
+        "serializeMs": 368.29999999981374,
+        "saveBytes": 13100923,
+        "meets": 120,
+        "hydrateMs": 731.9000000003725
+      }
+    ]
+  },
+  "riderLife": [
+    {
+      "startAge": 17,
+      "entered": 89,
+      "teamStarts": 3,
+      "games": true,
+      "checkpoint": true,
+      "meets": 1342
+    },
+    {
+      "startAge": 22,
+      "entered": 77,
+      "teamStarts": 7,
+      "games": true,
+      "checkpoint": true,
+      "meets": 1312
+    }
+  ]
+}

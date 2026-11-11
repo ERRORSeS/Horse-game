@@ -30,6 +30,7 @@ function careerPointCredits(meet,row) {
 function careerComputeBoards(hour) {
   const boards = {};
   const specialties=new Map((careerState().npcs||[]).map(r=>[r.id,r.specialty]));
+  const nationalities=new Map([...(careerState().npcs||[]).map(r=>[r.id,r.country]),...(app.riderRealism?.profiles||[]).map(r=>[r.id,r.career?.country])]);
   const year = pastureDate(hour).year;
   function add(discipline,{type,filter,id,name,country,points}) {
     if (!points) return;
@@ -42,7 +43,7 @@ function careerComputeBoards(hour) {
     if (meet.sandbox || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
     const seasonal = pastureDate(meet.hour).year === year;
     for (const row of meet.results.filter(row=>!specialties.has(row.riderId)||specialties.get(row.riderId)===meet.discipline)) for (const credit of careerPointCredits(meet,row)) {
-      if (!credit.seasonal || seasonal) add(meet.discipline,credit);
+      if (!credit.seasonal || seasonal){const country=nationalities.get(row.riderId)||credit.country;add(meet.discipline,{...credit,country,filter:credit.type==='national'?country:credit.type==='youth-national'?String(credit.filter).split('|')[0]+'|'+country:credit.filter});}
     }
     if (seasonal && meet.series) for (const row of meet.teams || []) {
       add(meet.discipline,{type:'team',filter:meet.series,id:row.country,

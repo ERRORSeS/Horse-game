@@ -1,51 +1,29 @@
 /* Weekly background circuits keep every selectable ranking category competitive.
-   Fields and results are deterministic, so unopened boards need no saved NPC pool. */
+   Every published circuit score comes from persistent riders, horses and completed meets. */
 function careerCircuitField(type,discipline,filter,hour){
- const year=pastureDate(hour).year,week=Math.floor(hour/CAREER_HOURS_PER_WEEK);
- const parts=String(filter||'').split('|'),countries=Object.keys(CAREER_COUNTRIES);
- const division=['division','youth-international','youth-national'].includes(type)?parts[0]:'senior';
- const ages=CAREER_AGE_DIVISIONS[division]?.ages||[18,55];
- const home=type==='national'?String(filter):type==='youth-national'?parts[1]:null;
- const firstNames=CAREER_FIRST_NAMES.filter((_,i)=>i%DISCIPLINES.length===DISCIPLINES.indexOf(discipline));
- const used=new Set(),field=[];
- for(let index=0;index<32;index++){
-  const id=['ranking-circuit',year,discipline,type,filter||'open',index].join(':');
-  const country=home||countries[index%countries.length];
-  let name=careerPick(id,'first',firstNames)+' '+careerPick(id,'last',CAREER_SURNAMES);
-  if(used.has(name))name+=' '+(index+1);used.add(name);
-  const age=ages[0]+Math.floor(careerRoll(id,'age')*(Math.min(ages[1],55)-ages[0]+1));
-  const horseName=careerPick(id,'horse-first',CAREER_SURNAMES)+' '+careerPick(id,'horse-last',CAREER_SURNAMES);
-  const skill=58+careerRoll(id,'skill')*38;
-  field.push({id:type==='team'?country:id,name:type==='team'?CAREER_COUNTRIES[country][0]:type==='horse'||type==='young-horse'?horseName:type==='combination'?name+' / '+horseName:name,
-   country,age,division,specialty:discipline,skill,horseAge:type==='young-horse'?Number(filter):8+index%8,
-   circuit:true,circuitResults:[],points:0,week});
- }
- const seasonal=!['world','horse','combination','division','youth-international','young-horse'].includes(type);
- // Four weekly rounds provide varied form and recurring rivals, with 24 scoring places per round.
- for(let round=0;round<4;round++){
-  const at=hour-round*CAREER_HOURS_PER_WEEK;if(at<0||seasonal&&pastureDate(at).year!==year)continue;
-  const standings=field.map(row=>({row,performance:row.skill+(careerRoll(row.id,'form:'+Math.floor(at/CAREER_HOURS_PER_WEEK))-.5)*42}))
-   .sort((a,b)=>b.performance-a.performance||a.row.id.localeCompare(b.row.id));
-  for(const [index,{row,performance}]of standings.entries()){
-   const placing=index+1,base=type==='world'?100:type==='national'||type==='youth-national'?20:40;
-   const points=placing<=24?Math.max(1,Math.round(base*(25-placing)/24)):0;
-   row.points+=points;row.circuitResults.push({at,placing,points,performance:Math.round(performance*10)/10});
+ const ids=npc85EnsureCircuit(type,discipline,filter,hour),world=careerState(),rows=new Map();
+ for(const id of ids){const meet=world.meets[id];if(!meet)continue;
+  const source=type==='team'?(meet.teams||[]).map(t=>({...t,riderId:t.country,riderName:CAREER_COUNTRIES[t.country][0],horseId:null,horseName:null})):meet.results;
+  for(const result of source){const credit=type==='team'?result:careerPointCredits(meet,result).find(c=>c.type===type&&String(c.filter)===String(filter));if(!credit?.points)continue;const points=credit.points;
+   const key=type==='team'?result.country:['horse','young-horse'].includes(type)?result.horseId:type==='combination'?result.riderId+'|'+result.horseId:result.riderId;
+   const rider=npc85Registry().riders.get(result.riderId);if(rider&&['division','youth-national','youth-international'].includes(type)&&!careerDivisions(rider,hour).includes(String(filter).split('|')[0]))continue;const name=type==='team'?result.riderName:['horse','young-horse'].includes(type)?result.horseName:type==='combination'?result.riderName+' / '+result.horseName:result.riderName;
+   if(!rows.has(key))rows.set(key,{id:key,riderId:result.riderId,horseId:result.horseId,name,country:rider?npc85Nationality(rider):result.country,age:rider?careerAge(rider,hour,true):null,division:meet.division,specialty:discipline,circuit:true,circuitResults:[],points:0});
+   const row=rows.get(key);row.points+=points;row.circuitResults.push({at:meet.hour,placing:result.placing,points,horseId:result.horseId,horseName:result.horseName});
   }
  }
- return field.filter(row=>row.points>0);
+ return [...rows.values()];
 }
 function careerRankingRows(type,discipline,filter='',hour=careerState().rankingHour??pastureCalendarHour(),force=false,priorRows){
- const world=careerState(),key=careerBoardKey(type,discipline,filter);
- world.rankingCircuits||={};
- if(!force&&world.rankingCircuits[key]===hour&&world.rankings[key]?.some(row=>row.circuit))return world.rankings[key];
- const prior=new Map((priorRows||world.rankings[key]||[]).map(row=>[row.id,row]));
- const earned=(world.rankings[key]||[]).filter(row=>!row.circuit);
- const earnedIds=new Set(earned.map(row=>row.id));
- const rows=[...earned,...careerCircuitField(type,discipline,filter,hour).filter(row=>!earnedIds.has(row.id))]
-  .sort((a,b)=>b.points-a.points||a.id.localeCompare(b.id))
-  .map((row,index)=>({...row,rank:index+1,previous:prior.get(row.id)?.rank??null,best:Math.min(prior.get(row.id)?.best??Infinity,index+1)}));
- world.rankings[key]=rows;world.rankingCircuits[key]=hour;world.rankingHour??=hour;
- return rows;
+ const world=careerState(),key=careerBoardKey(type,discipline,filter);world.rankingCircuits||={};
+ if(!force&&world.rankingCircuits[key]===hour&&world.rankings[key]?.some(row=>row.circuit&&row.horseId||type==='team'&&row.circuit))return world.rankings[key];
+ const old=priorRows||world.rankings[key]||[];
+ if(old.some(row=>row.circuit&&!row.horseId&&type!=='team')){world.legacyCircuitRankings85 ||= {};world.legacyCircuitRankings85[key] ||= {hour,rows:HorseHealth.copy(old)};world.legacyCircuitIdentities85 ||= {};for(const row of old.filter(r=>r.circuit))world.legacyCircuitIdentities85[row.id] ||= {...HorseHealth.copy(row),legacy85:true};}
+ const prior=new Map(old.map(row=>[row.id,row])),circuits=careerCircuitField(type,discipline,filter,hour),circuitById=new Map(circuits.map(row=>[row.id,row]));
+ const earned=careerComputeBoards(hour+1)[key]||[];
+ world.legacyEarnedRankings85 ||= {};if(!world.legacyEarnedRankings85[key]){const missing=old.filter(row=>!row.circuit&&!earned.some(r=>r.id===row.id)&&!careerResults({riderId:row.id,discipline}).length);world.legacyEarnedRankings85[key]={hour:world.rankingHour??hour,rows:HorseHealth.copy(missing)};}
+ const legacy=world.legacyEarnedRankings85[key];if(hour-legacy.hour<CAREER_HOURS_PER_YEAR&&(!['national','youth-national','tour','team'].includes(type)||pastureDate(legacy.hour).year===pastureDate(hour).year))for(const row of legacy.rows)if(!earned.some(r=>r.id===row.id))earned.push({...row,legacy85:true});earned.sort((a,b)=>b.points-a.points||a.id.localeCompare(b.id));
+ const rows=earned.map((row,index)=>({...row,...(circuitById.get(row.id)?{...circuitById.get(row.id),points:row.points}:{}),rank:index+1,previous:prior.get(row.id)?.rank??null,best:Math.min(prior.get(row.id)?.best??Infinity,index+1)}));
+ world.rankings[key]=rows;world.rankingCircuits[key]=hour;world.rankingHour??=hour;return rows;
 }
 const CIRCUIT_PUBLISH=careerPublish;
 careerPublish=function(hour,...args){
@@ -55,7 +33,7 @@ careerPublish=function(hour,...args){
  return result;
 };
 const CIRCUIT_DETAILS=careerLeaderboardDetails;
-careerLeaderboardDetails=function(row,...args){
- if(!row.circuit)return CIRCUIT_DETAILS(row,...args);
+careerLeaderboardDetails=function(row,type,...args){
+ if(!row.circuit||type==='team')return CIRCUIT_DETAILS(row,type,...args);
  return `<p>${row.age} years old · ${csEscape(CAREER_AGE_DIVISIONS[row.division]?.label||row.division)} · ${csEscape(CAREER_DISCIPLINE_LABELS[row.specialty])} specialist</p><p>Weekly circuit results</p>${row.circuitResults.map(result=>`<p>${csEscape(pastureDateLabel(result.at))} · #${result.placing} · ${result.points} points</p>`).join('')}`;
 };

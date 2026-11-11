@@ -242,8 +242,8 @@ careerEnter = function(event,horse) {
 };
 
 const FEDERATION_RECORD = careerRecordMeet;
-careerRecordMeet = function(event,standings,player=null) {
-  const previous=app.career?.meets[event.id], result=FEDERATION_RECORD(event,standings,player);
+careerRecordMeet = function(event,standings,player=null,...options) {
+  const previous=app.career?.meets[event.id], result=FEDERATION_RECORD(event,standings,player,...options);
   if (federationEnabled() && !previous && player) {
     const at=careerEventEnd(event);
     for (const plan of federationPlans(pastureDate(at).year,player.country)) {
