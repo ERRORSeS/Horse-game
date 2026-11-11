@@ -1,0 +1,214 @@
+{
+  "url": "http://localhost:8094",
+  "months": [
+    {
+      "month": 2,
+      "simulationMs": 3184.399999999907,
+      "meets": 595,
+      "profile": {
+        "HorseHealth.advance": {
+          "calls": 384,
+          "ms": 2.9999999995343387
+        },
+        "HorseSales.advanceMarket": {
+          "calls": 31,
+          "ms": 0.6000000000931323
+        },
+        "manager85Hour": {
+          "calls": 720,
+          "ms": 1267.199999999255
+        },
+        "simulatePastureHour": {
+          "calls": 720,
+          "ms": 1309.0999999996275
+        },
+        "manager85Care": {
+          "calls": 120,
+          "ms": 3.599999999627471
+        },
+        "t2start": {
+          "calls": 61,
+          "ms": 1171.000000001397
+        },
+        "careerNpcField": {
+          "calls": 150,
+          "ms": 794.7000000011176
+        },
+        "auctionAdvance": {
+          "calls": 1,
+          "ms": 811.4000000003725
+        },
+        "careerResolveNpcMeet": {
+          "calls": 125,
+          "ms": 660.9000000003725
+        },
+        "careerResultIndex": {
+          "calls": 25,
+          "ms": 23.90000000037253
+        },
+        "careerComputeBoards": {
+          "calls": 10,
+          "ms": 220.10000000009313
+        },
+        "careerPublish": {
+          "calls": 5,
+          "ms": 293.99999999953434
+        },
+        "federationAdvance": {
+          "calls": 1,
+          "ms": 8.100000000093132
+        },
+        "careerAdvance": {
+          "calls": 1,
+          "ms": 1008.5
+        },
+        "render": {
+          "calls": 1,
+          "ms": 2.2000000001862645
+        },
+        "serializeAppState": {
+          "calls": 1,
+          "ms": 431.59999999962747
+        }
+      }
+    },
+    {
+      "month": 3,
+      "simulationMs": 1642.8999999999069,
+      "meets": 772,
+      "profile": {
+        "manager85Hour": {
+          "calls": 720,
+          "ms": 886.8000000002794
+        },
+        "simulatePastureHour": {
+          "calls": 720,
+          "ms": 905.7999999998137
+        },
+        "manager85Care": {
+          "calls": 120,
+          "ms": 3.599999999627471
+        },
+        "t2start": {
+          "calls": 60,
+          "ms": 782.5000000023283
+        },
+        "HorseHealth.advance": {
+          "calls": 372,
+          "ms": 0.7999999993480742
+        },
+        "HorseSales.advanceMarket": {
+          "calls": 30,
+          "ms": 0
+        },
+        "careerNpcField": {
+          "calls": 52,
+          "ms": 237.1000000005588
+        },
+        "auctionAdvance": {
+          "calls": 1,
+          "ms": 287
+        },
+        "careerComputeBoards": {
+          "calls": 10,
+          "ms": 178.49999999906868
+        },
+        "careerPublish": {
+          "calls": 5,
+          "ms": 232.09999999962747
+        },
+        "careerResolveNpcMeet": {
+          "calls": 41,
+          "ms": 180.60000000009313
+        },
+        "federationAdvance": {
+          "calls": 1,
+          "ms": 0.2999999998137355
+        },
+        "careerAdvance": {
+          "calls": 1,
+          "ms": 434.10000000009313
+        },
+        "render": {
+          "calls": 1,
+          "ms": 3.1000000000931323
+        },
+        "serializeAppState": {
+          "calls": 1,
+          "ms": 228.6999999997206
+        }
+      }
+    },
+    {
+      "month": 4,
+      "simulationMs": 2546.100000000093,
+      "meets": 1298,
+      "profile": {
+        "manager85Hour": {
+          "calls": 720,
+          "ms": 1525.8999999989755
+        },
+        "simulatePastureHour": {
+          "calls": 720,
+          "ms": 1543.7999999998137
+        },
+        "manager85Care": {
+          "calls": 120,
+          "ms": 3.8000000002793968
+        },
+        "t2start": {
+          "calls": 119,
+          "ms": 1370.8999999980442
+        },
+        "HorseHealth.advance": {
+          "calls": 372,
+          "ms": 1.5000000004656613
+        },
+        "HorseSales.advanceMarket": {
+          "calls": 30,
+          "ms": 0.19999999972060323
+        },
+        "careerNpcField": {
+          "calls": 38,
+          "ms": 206.20000000158325
+        },
+        "auctionAdvance": {
+          "calls": 1,
+          "ms": 575.3000000002794
+        },
+        "careerResolveNpcMeet": {
+          "calls": 23,
+          "ms": 196.8000000002794
+        },
+        "careerComputeBoards": {
+          "calls": 8,
+          "ms": 152.39999999897555
+        },
+        "careerPublish": {
+          "calls": 4,
+          "ms": 190.79999999981374
+        },
+        "careerResultIndex": {
+          "calls": 4,
+          "ms": 10.5
+        },
+        "federationAdvance": {
+          "calls": 1,
+          "ms": 0.3000000002793968
+        },
+        "careerAdvance": {
+          "calls": 1,
+          "ms": 394.40000000037253
+        },
+        "render": {
+          "calls": 1,
+          "ms": 3
+        },
+        "serializeAppState": {
+          "calls": 1,
+          "ms": 767.2999999998137
+        }
+      }
+    }
+  ]
+}

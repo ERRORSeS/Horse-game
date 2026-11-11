@@ -1,0 +1,50 @@
+{
+  "url": "http://localhost:8094",
+  "measurements": [
+    {
+      "year": 1,
+      "payloadBytes": 14264049,
+      "saveError": null,
+      "horses": 4,
+      "meets": 818,
+      "npcs": 6670,
+      "simulationAndRenderMs": 1545.5,
+      "totalWithSaveMs": 2589.2999999998137,
+      "beats": 121,
+      "maxGap": 251.70000000018626,
+      "result": {
+        "ok": true,
+        "simulationMs": 1161.4000000003725,
+        "timings": {
+          "inputMs": 62.59999999962747,
+          "prepareMs": 101.90000000037253,
+          "returnMs": 207.7998046875,
+          "applyMs": 5.199951171875
+        }
+      }
+    },
+    {
+      "year": 1,
+      "payloadBytes": 14457369,
+      "saveError": null,
+      "horses": 30,
+      "meets": 818,
+      "npcs": 6670,
+      "simulationAndRenderMs": 1336.1000000005588,
+      "totalWithSaveMs": 2954.100000000559,
+      "beats": 132,
+      "maxGap": 414.40000000037253,
+      "result": {
+        "ok": true,
+        "simulationMs": 860.5,
+        "timings": {
+          "inputMs": 62.799999999813735,
+          "prepareMs": 91.50004882831126,
+          "returnMs": 311.599853515625,
+          "applyMs": 2.199951171875
+        }
+      }
+    }
+  ],
+  "pageErrors": []
+}

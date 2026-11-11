@@ -265,10 +265,10 @@ function federationMarkup82(rider,horses) {
   const previous=Object.values(state.seasons).filter(season=>season.country===rider.country).sort((a,b)=>b.year-a.year);
   return `<details class="shop-drawer" data-ui-key="show82-federation"${Object.values(state.applications).some(row=>row.riderId===rider.id&&row.status==='Trial Invited') ? ' open' : ''}><summary>National team applications</summary><div class="shop-drawer-body">
     <p class="shop-eyebrow">${csEscape(CAREER_COUNTRIES[rider.country][0])} · Federation selection office</p>
-    <p>Applications close on month 3, day 15. Trials run in month 5 and squad selection is announced in month 6.</p>
+    <p>Applications close on month 3, day 15. Configured trial rounds are shown below; the final squad decision follows the last round.</p>
     <p role="status" data-federation-status></p>
     <details${teamEntries.length ? ' open' : ''}><summary>Represent ${csEscape(CAREER_COUNTRIES[rider.country][0])} · Team competitions</summary>
-    ${teamEntries.length ? teamEntries.map(({event,horse})=>{const blocker=show82Blocker(event,rider,horse),registered=app.activeShow?.eventId===event.id;return `<article class="box"><strong>${csEscape(event.name)}</strong><p>${csEscape(pastureDateLabel(event.at))} · ${csEscape(horse.name)}</p>${registered ? '<button type="button" data-federation-open-trial>Open registered team show</button>' : `<button type="button" data-federation-team-enter="${event.id}"${blocker ? ' disabled' : ''}>Enter for ${csEscape(CAREER_COUNTRIES[rider.country][0])}</button>${blocker ? '<p>'+csEscape(blocker)+'</p>' : ''}`}</article>`;}).join('') : '<p>Upcoming team entries appear here after national or championship squad selection, within the 90-day booking window.</p>'}
+    ${teamEntries.length ? teamEntries.map(({event,horse})=>{const blocker=show82Blocker(event,rider,horse),registered=app.activeShow?.eventId===event.id;return `<article class="box"><strong>${csEscape(event.name)}</strong><p>${csEscape(pastureDateLabel(event.at))} · ${csEscape(horse.name)}</p>${registered ? '<button type="button" data-federation-open-trial>Open registered team show</button>' : `<button type="button" data-federation-team-enter="${event.id}"${blocker ? ' disabled' : ''}>Enter for ${csEscape(CAREER_COUNTRIES[rider.country][0])}</button>${event.allowSubstitutions?`<button type="button" data-federation-withdraw-nomination="${event.id}">Decline this nomination</button>`:''}${blocker ? '<p>'+csEscape(blocker)+'</p>' : ''}`}</article>`;}).join('') : '<p>Upcoming development, reserve and main team entries appear here after squad selection, within the 90-day booking window.</p>'}
     <p>Compete for show prizes and your country’s team ranking points. Games results can earn individual and team medals.</p></details>
     <div class="cards sales-listings">${plans.map(plan=>{
       const id=plan.id+':'+rider.id, row=state.applications[id], invitation=state.invitations[id],ageIssue=careerAge(rider,plan.trial.at,true)===null?'Set your rider age to apply.':!careerDivisions(rider,plan.trial.at).includes(plan.division)?'This division accepts competition-year ages '+CAREER_AGE_DIVISIONS[plan.division].ages.join('–')+'.':'';
@@ -279,8 +279,8 @@ function federationMarkup82(rider,horses) {
       ${invitation && !row && now<=invitation.expires ? `<p>${csEscape(invitation.type)} · Recent verified results</p>` : ''}
       ${row ? `<p>${csEscape(row.horseName)}${row.reason ? ' · '+csEscape(row.reason) : ''}</p>
         <details><summary>Application history</summary>${row.history.map(item=>`<p>${item.status} · ${csEscape(pastureDateLabel(item.hour))}</p>`).join('')}
-        ${row.selection ? `<p>Selection score ${row.selection.score.toFixed(1)}/100</p>` : ''}</details>
-        ${row.status==='Trial Invited' ? `<p>Selection trial · ${csEscape(pastureDateLabel(plan.trial.at))}</p>${registered ? '<p>Registered — attend through your active show.</p><button type="button" data-federation-open-trial>Open registered trial</button>' : `<button type="button" data-federation-register-trial="${plan.id}"${trialBlocker ? ' disabled' : ''}>Register for selection trial</button>${trialBlocker ? '<p>'+csEscape(trialBlocker)+'</p>' : ''}`}` : ''}
+        ${row.selection ? `<p>Selection score ${row.selection.scored===false?'Not scored':row.selection.score.toFixed(1)+'/100'}</p>` : ''}</details>
+        ${['Trial Invited','Trial Completed'].includes(row.status) ? plan.trials.map(trial=>{const recorded=careerState().meets[trial.id]?.results.find(r=>r.riderId===rider.id&&r.horseId===row.horseId),block=show82Blocker(trial,rider,calendarHorseById(row.horseId));return `<p>Selection trial ${trial.federationTrialRound} · ${csEscape(pastureDateLabel(trial.at))}${recorded?' · Recorded '+(recorded.placing?'#'+recorded.placing:recorded.status||'Eliminated'):row.declinedTrials90?.includes(trial.id)?' · Declined':''}</p>${recorded||row.declinedTrials90?.includes(trial.id)?'':app.activeShow?.eventId===trial.id?'<button type="button" data-federation-open-trial>Open registered trial</button>':`<button type="button" data-federation-register-trial="${plan.id}" data-federation-trial-id="${trial.id}"${block?' disabled':''}>Register for selection trial ${trial.federationTrialRound}</button><button type="button" data-federation-decline-trial="${plan.id}" data-federation-trial-id="${trial.id}">Decline this trial</button>${block?'<p>'+csEscape(block)+'</p>':''}`}`;}).join('') : ''}
         ${['Submitted','Under Review','Shortlisted','Trial Invited'].includes(row.status) ? `<button type="button" data-federation-withdraw="${id}">Withdraw application</button>` : ''}`
       : now<=plan.closes ? `<p>Requires a verified top-ten regional or higher result with this horse.</p>
         <label>Horse<select data-federation-mount>${careerOptions(horses.map(horse=>[horse.id,horse.name]),invitation?.horseId)}</select></label>
@@ -304,7 +304,7 @@ function show82BindFederation(panel,rider,horses) {
     saveGame(false);renderCalendar();panel.querySelector('[data-ui-key="show82-federation"]')?.setAttribute('open','');
   };
   for(const button of panel.querySelectorAll('[data-federation-register-trial]'))button.onclick=()=>{
-    const result=federationRegisterTrial(button.dataset.federationRegisterTrial,rider);
+    const result=federationRegisterTrial(button.dataset.federationRegisterTrial,rider,button.dataset.federationTrialId);
     if(!result.ok){panel.querySelector('[data-federation-status]').textContent=result.message;return;}
     saveGame(false);changeTab('shows');
   };

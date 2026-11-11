@@ -1,0 +1,244 @@
+=== core-regressions ===
+✔ ledger transfer retains unchanged records and includes nested repairs, additions and deletions (4.194933ms)
+✔ no-career games and unchanged ledgers transfer without invented history (0.450238ms)
+✔ inventory reads avoid repeated scans and resale stays correct after wear, repair and reload (25.733168ms)
+✔ automatic saves wait for quiet input and active skips, and cancellation prevents stale jobs (2.241523ms)
+✔ every canonical definition has complete metadata and normalized conditional outcomes (3.154919ms)
+✔ baseline incidence and user-configured selection/residual/recurrence rates are preserved (1.202825ms)
+✔ daily supplies are required and consumed once; missing care is not credited as completed treatment (5.884921ms)
+✔ twelve daily advances equal continuous twelve-day advance including inventory and save/load (6.671846ms)
+✔ serious injuries require imaging, follow-up and medical clearance (2.719559ms)
+✔ one prepared medication package supports an authorized game course, never a free unrelated cure (3.266029ms)
+✔ observations reveal symptoms, respect distance, phase and stable-finding deduplication (1.362654ms)
+✔ chronic diseases stabilize without a full biological cure or repeat outcome roll (1.849071ms)
+✔ weight-loss investigation still requires an underlying cause (2.448491ms)
+✔ surgery requires emergency and specialist assessments and never charges an invalid operation (3.051936ms)
+✔ critical colic produces both survival and death with one terminal outcome, preserved identity and history (41.018955ms)
+✔ unavailable surgery requires a specialist prognosis and cannot become a safe wait-to-heal branch (0.693728ms)
+✔ severe fractures and ruptures have different final tables and non-sport residual restrictions (0.317495ms)
+✔ healthy horses have no death roll and lost shoes have no second recurrence chance (1.095501ms)
+✔ existing prepared medicine packages migrate without losing their paid support or inventing medication (0.361944ms)
+✔ an expired unfilled prescription can be renewed through review of the existing care plan (0.476942ms)
+✔ an invalid external severity cannot turn a superficial scratch into a catastrophic injury (0.219592ms)
+✔ authorizing surgery without an existing plan starts paid care and actual next-day rehabilitation (1.439177ms)
+✔ only diagnosis-relevant operations are offered; critical colic cannot buy the cheaper ordinary surgery (0.585722ms)
+✔ hospital nursing is paid once across manual booking and the daily clock (0.6763ms)
+✔ professional dental care starts the plan and changes subsequent recovery rather than only charging money (0.475865ms)
+✔ wound service starts prescribed care, lists material requirements and does not invent supplies (0.616151ms)
+✔ fluid therapy and colic treatment start condition-specific care with visible findings (0.512953ms)
+✔ existing paid operations acquire the missing plan on load without repeating the operation or its payment (16.554011ms)
+✔ postoperative care cannot be changed to the surgery-unavailable branch (0.189672ms)
+✔ old impossible unavailable-surgery flags cannot kill a horse after a completed operation (0.38885ms)
+✔ an already-resolved invalid post-surgery terminal branch is corrected with its original record archived (0.349025ms)
+✔ a completed course awaiting follow-up does not offer another paid procedure or unnecessary medicine renewal (0.224293ms)
+✔ real compressed storage at quota consolidates atomically and resumes in a fresh runtime (1045.845965ms)
+✔ a quota failure preserves the previous raw record byte for byte across reload (649.550474ms)
+✔ a pre-care legacy stable can load at full capacity without requiring a duplicate backup (422.565069ms)
+✔ single Save UI has no slot picker, load/delete menu or duplicate-save controls (0.66903ms)
+✔ a corrupt compressed duplicate cannot block a valid legacy stable from loading or saving (1185.179507ms)
+✔ quota retry frees duplicate records while retaining a validated stable (2020.094931ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5967.881585
+
+
+=== old-selection ===
+PASS national trials require an invitation and a real placing for championship selection
+
+
+=== career-index ===
+PASS rider result lookup skips unrelated fields after warming its index and handles repaired ledgers
+PASS roster lookups are reused and refresh when new competitors arrive
+
+
+=== update85 ===
+PASS editor edits authoritative fields, applies potential overrides and preserves identity and negative behavior
+PASS actual result IDs recover missing current links without inventing horses, and missing history is flagged
+PASS multi-horse selection rotates actual partners and rejects retirement, health, age and simultaneous starts
+PASS NPC sales transfer one real horse, conserve money and retain history with idempotent payment
+PASS current sporting nationality agrees across boards while old result country stays historical
+PASS calendar keeps legacy IDs, offers all height ranges, and keeps ordinary monthly density balanced
+PASS manager independent switches, funded wages and actual farrier care are once-only
+PASS manager follows a confirmed care plan without diagnosing or free healing
+PASS manager trains through Quick handler, respects medical/workload and changes actual weak skills gradually
+PASS manager hour and multi-day skips process the same paid tasks and actual session timestamps
+PASS player delivery and save migration update NPC ownership references; expired unsold stock stays owned
+PASS multi-horse classes record separate legitimate starts and block competing distant bookings
+PASS automatic veterinarian checks are real paid visits and are not repeated the next day
+PASS manager respects an explicit horse booking at another barn
+PASS full NPC sale horses retain actual technical development after a completed start
+
+
+=== ranking-age ===
+PASS ranking schooling limits use horse age at competition across all disciplines
+PASS new open ranking riders have a range of ages and zero opening points
+
+
+=== month-regressions ===
+PASS indexed geography preserves every country, aliases and per-venue region overrides
+PASS distant historical bookings skip geography while continental conflict boundaries remain intact
+PASS bounded seed caching retains exact deterministic rolls and avoids repeated ID hashing
+PASS optimized hashing and show rolls preserve legacy seeds including Unicode and lone surrogates
+
+
+=== care-sales ===
+✔ migration preserves truth, known diagnoses, history, genetics and skill precision (3.636915ms)
+✔ healthy migration does not fabricate illness or expose hidden truth (0.593292ms)
+✔ observations remain contextual and a repeat menu cannot reroll (1.877428ms)
+✔ irrelevant diagnostics cannot reveal a hidden strain; relevant exams query existing truth (1.858071ms)
+✔ minor scratches resolve without a permanent penalty; significant conditions require reassessment (7.299804ms)
+✔ chronological processing is idempotent and skip-equivalent (1.735688ms)
+✔ baseline opportunities remain near 4% monthly; severity weights resolve separately (454.934342ms)
+✔ prescriptions validate horse, expiry, quantity and exact product; payments are once-only (1.059899ms)
+✔ supplies do not substitute for medicine or cure a condition (1.407821ms)
+✔ farrier prices, handling, due dates and skill preservation (1.175683ms)
+✔ vaccination policy and incomplete courses matter without total immunity (0.591139ms)
+✔ persistent listings keep seller identity and reserve across repeated inquiries (1.522438ms)
+✔ purchase requires accepted offer, reviewed contract, confirmed signatures, payment and delivery (1.60992ms)
+✔ cancel leaves balances, identity and historical records intact (1.041265ms)
+✔ player sale routes through the same transfer engine and retains the sold horse history (0.308913ms)
+✔ PPE never generates a condition and uses persistent medical truth (1.332003ms)
+✔ serialization preserves all new identities, conditions and transaction guards (0.326033ms)
+✔ lost shoes are persistent truth, cannot affect barefoot horses through baseline generation, and relevant service resolves them (0.445997ms)
+✔ routine hoof service does not cure an abscess or unrelated illness (0.264903ms)
+✔ contract cannot undercharge or duplicate optional equipment (0.690868ms)
+✔ seeded market lifetimes stay within one to ten months and paid transfers are reserved (3.809893ms)
+✔ higher-skilled horses tend to have shorter hidden sale lifetimes (26.266156ms)
+✔ delete and restore a conversation leave all transaction and economic factors intact (0.674955ms)
+✔ severity uses the approved 80:14:13:7 weights deterministically (44.545779ms)
+✔ seller loading, health and show replies vary persistently without fabricating diagnoses or results (3.426133ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 788.972893
+
+
+=== integration ===
+PASS startup with unchanged canonical horse and training data
+PASS legacy hydration needs no duplicate backup and financial state round-trips
+PASS old discipline progression and independent attributes retain fractional gains
+PASS every original skill and ridden exercise remains canonical
+PASS hidden truth projects no diagnosis or monthly timer cure
+PASS trial uses existing RPG for 50 minutes without ownership transfer or a fixed seller height cap
+PASS seeded rescue profiles and hidden fears vary and persist
+PASS crop/spur inventory and contextual safety preserve ordinary cues
+Integration checks passed
+PASS every listing has a stat-based discipline and a persistent bounded advertised level
+PASS seller tack varies, has real fit effects and persists without changing owned equipment
+PASS optional tack has explicit contract cost and transfers selected items only once
+PASS care dates use the canonical day/month/year calendar
+PASS visible injury markers exclude hidden conditions and resolved wounds
+PASS rescue placement windows persist for thirty to one hundred fifty days
+PASS actual hour/day advancement uses one medical clock and preserves consumed inventory on save/load
+PASS an unowned emergency never blocks the player clock
+PASS month skip and thirty chronological day skips consume the same prescribed care
+PASS authorizing a veterinary operation starts real scheduled care through the game clock
+PASS exam, treatment and farrier actions generate concrete player feedback
+PASS manual and automatic saving update the same single stable record
+PASS a named-only legacy stable loads without changing its source and consolidates after Save
+PASS the current session wins over an older named snapshot
+PASS failed storage writes preserve every existing save and the successful-save timestamp
+PASS a broken legacy list does not block saving a valid running stable
+PASS invalid saved data cannot silently seed and overwrite the old stable
+PASS quarterly boundaries update the same record without writing historical copies
+PASS save success requires confirmed storage readback
+PASS full storage can atomically replace a legacy copy before retiring duplicates
+PASS a failed fallback write never deletes the only legacy copy
+PASS a quarterly-only legacy stable remains recoverable without extra UI
+PASS pending offers, PPE, completed sales and acquired horses survive real saving and loading
+PASS undiagnosed sale horses retain ridden eligibility and repeated RPG work aggravates actual truth
+PASS ordinary renders update only the active panel and navigating redraws fresh content
+PASS saving serializes the complete stable only once while retaining readback verification
+
+
+=== competition-regression ===
+PASS trait fixture
+PASS trait Rushes Fences activates only in its eligible jump context
+PASS trait Cautious Jumper activates only in its eligible newExercise context
+PASS trait Bold Jumper activates only in its eligible jump context
+PASS trait Hesitates at Fillers activates only in its eligible hasFiller context
+PASS trait Water-Shy activates only in its eligible water context
+PASS trait Overjumps activates only in its eligible jump context
+PASS trait Careful Front End activates only in its eligible jump context
+PASS trait Trails Hind Legs activates only in its eligible jump context
+PASS trait Long Stride Tendency activates only in its eligible related context
+PASS trait Short Stride Tendency activates only in its eligible related context
+PASS trait Drifts Left to Fences activates only in its eligible jump context
+PASS trait Drifts Right to Fences activates only in its eligible jump context
+PASS trait Strong After Fences activates only in its eligible jump context
+PASS trait Careful but Slow activates only in its eligible jump context
+PASS trait Enjoys Jumping activates only in its eligible jump context
+PASS trait Strong on Left Rein activates only in its eligible left context
+PASS trait Strong on Right Rein activates only in its eligible right context
+PASS trait Weak Left Canter Lead activates only in its eligible leftCanter context
+PASS trait Weak Right Canter Lead activates only in its eligible rightCanter context
+PASS trait Anticipates Transitions activates only in its eligible transition context
+PASS trait Difficult Downward Transitions activates only in its eligible downward context
+PASS trait Naturally Straight activates only in its eligible flat context
+PASS trait Falls Inward on Circles activates only in its eligible circle context
+PASS trait Excellent Rhythm activates only in its eligible rhythmEligible context
+PASS trait Contact Sensitive activates only in its eligible inconsistentContact context
+PASS trait Quick Learner activates only in its eligible completed context
+PASS trait Slow Learner activates only in its eligible completed context
+PASS trait Dislikes Repetition activates only in its eligible fourth context
+PASS trait Patient Worker activates only in its eligible repeated context
+PASS trait Easily Distracted activates only in its eligible realDistraction context
+PASS trait Strong Work Ethic activates only in its eligible demanding context
+PASS trait Needs Encouragement activates only in its eligible encouraged context
+PASS trait Frustrates Easily activates only in its eligible failedAttempt context
+PASS trait Slow to Warm Up activates only in its eligible cold context
+PASS trait Quick to Settle activates only in its eligible disturbed context
+PASS trait Nervous in New Arenas activates only in its eligible newArrival context
+PASS trait Comfortable in New Arenas activates only in its eligible newArrival context
+PASS trait Distracted by Other Horses activates only in its eligible horses context
+PASS trait Enjoys Working Around Horses activates only in its eligible horses context
+PASS trait Wind Sensitive activates only in its eligible wind context
+PASS trait Traffic Nervous activates only in its eligible traffic context
+PASS trait Likes Open Spaces activates only in its eligible outdoor context
+PASS trait Prefers Enclosed Spaces activates only in its eligible indoor context
+PASS trait Nervous Around Arena Gates activates only in its eligible gate context
+PASS trait Enjoys Trail Work activates only in its eligible trail context
+PASS trait Difficult to Mount activates only in its eligible mount context
+PASS trait Stands Quietly activates only in its eligible standing context
+PASS trait Sensitive to Grooming activates only in its eligible groom context
+PASS trait Hoof-Handling Difficulties activates only in its eligible hoof context
+PASS trait Calm with Farrier activates only in its eligible farrier context
+PASS trait Nervous with Farrier activates only in its eligible farrier context
+PASS trait Sensitive to Clipping activates only in its eligible clip context
+PASS trait Equipment Cautious activates only in its eligible newEquipment context
+PASS trait Mouths Equipment activates only in its eligible equipment context
+PASS trait Very People-Oriented activates only in its eligible familiarHandler context
+EXAM 20 396/1000
+EXAM 50 684/1000
+EXAM 90 901/1000
+EXAM 0 0/1000
+PASS symptom sensitivity independently samples actual general examination findings
+PASS medical mood quantiles match conditional severity and clear after recovery
+PASS exactly five hours needs no night; longer trips require one
+PASS reservations, failed bookings and fixed international dates preserve funds
+PASS complete distant journey, per-night care and reload retain itinerary and venue familiarity
+PASS profiles vary independently and loading outcomes reflect individuality
+PASS all supplied narrative lines are preserved and substitutions resolve
+PASS zero-fence rounds cannot generate nonexistent rails
+PASS sensitivity amplifies actual tack discomfort within the three-point budget
+PASS veterinary trait handling is visible, timed and not replayed by repeated examination
+PASS illustrative Silver Storm Eclipse Nova Ruby ranking preserves original nonqualifiers
+PASS ranking never uses the player flag as an advantage
+PASS trip experience changes coping slowly and is applied only once
+PASS leave before warm-up releases a home entry and routes an arrived horse home without awards
+PASS ridability ignores age and expired estimates but respects young age and lifelong kissing spines
+PASS a refused fence can cause a rolled fall with a recorded incident cause
+
+
+=== auction-cap ===
+PASS three catalogs per cycle retain all eight rotating themes
+PASS legacy extra catalogs queue without losing bids, horses or save identities

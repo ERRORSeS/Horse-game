@@ -13,7 +13,7 @@ check('national trials require an invitation and a real placing for championship
   if(outcome!=='missed')w.meets[plan.trial.id]={id:plan.trial.id,hour:careerEventEnd(plan.trial),discipline:'jumping',tier:4,division:'junior',results:[{riderId:rider.id,horseId:h.id,placing:outcome==='completed'?1:null,score:outcome==='completed'?0:null,eliminated:outcome==='eliminated',country:'GBR'}]};
   federationReview(plan,plan.selection);
   const status=application.application.status;
-  if(outcome==='completed'&&status!=='Selected — Championship Team')throw Error('successful trial blocked');
+  if(outcome==='completed'&&status!=='Selected — National Squad')throw Error('successful trial blocked');
   if(outcome!=='completed'&&['Selected — Championship Team','Selected — National Squad'].includes(status))throw Error('missing/failed trial earned championship nomination');
   const before=JSON.stringify(federationState());federationReview(plan,plan.selection);if(JSON.stringify(federationState())!==before)throw Error('selection rerolled');
  }

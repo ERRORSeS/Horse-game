@@ -5,12 +5,15 @@ function runResponsiveTimeSkip(unit,{testSeed}={}){
  if(timeSkipTask)return timeSkipTask.promise;
  if(!['hour','day','month'].includes(unit))return Promise.reject(Error('Unknown time skip.'));
  if(typeof Worker==='undefined')return Promise.reject(Error('Background simulation is unavailable in this browser.'));
- const dialog=document.createElement('dialog');dialog.className='time-skip-dialog';dialog.innerHTML='<div class="time-skip-spinner" aria-hidden="true"></div><h2>Advancing time</h2><p role="status" aria-live="polite">Preparing simulation…</p><button type="button">Cancel skip</button>';document.body.appendChild(dialog);dialog.showModal();
- let worker;try{if(timeSkipIdleTimer!==null)clearTimeout(timeSkipIdleTimer);worker=timeSkipIdleWorker||new Worker(new URL('time-skip-worker.js?v=2',document.baseURI));timeSkipIdleWorker=null;timeSkipIdleTimer=null;}catch(error){dialog.close();dialog.remove();saveFeedback('Could not advance time: '+error.message,true);return Promise.resolve({ok:false,error:error.message});}
+ if(app.activeShow&&['ride','jump-off-ready'].includes(app.activeShow.stage)){saveFeedback('Finish or leave the active competition round before advancing time.',true);return Promise.resolve({ok:false,error:'An active competition round requires your decision.'});}
+ const decision=typeof timeAdvanceDecision90==='function'?timeAdvanceDecision90(unit):'';if(decision){saveFeedback(decision,true);return Promise.resolve({ok:false,error:decision});}
+ const dialog=document.createElement('span');dialog.className='time-skip-status';dialog.setAttribute('data-time-skip-status','');dialog.innerHTML='<span role="status" aria-live="polite">Advancing '+unit+'…</span> <button type="button" data-time-skip-cancel>Cancel</button>';(document.querySelector('.topbar .status')||document.body).appendChild(dialog);
+
+ let worker;try{if(timeSkipIdleTimer!==null)clearTimeout(timeSkipIdleTimer);worker=timeSkipIdleWorker||new Worker(new URL('time-skip-worker.js?v=2',document.baseURI));timeSkipIdleWorker=null;timeSkipIdleTimer=null;}catch(error){dialog.remove();saveFeedback('Could not advance time: '+error.message,true);return Promise.resolve({ok:false,error:error.message});}
  let settle;const promise=new Promise(resolve=>settle=resolve),task={worker,promise,committed:false,startedAt:performance.timeOrigin+performance.now()};timeSkipTask=task;
  const status=dialog.querySelector('[role="status"]'),cancel=dialog.querySelector('button');
- const finish=result=>{if(task.done)return;task.done=true;if(result.ok){worker.onmessage=null;worker.onerror=null;timeSkipIdleWorker=worker;timeSkipIdleTimer=setTimeout(()=>{if(timeSkipIdleWorker===worker){worker.terminate();timeSkipIdleWorker=null;timeSkipIdleTimer=null;}},60000);}else worker.terminate();dialog.close();dialog.remove();if(timeSkipTask===task)timeSkipTask=null;settle(result);};
- const abort=()=>{if(!task.committed)finish({cancelled:true});};cancel.onclick=abort;dialog.addEventListener('cancel',event=>{event.preventDefault();abort();});
+ const finish=result=>{if(task.done)return;task.done=true;if(result.ok){worker.onmessage=null;worker.onerror=null;timeSkipIdleWorker=worker;timeSkipIdleTimer=setTimeout(()=>{if(timeSkipIdleWorker===worker){worker.terminate();timeSkipIdleWorker=null;timeSkipIdleTimer=null;}},60000);}else worker.terminate();dialog.remove();if(timeSkipTask===task)timeSkipTask=null;settle(result);};
+ const abort=()=>{if(!task.committed)finish({cancelled:true});};cancel.onclick=abort;
  const fail=message=>{if(task.done)return;finish({ok:false,error:message});saveFeedback('Time skip did not complete. Your previous game state is unchanged. '+message,true);};
  worker.onerror=event=>{event.preventDefault();fail(event.message||'Background simulation could not start.');};
  worker.onmessage=({data})=>{
@@ -23,9 +26,9 @@ function runResponsiveTimeSkip(unit,{testSeed}={}){
    if(data.ledger)SimulationDelta.restore(data,app);
    Save3.validate(data.state);
    // Keep the active app object, replacing its state only after successful completion.
-   const identity=app.saveIdentity,lastSaved=app.lastSuccessfulSave;
+   const identity=app.saveIdentity,lastSaved=app.lastSuccessfulSave,view={uiActiveTab:app.uiActiveTab,uiDisclosures:app.uiDisclosures,uiSelections:app.uiSelections},careerView=app.career?.ui;
    for(const key of Object.keys(app))delete app[key];Object.assign(app,data.state);
-   if(identity)app.saveIdentity=identity;if(lastSaved)app.lastSuccessfulSave=lastSaved;
+   Object.assign(app,view);if(careerView&&app.career)app.career.ui=careerView;if(identity)app.saveIdentity=identity;if(lastSaved)app.lastSuccessfulSave=lastSaved;
    RECENT_HORSE_NAMES.clear();for(const name of data.recentHorseNames||[])RECENT_HORSE_NAMES.add(name);
    task.committed=true;render();saveGame(false);finish({ok:true,simulationMs:data.simulationMs,timings:{inputMs:task.inputMs,prepareMs:data.startedAt-task.startedAt-task.inputMs,returnMs:receivedAt-data.finishedAt,applyMs:performance.timeOrigin+performance.now()-receivedAt}});
   }catch(error){if(task.committed){finish({ok:true,displayError:error.message});saveFeedback('Time advanced. Refresh the view and retry saving: '+error.message,true);}else fail(error.message);}
@@ -47,3 +50,7 @@ function prepareTimeSkipWorker(){
 }
 window.addEventListener('load',()=>{const ready=()=>{if(Save3.supported&&!Save3.ready){setTimeout(ready,100);return;}if(typeof requestIdleCallback==='function')requestIdleCallback(prepareTimeSkipWorker,{timeout:1000});else setTimeout(prepareTimeSkipWorker,0);};ready();});
 for(const id of ['skipHourBtn','skipDayBtn','skipMonthBtn']){const button=document.getElementById(id);if(button){button.addEventListener('pointerenter',prepareTimeSkipWorker);button.addEventListener('focus',prepareTimeSkipWorker);}}
+
+// Read-only navigation remains available during the atomic advance; gameplay choices wait.
+function timeAdvanceInputGuard(event){if(!timeSkipTask)return;const target=event.target;if(target?.closest?.('[data-time-skip-cancel],[data-tab],summary,#toggleTabsBtn,#saveGameBtn,[data-save3="export"],[data-save3="copy"]'))return;if(event.type==='keydown'&&['Tab','Escape'].includes(event.key))return;if(target?.closest?.('button,input,select,textarea,#moneyLabel')){event.preventDefault();event.stopImmediatePropagation();}}
+for(const event of ['click','pointerdown','keydown','input','change'])document.addEventListener(event,timeAdvanceInputGuard,true);

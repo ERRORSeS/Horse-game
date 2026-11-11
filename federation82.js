@@ -234,7 +234,7 @@ const FEDERATION_ENTER = careerEnter;
 careerEnter = function(event,horse) {
   if (federationEnabled() && (event?.team || event?.games)) {
     const nomination = federationNomination(event,careerRider(),horse);
-    if (!nomination || !['Selected — National Squad','Selected — Championship Team'].includes(nomination.status)) {
+    if (!nomination || !(typeof federationMayRepresent==='function'?federationMayRepresent(event,nomination):['Selected — National Squad','Selected — Championship Team'].includes(nomination.status))) {
       return {ok:false,message:'An active federation nomination for this combination is required.'};
     }
   }

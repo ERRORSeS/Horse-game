@@ -1,0 +1,660 @@
+{
+  "elapsedMs": 80673,
+  "startAge": 17,
+  "entered": 95,
+  "teamStarts": 7,
+  "games": true,
+  "checkpoint": true,
+  "log": [
+    {
+      "year": 1,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 1,
+      "type": "invitation reloaded"
+    },
+    {
+      "year": 1,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 1,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 1,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 3 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 2,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 2,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 2,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 5 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 3,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 3,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 3,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 3,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 70,
+      "prize": 9100,
+      "represented": "GBR"
+    },
+    {
+      "year": 3,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 2,
+      "teamPoints": 36,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 3,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 10 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 4,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 4,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 0,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 4,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 4,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 4,
+      "type": "Games",
+      "placing": 1,
+      "prize": 42250
+    },
+    {
+      "year": 4,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 11 eligible candidates; selected for 5 main-squad positions."
+    }
+  ],
+  "blocked": [
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 1,
+      "event": "Global Jumping World Cup · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 1,
+      "event": "Global Masters Indoor Series · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Global Champions Jumping Tour · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Global Jumping World Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 1,
+      "event": "International Rising Stars · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Global Champions Jumping Tour · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 1,
+      "event": "World Nations Jumping League · Leg 2",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 1,
+      "event": "Showjumping CSI3★ Circuit",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 1,
+      "event": "International Rising Stars · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 1,
+      "event": "Continental Jumping Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Showjumping CSI5★ Circuit",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 1,
+      "event": "Global Masters Indoor Series · Leg 3",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 2,
+      "event": "Global Jumping World Cup · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 2,
+      "event": "Global Masters Indoor Series · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "Global Champions Jumping Tour · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "Global Jumping World Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors Main Squad Nations Preparation Cup",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 2,
+      "event": "International Rising Stars · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "Global Champions Jumping Tour · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 2,
+      "event": "Showjumping CSI3★ Circuit",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "International Rising Stars · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 2,
+      "event": "Continental Jumping Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "Showjumping CSI5★ Circuit",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Juniors Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 2,
+      "event": "Global Masters Indoor Series · Leg 3",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 3,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 3,
+      "event": "Global Jumping World Cup · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 3,
+      "event": "United Kingdom Open / Senior Main Squad Nations Preparation Cup",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 3,
+      "event": "Global Masters Indoor Series · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 3,
+      "event": "Global Champions Jumping Tour · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 3,
+      "event": "Global Jumping World Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 3,
+      "event": "United Kingdom Open / Senior Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 4,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    }
+  ],
+  "meets": 2290
+}
+{
+  "elapsedMs": 87725,
+  "startAge": 22,
+  "entered": 82,
+  "teamStarts": 8,
+  "games": true,
+  "checkpoint": true,
+  "log": [
+    {
+      "year": 1,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 1,
+      "type": "invitation reloaded"
+    },
+    {
+      "year": 1,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 1,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 1,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 1,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 6 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 2,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 0,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 2,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "prize": 9100,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 2,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 8 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 3,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 3,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 45,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 3,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 3,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 3,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "prize": 9100,
+      "represented": "GBR"
+    },
+    {
+      "year": 3,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 4,
+      "teamPoints": 25,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 3,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 10 eligible candidates; selected for 5 main-squad positions."
+    },
+    {
+      "year": 4,
+      "type": "application",
+      "status": "Submitted"
+    },
+    {
+      "year": 4,
+      "type": "team start",
+      "country": "GBR",
+      "teamSize": 4,
+      "teamPlace": 1,
+      "teamPoints": 0,
+      "prize": 3900,
+      "represented": "GBR"
+    },
+    {
+      "year": 4,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 4,
+      "type": "trial",
+      "placing": 1
+    },
+    {
+      "year": 4,
+      "type": "Games",
+      "placing": 1,
+      "prize": 42250
+    },
+    {
+      "year": 4,
+      "type": "selection",
+      "status": "Selected — National Squad",
+      "reason": "Ranked 1 of 11 eligible candidates; selected for 5 main-squad positions."
+    }
+  ],
+  "blocked": [
+    {
+      "year": 1,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 1,
+      "event": "Global Jumping World Cup · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Open / Senior Main Squad Nations Preparation Cup",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 1,
+      "event": "Global Masters Indoor Series · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Global Champions Jumping Tour · Leg 1",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "Global Jumping World Cup · Leg 2",
+      "reason": "A recent top-ten finish at the preceding competition tier is required."
+    },
+    {
+      "year": 1,
+      "event": "World Nations Jumping League · Leg 3",
+      "reason": "Your federation cannot field a complete qualified squad for this class."
+    },
+    {
+      "year": 1,
+      "event": "United Kingdom Open / Senior Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 2,
+      "event": "United Kingdom Open / Senior Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 3,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    },
+    {
+      "year": 3,
+      "event": "United Kingdom Open / Senior Development Nations Challenge",
+      "reason": "An active nomination and an open team competition are required."
+    },
+    {
+      "year": 4,
+      "event": "United Kingdom Open / Senior National Development Cup",
+      "reason": "This event requires an active development / reserve squad nomination."
+    }
+  ],
+  "meets": 2262
+}

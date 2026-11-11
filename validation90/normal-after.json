@@ -1,0 +1,50 @@
+{
+  "url": "http://localhost:8093",
+  "measurements": [
+    {
+      "year": 1,
+      "payloadBytes": 14279225,
+      "saveError": null,
+      "horses": 4,
+      "meets": 754,
+      "npcs": 6666,
+      "simulationAndRenderMs": 1810.3999999994412,
+      "totalWithSaveMs": 3063.0999999996275,
+      "beats": 150,
+      "maxGap": 245.5,
+      "result": {
+        "ok": true,
+        "simulationMs": 1448.5,
+        "timings": {
+          "inputMs": 61.60000000055879,
+          "prepareMs": 95.0000976556912,
+          "returnMs": 196.39990234375,
+          "applyMs": 6
+        }
+      }
+    },
+    {
+      "year": 1,
+      "payloadBytes": 14472545,
+      "saveError": null,
+      "horses": 30,
+      "meets": 754,
+      "npcs": 6666,
+      "simulationAndRenderMs": 1650.5999999996275,
+      "totalWithSaveMs": 3346.2000000001863,
+      "beats": 141,
+      "maxGap": 606.9000000003725,
+      "result": {
+        "ok": true,
+        "simulationMs": 1249.9000000003725,
+        "timings": {
+          "inputMs": 68.3999999994412,
+          "prepareMs": 110.4999023443088,
+          "returnMs": 218,
+          "applyMs": 2.800048828125
+        }
+      }
+    }
+  ],
+  "pageErrors": []
+}

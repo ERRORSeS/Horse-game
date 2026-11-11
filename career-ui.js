@@ -37,7 +37,7 @@ function careerGuide() {
         `<p>${CAREER_DISCIPLINE_LABELS[discipline]} international winner bases, 1★ through World Championship · ${points.join(', ')}.</p>`).join('')}
       <p>Dressage uses the final percentage. Eventing uses total penalties across all phases. Hunter uses the judged score.</p></details>
     <details><summary>Ranking periods</summary>
-      <p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release at month boundaries. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
+      <p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release every seven game days. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
     <details><summary>Age divisions and ponies</summary>
       <ul>${Object.values(CAREER_AGE_DIVISIONS).map(division => `<li>${division.label} · ${division.ages.join('–')}</li>`).join('')}</ul>
       <p>Age divisions use age in the competition year. Pony classes check measured height. The default 148 cm ceiling includes a 1 cm allowance for a shod measurement. Young horse divisions require the specified age and suitable schooling.</p></details>
@@ -238,8 +238,8 @@ function renderCareerRankings() {
   const state = careerState(), selected = careerSelection(), rider = careerRider();
   const type = CAREER_BOARD_TYPES.includes(selected.board) ? selected.board : 'world';
   const discipline = CAREER_DISCIPLINE_LABELS[selected.discipline] ? selected.discipline : 'jumping';
-  const series = [...new Map(CAREER_SERIES.filter(event => event.discipline === discipline && event.series &&
-    (type === 'team' ? event.team : !event.team)).map(event => [event.series,CAREER_SERIES_LABELS.get(event.series)])).entries()];
+  const series = [...new Map([...CAREER_SERIES,...(typeof federationSeries90==='function'?federationSeries90():[])].filter(event => event.discipline === discipline && event.series &&
+    (type === 'team' ? event.team : !event.team || event.federationProgram)).map(event => [event.series,CAREER_SERIES_LABELS.get(event.series)])).entries()];
   const options = type === 'national' ? Object.entries(CAREER_COUNTRIES).map(([code,[name]]) => [code,name])
     : ['division','youth-international'].includes(type) ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior').map(([key,row]) => [key,row.label])
     : type === 'youth-national' ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior')
