@@ -79,7 +79,7 @@ function c7Resolve(h,s,index,{npc=false}={}){
     record.routeDistance=plan.distance*route;record.time=record.routeDistance/speed*style*slow+(record.events6.includes('hesitation')?1.5:0)+(record.error?.startsWith('drift')?.5:0);record.slowerPace6=slow>1?record.time-record.time/slow:0;
     }
     if(skip){record.completed=false;record.quality=0;record.faults=4;s.roundStats.faults+=4;record.represent=true;record.outcome='Cross-country question skipped; not completed';}
-    const exertion=warmup?2:plan.phase==='cross-country'?3:1;i6StateChange(s,'energy',-exertion);if(w.energy<25)c7Readiness(s,-5,'Actual exertion');
+    const exertion=(warmup?2:plan.phase==='cross-country'?3:1)*(main?({Conservative:.9,Balanced:1,Competitive:1.1,Aggressive:1.2}[showRidingStyle(s)]||1):1);record.energyUse85=exertion;i6StateChange(s,'energy',-exertion);if(w.energy<25)c7Readiness(s,-5,'Actual exertion');
    }
   }
  }

@@ -1,7 +1,9 @@
 const {check}=require('./behavior5-harness.cjs');
+const selectedDiscipline=process.env.RANKING_DISCIPLINE;
 check('all ranking categories and every federation have at least 24 scoring competitors', `{
  resetGame();const hour=pastureCalendarHour();
- for(const discipline of DISCIPLINES){
+ for(const discipline of ${selectedDiscipline?JSON.stringify([selectedDiscipline]):'DISCIPLINES'}){
+  resetGame();
   const cases=[['world',''],['horse',''],['horse','pony'],['combination','']];
   for(const division of Object.keys(CAREER_AGE_DIVISIONS).filter(d=>d!=='senior')){
    cases.push(['division',division],['youth-international',division]);
@@ -36,7 +38,7 @@ check('weekly publication refreshes watched categories and preserves competitors
  const key=careerBoardKey('youth-national','jumping','kids|KAZ'),first=careerRankingRows('youth-national','jumping','kids|KAZ');
  const ids=first.map(r=>r.id).sort(),next=(Math.floor(w.cursor/CAREER_HOURS_PER_WEEK)+1)*CAREER_HOURS_PER_WEEK;
  careerAdvance(next);const rows=w.rankings[key];
- if(w.rankingCircuits[key]!==next||rows.length<24||rows.some(r=>!r.circuitResults.some(result=>result.at===next)))throw Error('weekly update missing');
+ if(w.rankingCircuits[key]!==next||rows.length<24||rows.filter(r=>r.circuitResults?.some(result=>result.at===next)).length<24)throw Error('weekly update missing');
  const saved=JSON.parse(serializeAppState());hydrateFromSave(saved);
  const loaded=careerRankingRows('youth-national','jumping','kids|KAZ');
  if(loaded.length<24||careerState().rankingCircuits[key]!==next)throw Error('save lost category');

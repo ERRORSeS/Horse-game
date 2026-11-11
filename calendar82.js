@@ -187,7 +187,7 @@ function show82CustomClass(index) {
     <legend>Class ${index+1}</legend><label>Class name<input data-class-value="name" maxlength="60"></label>
     <div class="shop-option-grid">
     <label>Discipline<select data-class-value="discipline">${careerOptions(Object.entries(CAREER_DISCIPLINE_LABELS),'jumping')}</select></label>
-    <label>Level<select data-class-value="level">${careerOptions(SHOW_LEVELS.jumping.map(level=>[level,level]),'0.70')}</select></label>
+    <label>Level<select data-class-value="level">${careerOptions(competitionLevels('jumping').filter(level=>Number.isFinite(Number(level))).map(level=>[level,level]),'0.70')}</select></label>
     <label>Rider division<select data-class-value="division">${careerOptions(Object.entries(CAREER_AGE_DIVISIONS).map(([key,row])=>[key,row.label]),'senior')}</select></label>
     <label>Horse age<select data-class-value="horseAge">${careerOptions([[0,'Open'],...[4,5,6,7,8].map(age=>[age,age+' years'])],0)}</select></label>
     <label>Format<select data-class-value="format">${careerOptions(Object.entries(CALENDAR_FORMATS).filter(([key])=>key!=='Puissance').map(([key,row])=>[key,row.label]),'Standard')}</select></label>
@@ -232,7 +232,7 @@ function show82BindCreator(panel) {
   if (!classes) return;
   const bind=(row)=>{
     const discipline=row.querySelector('[data-class-value="discipline"]'),level=row.querySelector('[data-class-value="level"]');
-    discipline.onchange=()=>{level.innerHTML=careerOptions(SHOW_LEVELS[discipline.value].map(value=>[value,value]),SHOW_LEVELS[discipline.value][0]);};
+    discipline.onchange=()=>{level.innerHTML=careerOptions(competitionLevels(discipline.value).filter(value=>discipline.value!=='jumping'||Number.isFinite(Number(value))).map(value=>[value,value]),SHOW_LEVELS[discipline.value][0]);};
     row.querySelector('[data-show82-remove]').onclick=()=>{if (classes.children.length>1) row.remove();};
   };
   for (const row of classes.children) bind(row);

@@ -120,7 +120,7 @@
       app.horses.push(h);}else{h.owner=tx.contract.buyer;app.horses=app.horses.filter(h=>h.id!==l.horseId);}
     l.horse=h;
     (h.ownershipHistory ||= []).push({day,from:tx.contract.seller,to:tx.contract.buyer,transactionId:tx.id,price:tx.offer});
-    tx.transferred=true;tx.status='Complete';tx.completed=day;l.status=tx.direction==='sell'?'Sold':'Complete';
+    tx.transferred=true;if(typeof root.npc85PlayerTransfer==='function')root.npc85PlayerTransfer(app,tx,l,h,day);tx.status='Complete';tx.completed=day;l.status=tx.direction==='sell'?'Sold':'Complete';
     for(const other of state(app).transactions)if(other.id!==tx.id&&other.listingId===l.id&&!other.paid)other.status='Cancelled';
     // Historical pools are retained in listing.horse; remove active advertisements only.
     app.saleBarn=(app.saleBarn||[]).filter(x=>x.id!==h.id);app.npcSales=(app.npcSales||[]).filter(x=>x.id!==h.id);return {ok:true};
@@ -144,6 +144,7 @@
     for(const l of s.listings){
       if(l.direction!=='buy'||l.status!=='Listing Active')continue;scheduleMarketExit(l);
       if(day<l.marketExitDay)continue;
+      if(typeof root.npc85ExpireListing==='function'&&root.npc85ExpireListing(app,l,day))continue;
       l.status='Sold Elsewhere';l.closed=l.marketExitDay;l.horse.owner='Another Stable';
       (l.horse.ownershipHistory ||= []).push({day:l.closed,from:l.seller,to:'Another Stable',listingId:l.id});
       s.history.push({number:`MARKET-${l.id}`,date:l.closed,horseId:l.horseId,horse:l.horse.name,total:null,status:'Sold Elsewhere'});
@@ -195,6 +196,19 @@
     const transfer=deliver(app,tx,day);if(!transfer.ok)return transfer;
     const l=listing(app,tx);return {ok:true,message:l.horse.name+' has been sold for $'+tx.offer+'.',receipt:tx.receipt};
   }
+  // NPC-to-NPC sales share the persistent listing and ownership ledger.
+  function transferNpc(app,listingId,buyer,seller,day,eventId){
+    const s=state(app);s.npcTransfers85 ||= {};if(s.npcTransfers85[eventId])return {ok:true,transfer:s.npcTransfers85[eventId]};
+    const l=s.listings.find(l=>l.id===listingId),h=l?.horse;
+    if(!l||l.status!=='Listing Active'||l.direction!=='buy'||!h||h.owner==='Your Stable'||app.horses?.some(owned=>owned.id===h.id)||buyer.id===seller?.id||h.ownerId&&seller&&h.ownerId!==seller.id)return {ok:false,message:'This horse is not available for an NPC transfer.'};
+    if(s.transactions.some(t=>t.listingId===listingId&&!['Complete','Cancelled','Withdrawn','Declined'].includes(t.status)))return {ok:false,message:'An existing customer inquiry must be resolved first.'};
+    if(!Number.isFinite(buyer.resources85)||buyer.resources85<l.ask)return {ok:false,message:'The buyer cannot fund this horse.'};
+    const previous=h.owner,previousRider=h.assignedRiderId;buyer.resources85-=l.ask;if(seller)seller.resources85=(seller.resources85||0)+l.ask;
+    h.owner=buyer.name;h.ownerId=buyer.id;h.assignedRiderId=buyer.id;(h.formerRiderIds ||= []);if(previousRider&&!h.formerRiderIds.includes(previousRider))h.formerRiderIds.push(previousRider);
+    const transfer={id:eventId,listingId,horseId:h.id,from:seller?.id||previous,to:buyer.id,day,price:l.ask,paid:true};
+    (h.ownershipHistory ||= []).push({day,from:previous,to:buyer.name,fromId:seller?.id,toId:buyer.id,transactionId:eventId,price:l.ask});
+    l.status='Sold';l.closed=day;for(const key of ['saleBarn','npcSales','rescueHorses'])if(Array.isArray(app[key]))app[key]=app[key].filter(row=>row.id!==h.id);s.npcTransfers85[eventId]=transfer;return {ok:true,transfer};
+  }
   function deleteConversation(tx){
     if(tx.conversation?.length)(tx.deletedConversations ||= []).push(H.copy(tx.conversation));
     tx.conversation=[];tx.conversationDeleted=true;return {ok:true,message:'Conversation removed. Transaction and horse records are unchanged.'};
@@ -203,5 +217,5 @@
     const previous=tx.deletedConversations?.pop();if(previous)tx.conversation=[...previous,...(tx.conversation||[])];
     tx.conversationDeleted=false;return {ok:true,message:'Conversation restored.'};
   }
-  root.HorseSales={reasonForSale,advanceBuyers,respondOffer,editPrice,withdrawListing,completeSale,scheduleMarketExit,deleteConversation,restoreConversation,advanceMarket,sellers,transports,state,list,inquiry,listing,active,say,offer,contract,sign,pay,deliver,cancel,ppe};if(typeof module!=='undefined')module.exports=root.HorseSales;
+  root.HorseSales={transferNpc,reasonForSale,advanceBuyers,respondOffer,editPrice,withdrawListing,completeSale,scheduleMarketExit,deleteConversation,restoreConversation,advanceMarket,sellers,transports,state,list,inquiry,listing,active,say,offer,contract,sign,pay,deliver,cancel,ppe};if(typeof module!=='undefined')module.exports=root.HorseSales;
 })(globalThis);

@@ -18,7 +18,7 @@ function customShowCreate(input) {
   for (const raw of input.classes) {
     const {discipline,level,division,horseAge,offset,capacity,fee,prize,course} = raw;
     const format = raw.format || 'Standard';
-    if (!SHOW_LEVELS[discipline]?.includes(level) || !Object.hasOwn(CAREER_AGE_DIVISIONS,division) ||
+    if (!competitionLevels(discipline)?.includes(level) || !Object.hasOwn(CAREER_AGE_DIVISIONS,division) ||
       !integer(offset,0,duration-1) || !integer(capacity,1,100) || !integer(fee,0,5000) || !integer(prize,0,25000) ||
       horseAge && !integer(horseAge,4,8) || !calendarSpecialCompatible(format,discipline,level) || format==='Puissance' ||
       raw.jumpOff && discipline!=='jumping' || course && !(discipline==='dressage' && ['Special','Freestyle'].includes(course) && level==='Grand Prix' ||

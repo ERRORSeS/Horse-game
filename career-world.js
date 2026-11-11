@@ -417,7 +417,8 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
     const candidates = rider.horses.filter(horse => !careerEligibility(event, rider, horse,
       { npc: true, history: histories.get(rider.id) || [] }));
     if (!candidates.length) continue;
-    const horse = candidates.sort((a,b) => b.skills[event.discipline] - a.skills[event.discipline])[0];
+    const horse = typeof npc85ChooseHorse==='function'?npc85ChooseHorse(rider,candidates,event):candidates.sort((a,b)=>b.skills[event.discipline]-a.skills[event.discipline])[0];
+    if(!horse)continue;
     const score = (rider.skill + horse.skills[event.discipline]) / 2;
     const qualifying = (histories.get(rider.id) || []).filter(row => row.placing && row.placing <= 10).length;
     const selection = score * .7 + Math.min(30, qualifying * 8);
@@ -627,7 +628,7 @@ function careerAdvance(hour = pastureCalendarHour()) {
     if(tick===nextMonth){
       const month=Math.floor(tick/CAREER_HOURS_PER_MONTH);
       if(month%12===0&&careerActive())for(const profile of rrSettings().profiles){if(!profile.career?.birth)continue;profile.career.ageHistory||={};profile.career.ageHistory[pastureDate(tick).year]=careerDivisions({...profile.career,professional:profile.level==='Professional'},tick);}
-      careerPaySponsors(month);nextMonth+=CAREER_HOURS_PER_MONTH;
+      careerPaySponsors(month);if(typeof npc85MarketMonth==='function')npc85MarketMonth(month);nextMonth+=CAREER_HOURS_PER_MONTH;
     }
     if(tick===hour)break;
   }

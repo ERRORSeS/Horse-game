@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(process.env.GAME_URL||'http://localhost:8085');await page.waitForFunction(()=>Save3.ready);
+await page.evaluate(()=>{resetGame();app.money=100000;changeTab('settings');renderSettings();});
+await page.locator('[data-editor85-enabled]').check();await page.evaluate(()=>{changeTab('horses');render();});
+await page.locator('[data-editor85-max]').first().evaluate(el=>el.closest('details').open=true);await page.locator('[data-editor85-max]').first().click();
+assert.equal(await page.evaluate(()=>effectiveDisciplineSkill(app.horses[0],'jumping')),100);
+await page.evaluate(()=>{changeTab('barn');renderBarn();});await page.locator('[data-manager85-hire]').click();await page.locator('[data-manager85-toggle="farrier"]').check();
+assert.deepEqual(await page.evaluate(()=>manager85State().toggles),{vet:false,farrier:true,treatment:false,training:false});
+const profile=await page.evaluate(()=>{const row=careerRankingRows('youth-national','jumping','kids|KAZ')[0];return careerLeaderboardDetails(row,'youth-national','jumping','kids|KAZ');});assert.match(profile,/Current Horses/);assert.match(profile,/Former Horses/);assert.match(profile,/Weekly circuit results/);
+assert.deepEqual(errors,[]);console.log(JSON.stringify({editor:'clicked Max All',manager:'hired and independent toggle clicked',rankings:'actual Kids national horse profile',pageErrors:errors}));await browser.close();})().catch(e=>{console.error(e);process.exit(1)});

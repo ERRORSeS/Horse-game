@@ -1,12 +1,12 @@
 const { check } = require('./behavior5-harness.cjs');
 
-check('career calendar uses explicit classifications, existing levels and four-year Games cycles', `{
+check('career calendar uses explicit classifications, supported levels and four-year Games cycles', `{
   resetGame();
   const from = pastureCalendarHour(1,1,1,0), to = pastureCalendarHour(8,12,30,23);
   const events = careerSchedule(from,to);
   if (events.length !== new Set(events.map(event => event.id)).size) throw Error('duplicate IDs');
   for (const event of events) {
-    if (!SHOW_LEVELS[event.discipline].includes(event.level)) throw Error(event.id + ' uses an invalid level');
+    if (!competitionLevels(event.discipline).includes(event.level)) throw Error(event.id + ' uses an invalid level');
     if (event.games && event.date.year % event.cycle !== event.edition) throw Error('wrong edition');
     if (event.star && (event.tier < 5 || event.tier > 9)) throw Error('bad classification');
   }
