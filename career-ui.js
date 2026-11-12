@@ -37,7 +37,7 @@ function careerGuide() {
         `<p>${CAREER_DISCIPLINE_LABELS[discipline]} international winner bases, 1★ through World Championship · ${points.join(', ')}.</p>`).join('')}
       <p>Dressage uses the final percentage. Eventing uses total penalties across all phases. Hunter uses the judged score.</p></details>
     <details><summary>Ranking periods</summary>
-      <p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release every seven game days. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
+      <p>Ranking categories simulate up to 50 NPC contenders, or 100 when your rider is eligible. A newly active category adds five contenders per weekly release. NPC points come from real calendar competitions; private seller histories and legacy hidden circuits do not count.</p><p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release every seven game days. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
     <details><summary>Age divisions and ponies</summary>
       <ul>${Object.values(CAREER_AGE_DIVISIONS).map(division => `<li>${division.label} · ${division.ages.join('–')}</li>`).join('')}</ul>
       <p>Age divisions use age in the competition year. Pony classes check measured height. The default 148 cm ceiling includes a 1 cm allowance for a shod measurement. Young horse divisions require the specified age and suitable schooling.</p></details>

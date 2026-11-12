@@ -9,7 +9,7 @@ function careerPointCredits(meet,row) {
   const {riderId,riderName,horseId,horseName,country,points} = row;
   const credits = [];
   function add(type,filter = '',seasonal = false,id = riderId,name = riderName,amount = points) {
-    if (id) credits.push({type,filter,seasonal,id,name,country,points:amount});
+    if (id) credits.push({type,filter,seasonal,id,name,country,points:amount,riderId,horseId});
   }
   if (meet.ranking === 'world') {
     add('world');
@@ -32,15 +32,15 @@ function careerComputeBoards(hour) {
   const specialties=new Map((careerState().npcs||[]).map(r=>[r.id,r.specialty]));
   const nationalities=new Map([...(careerState().npcs||[]).map(r=>[r.id,r.country]),...(app.riderRealism?.profiles||[]).map(r=>[r.id,r.career?.country])]);
   const year = pastureDate(hour).year;
-  function add(discipline,{type,filter,id,name,country,points}) {
+  function add(discipline,{type,filter,id,name,country,points,riderId,horseId}) {
     if (!points) return;
     const key = careerBoardKey(type,discipline,filter);
     const rows = boards[key] ||= new Map();
-    if (!rows.has(id)) rows.set(id,{id,name,country,scores:[]});
+    if (!rows.has(id)) rows.set(id,{id,name,country,riderId,horseId,scores:[]});
     rows.get(id).scores.push(points);
   }
   for (const meet of Object.values(careerState().meets)) {
-    if (meet.sandbox || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
+    if (meet.sandbox || (typeof rank91Real==='function'&&!rank91Real(meet)) || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
     const seasonal = pastureDate(meet.hour).year === year;
     for (const row of meet.results.filter(row=>!specialties.has(row.riderId)||specialties.get(row.riderId)===meet.discipline)) for (const credit of careerPointCredits(meet,row)) {
       if (!credit.seasonal || seasonal){const country=nationalities.get(row.riderId)||credit.country;add(meet.discipline,{...credit,country,filter:credit.type==='national'?country:credit.type==='youth-national'?String(credit.filter).split('|')[0]+'|'+country:credit.filter});}

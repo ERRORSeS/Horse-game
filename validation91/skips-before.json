@@ -1,0 +1,131 @@
+{
+  "url": "http://localhost:8097",
+  "rows": [
+    {
+      "unit": "day",
+      "elapsedMs": 520.0999999996275,
+      "result": {
+        "ok": true,
+        "simulationMs": 62.40000000037253,
+        "timings": {
+          "inputMs": 79.29999999888241,
+          "prepareMs": 119.00004882924259,
+          "returnMs": 255,
+          "applyMs": 2.900146484375
+        }
+      },
+      "date": [
+        1,
+        1,
+        2
+      ],
+      "meets": 599,
+      "npcs": 6646
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 417.80000000074506,
+      "result": {
+        "ok": true,
+        "simulationMs": 10.5,
+        "timings": {
+          "inputMs": 77.09999999962747,
+          "prepareMs": 105.20004882849753,
+          "returnMs": 191.89990234375,
+          "applyMs": 32
+        }
+      },
+      "date": [
+        1,
+        1,
+        3
+      ],
+      "meets": 599,
+      "npcs": 6646
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 359.6000000014901,
+      "result": {
+        "ok": true,
+        "simulationMs": 10.399999998509884,
+        "timings": {
+          "inputMs": 71.69999999925494,
+          "prepareMs": 105.80000000074506,
+          "returnMs": 168.099853515625,
+          "applyMs": 2.39990234375
+        }
+      },
+      "date": [
+        1,
+        1,
+        4
+      ],
+      "meets": 599,
+      "npcs": 6646
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 911.2000000011176,
+      "result": {
+        "ok": true,
+        "simulationMs": 471.2999999988824,
+        "timings": {
+          "inputMs": 79.20000000111759,
+          "prepareMs": 102.20014648325741,
+          "returnMs": 221.699951171875,
+          "applyMs": 35.7998046875
+        }
+      },
+      "date": [
+        1,
+        2,
+        1
+      ],
+      "meets": 748,
+      "npcs": 6650
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 462.69999999925494,
+      "result": {
+        "ok": true,
+        "simulationMs": 9.400000000372529,
+        "timings": {
+          "inputMs": 90.89999999850988,
+          "prepareMs": 154.80019531399012,
+          "returnMs": 201.5,
+          "applyMs": 2.599853515625
+        }
+      },
+      "date": [
+        1,
+        2,
+        2
+      ],
+      "meets": 748,
+      "npcs": 6650
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 1360.199999999255,
+      "result": {
+        "ok": true,
+        "simulationMs": 907.6000000014901,
+        "timings": {
+          "inputMs": 95.5,
+          "prepareMs": 105.7001953125,
+          "returnMs": 245.60009765625,
+          "applyMs": 5.099853515625
+        }
+      },
+      "date": [
+        1,
+        3,
+        1
+      ],
+      "meets": 1318,
+      "npcs": 6656
+    }
+  ]
+}

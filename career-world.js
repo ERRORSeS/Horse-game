@@ -34,12 +34,13 @@ function careerRosterIndex(roster=careerRoster()){
  for(const rider of roster){index.byId.set(rider.id,rider);for(const [map,key]of [[index.byDiscipline,rider.specialty],[index.byCountry,rider.country]]){if(!map.has(key))map.set(key,[]);map.get(key).push(rider);}}
  CAREER_ROSTER_INDEX.set(roster,index);return index;
 }
-const CAREER_RESULT_INDEX=new WeakMap();
-function careerResultIndex(meets){
- const keys=Object.keys(meets);let index=CAREER_RESULT_INDEX.get(meets);
+const CAREER_RESULT_INDEX=new WeakMap(),CAREER_CALENDAR_RESULT_INDEX91=new WeakMap();
+function careerResultIndex(meets,calendarOnly=false){
+ if(typeof SimulationDelta!=='undefined'&&SimulationDelta.rawLedger)meets=SimulationDelta.rawLedger(meets);
+ const cache=calendarOnly?CAREER_CALENDAR_RESULT_INDEX91:CAREER_RESULT_INDEX,keys=Object.keys(meets).filter(key=>!calendarOnly||typeof rank91Real!=='function'||rank91Real(meets[key]));let index=cache.get(meets);
  // Results are written atomically. Rebuild only for deletions, replacements or repaired arrays.
  if(index&&(keys.length<index.entries.size||keys.some(key=>index.entries.has(key)&&(index.entries.get(key)!==meets[key]||index.counts.get(key)!==meets[key].results.length||index.arrays.get(key)!==meets[key].results))))index=null;
- if(!index){index={entries:new Map(),counts:new Map(),arrays:new Map(),byRider:new Map(),byHorse:new Map(),byDiscipline:new Map(),order:new Map()};CAREER_RESULT_INDEX.set(meets,index);}
+ if(!index){index={entries:new Map(),counts:new Map(),arrays:new Map(),byRider:new Map(),byHorse:new Map(),byDiscipline:new Map(),order:new Map()};cache.set(meets,index);}
  for(const key of keys){
   if(index.entries.has(key))continue;
   const meet=meets[key];index.order.set(meet,index.entries.size);index.entries.set(key,meet);index.counts.set(key,meet.results.length);index.arrays.set(key,meet.results);
@@ -311,8 +312,8 @@ function careerBusy(spans, event) {
   return spans.some(span => span.start < end + 12 && event.at < span.end + 12);
 }
 
-function careerResults({ riderId, horseId, discipline, from = -Infinity, until = Infinity } = {}) {
-  const meets=app.career?.meets||{},index=careerResultIndex(meets);
+function careerResults({ riderId, horseId, discipline, from = -Infinity, until = Infinity, calendarOnly = false } = {}) {
+  const meets=app.career?.meets||{},index=careerResultIndex(meets,calendarOnly);
   const candidates=riderId?index.byRider.get(riderId):horseId?index.byHorse.get(horseId):discipline?index.byDiscipline.get(discipline):new Set(Object.values(meets));
   return [...(candidates||[])].sort((a,b)=>index.order.get(a)-index.order.get(b)).flatMap(meet =>
     meet.hour < from || meet.hour > until || meet.sandbox || discipline && meet.discipline !== discipline ? [] :
@@ -353,15 +354,15 @@ function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
   const needsHistory = event.tier >= 5 && (event.division === 'senior' || event.games) || event.youngFinal || event.final;
   if (!needsHistory) return '';
   const records = (history || careerResults({ riderId: rider.id, discipline: event.discipline,
-    from: event.at - 24 * CAREER_HOURS_PER_MONTH, until: event.at - 1 }))
-    .filter(row => row.placing && row.placing <= (event.games ? 20 : 10) && row.hour < event.at &&
+    from: event.at - 24 * CAREER_HOURS_PER_MONTH, until: event.at - 1, calendarOnly:true }))
+    .filter(row => (typeof rank91Real!=='function'||rank91Real(careerState().meets[row.eventId])) && row.placing && row.placing <= (event.games ? 20 : 10) && row.hour < event.at &&
       row.hour >= event.at - 24 * CAREER_HOURS_PER_MONTH &&
       (!event.games || (event.discipline === 'jumping' ? row.score <= 12 : event.discipline === 'dressage' ? row.score >= 58 : row.score <= 120)));
   const relevant = records.filter(row => event.horseAge ? row.horseId === horse?.id && row.horseAge
     : event.division === 'senior' ? row.division === 'senior' && !row.horseAge : row.division === event.division);
   if (event.final) {
     const qualified = event.team ? Object.values(careerState().meets).some(meet =>
-      meet.series === event.series && meet.hour < event.at && pastureDate(meet.hour).year === event.date.year &&
+      (typeof rank91Real!=='function'||rank91Real(meet)) && meet.series === event.series && meet.hour < event.at && pastureDate(meet.hour).year === event.date.year &&
       meet.teams.some(team => team.country === rider.country && team.placing <= 6))
       : relevant.some(row => row.series === event.series && pastureDate(row.hour).year === event.date.year);
     if (!qualified) return event.team ? 'The federation needs a top-six team finish in a qualifying leg this season.'
@@ -398,7 +399,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
   careerAddYouthCohort(pastureDate(careerState().cursor).year,roster);
   const histories = new Map();
   if (event.games || event.team || event.tier >= 10 || event.final) {
-    for (const row of careerResults({ discipline: event.discipline, until: event.at - 1, from: event.at - CAREER_HOURS_PER_YEAR * 2 })) {
+    for (const row of careerResults({ discipline: event.discipline, until: event.at - 1, from: event.at - CAREER_HOURS_PER_YEAR * 2, calendarOnly:true })) {
       if (!histories.has(row.riderId)) histories.set(row.riderId, []);
       histories.get(row.riderId).push(row);
     }
@@ -409,7 +410,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
   const conflict = booked?.eventSnapshot?.careerEvent && booked.eventId !== event.id &&
     careerBusy([{start:booked.eventSnapshot.at,end:careerEventEnd(booked.eventSnapshot)}],event)
     ? new Set(booked.competitors.filter(row=>!row.player).map(row=>row.riderId)) : null;
-  for (const rider of careerRosterIndex(roster).byDiscipline.get(event.discipline)||[]) {
+  for (const rider of (typeof ranking91EventRoster==='function'?ranking91EventRoster(event,roster):careerRosterIndex(roster).byDiscipline.get(event.discipline)||[])) {
     const age = year-rider.birth?.year;
     if (rider.specialty!==event.discipline || rider.retired || age < minimumAge || age > maximumAge || conflict?.has(rider.id) ||
       careerBusy(rider.recentStarts || [],event)) continue;

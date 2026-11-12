@@ -144,12 +144,13 @@ federationRecords = function (plan, riderId, horseId, until) {
     discipline: plan.discipline,
     from: until - CAREER_HOURS_PER_YEAR,
     until,
+    calendarOnly:true,
   }).filter(
     (r) =>
       r.tier >= 2 &&
       (r.division === plan.division ||
         (plan.division === "senior" && r.division === "amateur")) &&
-      careerState().meets[r.eventId]?.official !== false,
+      careerState().meets[r.eventId]?.official !== false && (typeof rank91Real!=='function'||rank91Real(careerState().meets[r.eventId])),
   );
 };
 function federation90Context(plan, hour) {
@@ -1273,7 +1274,7 @@ federationMarkup82 = function (rider, horses) {
         );
         if (!plan) return "";
         const season = federationState().seasons[plan.id];
-        return `<article class="box"><h3>${csEscape(CAREER_COUNTRIES[a.country][0])} · ${csEscape(CAREER_AGE_DIVISIONS[a.division].label)} · ${csEscape(CAREER_DISCIPLINE_LABELS[a.discipline])}</h3>${federation90Scorecard(plan, a, now)}${season ? "<details><summary>Current candidates and squad changes</summary>" + season.members.map((m) => "<p>#" + m.rank + " " + csEscape(m.riderName) + " / " + csEscape(m.horseName) + " · " + m.score.toFixed(1) + " · " + csEscape(m.status) + "</p>").join("") + season.history.map((h) => "<p>" + csEscape(pastureDateLabel(h.hour)) + " · " + csEscape(h.from || "Applicant") + " → " + csEscape(h.to || "Unselected") + " · " + csEscape(h.reason) + "</p>").join("") + "</details>" : ""}</article>`;
+        return `<article class="box"><h3>${csEscape(CAREER_COUNTRIES[a.country][0])} · ${csEscape(CAREER_AGE_DIVISIONS[a.division].label)} · ${csEscape(CAREER_DISCIPLINE_LABELS[a.discipline])}</h3>${federation90Scorecard(plan, a, now)}${season ? "<details><summary>Current candidates and squad changes</summary>" + (season.members || []).map((m) => "<p>#" + m.rank + " " + csEscape(m.riderName) + " / " + csEscape(m.horseName) + " · " + m.score.toFixed(1) + " · " + csEscape(m.status) + "</p>").join("") + (season.history || []).map((h) => "<p>" + csEscape(pastureDateLabel(h.hour)) + " · " + csEscape(h.from || "Applicant") + " → " + csEscape(h.to || "Unselected") + " · " + csEscape(h.reason) + "</p>").join("") + "</details>" : ""}</article>`;
       })
       .join("");
   const end = html.lastIndexOf("</div></details>");

@@ -96,13 +96,13 @@ simulatePastureHour = function (hour, ...args) {
 // its index once per write, rather than scanning every historical meet per candidate.
 let careerResultBatch90 = null;
 const CAREER_BATCH90_INDEX = careerResultIndex;
-careerResultIndex = function (meets) {
-  if (!careerResultBatch90) return CAREER_BATCH90_INDEX(meets);
+careerResultIndex = function (meets, calendarOnly = false) {
+  if (!careerResultBatch90) return CAREER_BATCH90_INDEX(meets,calendarOnly);
   if (careerResultBatch90.meets !== meets || !careerResultBatch90.index) {
     careerResultBatch90.meets = meets;
-    careerResultBatch90.index = CAREER_BATCH90_INDEX(meets);
+    careerResultBatch90.index = {};
   }
-  return careerResultBatch90.index;
+  const key=calendarOnly?"calendar":"all";return careerResultBatch90.index[key] ||= CAREER_BATCH90_INDEX(meets,calendarOnly);
 };
 const CAREER_BATCH90_ADVANCE = careerAdvance;
 careerAdvance = function (...args) {

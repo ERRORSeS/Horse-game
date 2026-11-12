@@ -9,8 +9,8 @@ function medicalIntensity(c){if(c.resolved||c.asymptomatic===true)return 0;retur
 function updateMedicalMood(h,day=csDay()){
   const active=(h.medicalConditions||[]).filter(c=>medicalIntensity(c)>0),intensity=Math.max(0,...active.map(medicalIntensity)),chance=intensity===0?0:intensity<30?.15:intensity<60?.4:intensity<90?.7:.9;
   // Reuse one daily quantile even when symptoms change after treatment or exertion.
-  const draw=HorseHealth.roll(h.healthSeed||HorseHealth.hash(h.id),'discomfort:'+day),previous=h.medicalMood;
-  h.medicalMoodDay=day;h.medicalMood=draw<chance?'Uncomfortable':null;h.medicalMoodObservation=h.medicalMood?competitionNarrative('mood quotes',previous?5:0,{HORSE:h.name}):previous?competitionNarrative('mood quotes',9,{HORSE:h.name}):'';return {chance,draw,intensity,mood:h.medicalMood};
+  const draw=HorseHealth.roll(h.healthSeed||HorseHealth.hash(h.id),'discomfort:'+day),previous=h.medicalMood,previousDay=h.medicalMoodDay,next=draw<chance?'Uncomfortable':null;
+  h.medicalMoodDay=day;h.medicalMood=next;if(previousDay!==day||previous!==next||typeof h.medicalMoodObservation!=='string')h.medicalMoodObservation=h.medicalMood?competitionNarrative('mood quotes',previous?5:0,{HORSE:h.name}):previous?competitionNarrative('mood quotes',9,{HORSE:h.name}):'';return {chance,draw,intensity,mood:h.medicalMood};
 }
 const COMPLETE_SYNC=csSync;
 csSync=function(h){const r=COMPLETE_SYNC(h);updateMedicalMood(h);return r;};
