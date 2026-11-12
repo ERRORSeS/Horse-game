@@ -72,7 +72,7 @@ function c7Resolve(h,s,index,{npc=false}={}){
      record.outcome=record.railCause?`Rail (${record.railCause} legs${main?', 4 faults':''})`:record.error?'Imperfect approach; clear':'Clean jump';
      if(record.error==='balance'&&w.energy<25)c7Incident(h,s,'Landing',record,npc);
     }else record.outcome=record.error?'Movement completed with '+record.error+' error':'Accurate movement';
-    if(plan.dressage){const skill=effectiveDisciplineSkill(h,'dressage'),base=clamp(5+skill*.035+clamp((w.timing+w.focus+w.confidence-150)/300,-.5,.5),0,10),deduction=record.error?(record.error==='lead'||record.error==='aid'||record.error==='anticipation'?.75:record.error==='balance'?.5:.2):0,bonus=record.quality>=.8?.2:0;record.mark=Math.round(clamp(base-deduction+bonus,0,10)*10)/10;record.markDeduction=deduction;record.coefficient=plan.coefficient;record.outcome=`${plan.title}: ${record.mark.toFixed(1)}/10`;}
+    if(plan.dressage){const skill=effectiveDisciplineSkill(h,'dressage'),deduction=record.error?(record.error==='lead'||record.error==='aid'||record.error==='anticipation'?.75:record.error==='balance'?.5:.2):0;record.mark=dressage95Mark({skill,quality:record.quality,preparation:(w.timing+w.focus+w.confidence)/3,deduction});record.markDeduction=deduction;record.coefficient=plan.coefficient;record.outcome=`${plan.title}: ${record.mark.toFixed(1)}/10`;}
     if(main)c7EffortTiming(h,s,plan,option,record);
     else{
     const style=SHOW_RIDING_STYLES[showRidingStyle(s)]?.time||1,route=/inside|tight|direct/i.test(option.label)?.94:/wide|steady|balance|extra/i.test(option.label)?1.06:1,slow=plan.jump&&i6Traits(h).includes('Careful but Slow')?1.05:1,speed=plan.phase==='cross-country'?10:plan.dressage?3:5+effectiveDisciplineSkill(h,s.discipline)/100;
