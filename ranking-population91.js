@@ -579,6 +579,8 @@ function rank91Visible(type, d, filter, rows, hour, pool, priorRows) {
         []
       ).map((r, i) => [r.id, i]),
     ),
+    previousMetadata=new Map((priorRows || careerState().rankings[careerBoardKey(type,d,String(filter))] || []).map(r=>[r.id,r])),
+    bestHistory=careerState().rankHistory[careerBoardKey(type,d,String(filter))] || {},
     registry = npc85Registry(),
     out = [];
   for (const row of rows) {
@@ -643,7 +645,12 @@ function rank91Visible(type, d, filter, rows, hour, pool, priorRows) {
         rank91Profiles().some((r) => r.id === rank91RowRider(row, type)) ||
         npcRows++ < pool.limit,
     )
-    .map((row, i) => ({ ...row, rank: i + 1, previous: row.previous ?? null }));
+    .map((row, i) => {
+      const old=previousMetadata.get(row.id);
+      const record=bestHistory[row.id];
+      const known=[row.best,old?.best,record?.best,...(row.points>0?[i+1]:[])].filter(n=>Number.isInteger(n)&&n>0);
+      return {...row,rank:i+1,best:known.length?Math.min(...known):null,previous:row.previous ?? old?.previous ?? null};
+    });
 }
 careerComputeBoards = function (hour) {
   rank91State();
@@ -670,7 +677,7 @@ careerComputeBoards = function (hour) {
               ),
             )
           : members.has(rank91RowRider(row, type)),
-    );
+    ).map((row,i)=>({...row,rank:i+1}));
   }
   return boards;
 };

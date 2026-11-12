@@ -1,0 +1,7 @@
+PASS 50 inactive and 100 active NPCs are persistent competition pools, not just row truncation
+PASS age transitions remove the bottom 50 immediately and add five zero-point entrants per week
+PASS hidden circuits and opening seeds cannot award points; actual calendar results still do
+PASS new category members start behind existing competitors until they earn a current result
+PASS discipline, youth, national, horse and series boards use bounded real-identity pools
+PASS seller backstories preserve horse experience without advancing real ranking rivals
+PASS legacy personal player points remain while synthetic NPC points are removed

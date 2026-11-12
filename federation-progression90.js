@@ -311,6 +311,7 @@ function federation90Issue(plan, rider, horse, hour, role = "main") {
   if (health) return health;
   const partner = federation90PartnerIssue(rider, horse);
   if (partner) return partner;
+  const opening=typeof federation93OpeningWindow==='function'&&federation93OpeningWindow(plan,hour);
   const event =
     role === "development"
       ? {
@@ -330,7 +331,7 @@ function federation90Issue(plan, rider, horse, hour, role = "main") {
   });
   if (issue) return issue;
   if (
-    !federationRecords(plan, rider.id, horse.id, hour).some(
+    !opening && !federationRecords(plan, rider.id, horse.id, hour).some(
       (r) => r.placing && r.placing <= 10,
     )
   )
@@ -911,7 +912,7 @@ careerEligibility = function (event, rider, horse, options = {}) {
         " squad nomination."
       );
   }
-  if (event.federationTrial && options.npc) {
+  if (event.federationTrial && options.npc && !event.openingTrial93) {
     const plan = federationPlan(
       event.date.year,
       event.federation,

@@ -18,7 +18,7 @@ careerCircuitField=function(type,d,filter,hour){const scored=RANK86_FIELD(type,d
 const RANK86_ROWS=careerRankingRows;
 careerRankingRows=function(type,d,filter='',hour=careerState().rankingHour??pastureCalendarHour(),...args){const before=new Map((args[1]||careerState().rankings[careerBoardKey(type,d,filter)]||[]).map((row,i)=>[row.id,i])),rows=RANK86_ROWS(type,d,filter,hour,...args),ids=new Set(rows.map(r=>r.id));rows.push(...rank86Pending(type,d,filter,hour).filter(r=>!ids.has(r.id)));rows.sort((a,b)=>b.points-a.points||(a.points===0?(before.get(a.id)??Infinity)-(before.get(b.id)??Infinity):0)||a.id.localeCompare(b.id));rows.forEach((row,i)=>row.rank=i+1);careerState().rankings[careerBoardKey(type,d,filter)]=rows;return rows;};
 const RANK86_POINTS=careerPoints;
-careerPoints=function(event,row,...args){const points=RANK86_POINTS(event,row,...args);if(!row.riderId)return points;const r=careerRosterIndex(careerState().npcs||[]).byId.get(row.riderId),debut=r?.rankingDebutHour86;if(debut==null)return points;if(event.at<debut)return 0;return Math.round(points*Math.min(1,((r.rankingScoringStarts86||0)+1)/4));};
+careerPoints=function(event,row,...args){const points=RANK86_POINTS(event,row,...args);if(!row.riderId)return points;const r=careerRosterIndex(careerState().npcs||[]).byId.get(row.riderId),debut=r?.rankingDebutHour86;if(debut==null)return points;if(event.at<debut)return 0;return points;};
 const RANK86_RECORD=careerRecordMeet;
 careerRecordMeet=function(event,...args){const previous=app.career?.meets[event.id],meet=RANK86_RECORD(event,...args);if(!previous&&!meet.sandbox){const ids=new Set(meet.results.filter(r=>r.points>0).map(r=>r.riderId));for(const id of ids){const r=careerRosterIndex(careerState().npcs||[]).byId.get(id);if(r?.rankingDebutHour86!=null)r.rankingScoringStarts86=(r.rankingScoringStarts86||0)+1;}}return meet;};
 
@@ -28,4 +28,4 @@ const RANK86_DETAILS=careerLeaderboardDetails;
 careerLeaderboardDetails=function(row,...args){return (row.newEntrant86&&row.points===0?'<p>New ranking entrant · 0 points. Results count from joining onward; no backdated points.</p>':'')+RANK86_DETAILS(row,...args);};
 
 const RANK86_RENDER=renderCareerRankings;
-renderCareerRankings=function(...args){const result=RANK86_RENDER(...args),panel=document.getElementById('rankings');if(panel){const p=document.createElement('p');p.textContent='New entrants begin at 0. Their first four scoring competitions build ranking points at 25%, 50%, 75% and full value. Viewing a board adds no past results.';panel.prepend(p);}return result;};
+renderCareerRankings=function(...args){const result=RANK86_RENDER(...args),panel=document.getElementById('rankings');if(panel){const p=document.createElement('p');p.textContent='New entrants begin at 0 and earn the same result-based points as other competitors. Viewing a board adds no past results.';panel.prepend(p);}return result;};

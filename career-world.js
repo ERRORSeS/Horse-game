@@ -21,7 +21,7 @@ const CAREER_REGIONAL_NAMES = {
 
 function careerState() {
   return app.career ||= {
-    version: 1, recordVersion:84, rankingPointsVersion92:1, settings: { progression: false, background: true, games: true, sponsors: true },
+    version: 1, recordVersion:84, rankingPointsVersion92:1, npcRankingPointsVersion93:1, settings: { progression: false, background: true, games: true, sponsors: true },
     origin: pastureCalendarHour(), cursor: pastureCalendarHour(), npcs: null, meets: {},
     allocations: {}, contracts: [], practice: {}, rankings: {}, rankHistory: {}
   };
@@ -537,6 +537,7 @@ function careerRecordMeet(event, standings, player = null, { recovery = false, r
     tier: event.tier, prestige: event.prestige, ranking: event.ranking, series: event.series, division: event.division, divisionScope:event.divisionScope,
     federationTrial:event.federationTrial,federationTrialRound:event.federationTrialRound,federationProgram:event.federationProgram,fieldStrength:mean, official: Boolean(event.official), sandbox: Boolean(event.sandbox), custom: Boolean(event.customShowId || event.userHosted),
     customId: event.customShowId, starters,
+    rankingRules93:{base:event.base,minField:event.minField,cutoff:event.cutoff},
     horseAge: event.horseAge, major: Boolean(event.major), games: Boolean(event.games), final: Boolean(event.final),
     results, teams: careerTeamScores(event, results)
   };
