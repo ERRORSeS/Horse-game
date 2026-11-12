@@ -57,7 +57,7 @@ function auction86History(h,lot,collection){
   const rivals=auction86Rivals(event,rider),pairs=[{rider,horse:h,score:(rider.skill+effectiveDisciplineSkill(h,lot.discipline))/2},...rivals];
   const entries=pairs.map((pair,index)=>careerNpcEntry(event,pair,index)),show={id:event.id,discipline:lot.discipline,level:event.level,round:lot.discipline==='eventing'?2:0,competitors:entries};
   for(const entry of entries)for(const phase of CAREER_PHASES[lot.discipline])entry.scores[phase]=showScore(show,entry,phase);
-  const standings=showStandings(show),row=standings.find(e=>e.horseId===h.id),meet=careerRecordMeet(event,standings,null,{ranked:false}),result=meet.results.find(r=>r.horseId===h.id),earnings=result.placing&&result.placing<=6?Math.round(event.prizeMoney/result.placing):0;
+  const standings=showStandings(show),row=standings.find(e=>e.horseId===h.id),meet=careerRecordMeet(event,standings,null,{ranked:false,recovery:true}),result=meet.results.find(r=>r.horseId===h.id),earnings=result.placing&&result.placing<=6?Math.round(event.prizeMoney/result.placing):0;
   const record={eventId:event.id,horseId:h.id,riderId:rider.id,discipline:lot.discipline,level:event.level,hour:at,score:row.total,placing:result.placing,status:result.status,eliminated:result.eliminated,prize:earnings,source:'Simulated seller competition',resultText:showResultText(row.result)};h.showResults.push(record);h.competitionResults.push({...record});h.competitionEarnings+=earnings;meet.auctionSellerMeet86=true;(rider.auctionSpans86 ||= []).push({start:at,end:careerEventEnd(event)});
 
  }

@@ -1,0 +1,6 @@
+{"index":0,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":false}
+{"index":1,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":2,"unit":"month","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":3,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":4,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":false}
+PASS exact consecutive full-input/cached-input parity, nested repairs, deletions, additions, month/day transitions, replacement invalidation and saved reload

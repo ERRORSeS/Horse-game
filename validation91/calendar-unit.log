@@ -1,0 +1,3 @@
+PASS calendar opens legacy federation decisions and applications without optional history arrays
+PASS programme template caching isolates mutable event state and preserves all dates and rules
+PASS repeated same-day clinical sync preserves a real recovery observation

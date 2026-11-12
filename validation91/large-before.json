@@ -1,0 +1,131 @@
+{
+  "url": "http://localhost:8097",
+  "rows": [
+    {
+      "unit": "day",
+      "elapsedMs": 1162.7999999988824,
+      "result": {
+        "ok": true,
+        "simulationMs": 252.2999999988824,
+        "timings": {
+          "inputMs": 242.39999999850988,
+          "prepareMs": 498.4000488296151,
+          "returnMs": 163.7998046875,
+          "applyMs": 3.400146484375
+        }
+      },
+      "date": [
+        1,
+        1,
+        2
+      ],
+      "meets": 10599,
+      "npcs": 6646
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 1024.0999999996275,
+      "result": {
+        "ok": true,
+        "simulationMs": 89,
+        "timings": {
+          "inputMs": 232.7999999988824,
+          "prepareMs": 425.5000488292426,
+          "returnMs": 273.699951171875,
+          "applyMs": 2.39990234375
+        }
+      },
+      "date": [
+        1,
+        1,
+        3
+      ],
+      "meets": 10599,
+      "npcs": 6646
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 889.4000000003725,
+      "result": {
+        "ok": true,
+        "simulationMs": 91.10000000149012,
+        "timings": {
+          "inputMs": 226.30000000074506,
+          "prepareMs": 411.89995117112994,
+          "returnMs": 155.999755859375,
+          "applyMs": 2.7001953125
+        }
+      },
+      "date": [
+        1,
+        1,
+        4
+      ],
+      "meets": 10599,
+      "npcs": 6646
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 1872.5,
+      "result": {
+        "ok": true,
+        "simulationMs": 663.4000000003725,
+        "timings": {
+          "inputMs": 244.19999999925494,
+          "prepareMs": 532.5001953132451,
+          "returnMs": 385.699951171875,
+          "applyMs": 45.699951171875
+        }
+      },
+      "date": [
+        1,
+        2,
+        1
+      ],
+      "meets": 10786,
+      "npcs": 6648
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 1011.5,
+      "result": {
+        "ok": true,
+        "simulationMs": 92,
+        "timings": {
+          "inputMs": 253.40000000037253,
+          "prepareMs": 478.10024414025247,
+          "returnMs": 182.099853515625,
+          "applyMs": 3.89990234375
+        }
+      },
+      "date": [
+        1,
+        2,
+        2
+      ],
+      "meets": 10786,
+      "npcs": 6648
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 2369.5999999996275,
+      "result": {
+        "ok": true,
+        "simulationMs": 1295.199999999255,
+        "timings": {
+          "inputMs": 269.6000000014901,
+          "prepareMs": 492.1001953110099,
+          "returnMs": 300.699951171875,
+          "applyMs": 10.300048828125
+        }
+      },
+      "date": [
+        1,
+        3,
+        1
+      ],
+      "meets": 11369,
+      "npcs": 6653
+    }
+  ]
+}

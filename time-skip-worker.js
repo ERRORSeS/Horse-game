@@ -15,15 +15,18 @@ self.onmessage=({data})=>{
   // IndexedDB exists in workers, but the live save remains exclusively in the UI.
   saveGame=()=>true;render=()=>{};
   if(data.type==='warmup'){self.postMessage({type:'ready'});return;}
+  if(data.ledgerInput91){if(!app.career?.meets)throw Error('The retained competition history is unavailable. Retry the skip.');SimulationDelta.restore(data,app);}
   for(const key of Object.keys(app))delete app[key];Object.assign(app,data.state);
   RECENT_HORSE_NAMES.clear();for(const name of data.recentHorseNames||[])RECENT_HORSE_NAMES.add(name);
   if(data.testSeed!==undefined){let seed=data.testSeed;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};}
   self.postMessage({type:'progress',text:'Advancing '+data.unit+' · simulating horse care, competitions and auctions…'});
-  const before=SimulationDelta.capture(app);
+  // Clock processing appends finalized records; repairs happen before this snapshot.
+  const journal=SimulationDelta.observe(app,{nested:false});
   const start=performance.now();
   if(data.unit==='month')monthlyProgress();else if(data.unit==='day')advanceOneDay();else if(data.unit==='hour')advanceOneHour();else throw Error('Unknown time skip.');
+  const engineMs=performance.now()-start,diffStart=performance.now();
   Save3.validate(app);
-  const delta=SimulationDelta.create(app,before);
-  self.postMessage({type:'complete',...delta,recentHorseNames:[...RECENT_HORSE_NAMES],simulationMs:performance.now()-start,startedAt:performance.timeOrigin+start,finishedAt:performance.timeOrigin+performance.now()});
+  const delta=journal.finish();
+  self.postMessage({type:'complete',ledgerInputReused:!!data.ledgerInput91,...delta,recentHorseNames:[...RECENT_HORSE_NAMES],simulationMs:performance.now()-start,engineMs,outputDiffMs:performance.now()-diffStart,startedAt:performance.timeOrigin+start,finishedAt:performance.timeOrigin+performance.now()});
  }catch(error){self.postMessage({type:'error',message:error.message,stack:error.stack});}
 };
