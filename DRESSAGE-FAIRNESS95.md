@@ -1,0 +1,9 @@
+# Attainable, consistent dressage judging
+
+Manual movement marks used `5 + 0.035 × skill`, a preparation adjustment capped at 0.5, and a 0.2 clean-execution bonus. Even at skill 100 that capped a perfect movement at 9.2; at skill 80 the maximum was 8.5. Automatic judging used a separate scale and class penalty. Exact dressage ties were broken by starting order.
+
+Manual player/NPC movements and automatic dressage now use one judge: `3 + 0.05 × skill + 1.5 × execution quality + 0.5 × preparation quality − recorded deductions`, bounded and rounded to 0–10. Preparation quality rises from zero at state 50 to one at state 100. Perfect training, execution and preparation can attain 10 at any existing class; less training and actual mistakes still reduce marks. Automatic players and NPCs use the same scale without a separate favorable judge roll. Interactive NPCs already use the same movement resolver as players.
+
+Weighted percentages still use actual recorded movement marks and coefficients. Equal dressage totals now share a placing, regardless of player flag or start order. Other disciplines retain their existing standings rules. Saved completed tests are not rescored.
+
+Validation: real resolver reaches ten, equal automatic player/NPC inputs match at skill 30/60/80/100 and difficulties 0/4/8, deductions and training still matter, ties share positions and better tests can win. Chromium ran a complete manual Grand Prix under best-case conditions, scored 100% and first place against the actual NPC field, then verified unchanged scores after save/reload. Existing interactive, competition completion and competition record tests passed. This controlled best-case test demonstrates attainability; ordinary rides still depend on preparation, execution and training. Evidence is in validation95. The full historical suite was not rerun.

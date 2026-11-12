@@ -1,0 +1,21 @@
+PASS all band endpoints and both contexts use exact linear interpolation and severity clamps
+PASS rider, height, learned confidence, trust and tension use their separate exact modifiers
+PASS Fence Resilience migrates safely, persists, scales only negative events and cannot change temporarily
+PASS positive learning applies Quick/Slow only to real learned deltas; incident recovery is excluded
+PASS spook recovery uses actual positive interactions, exact rolls, one milestone per three events and no duplicate events
+PASS all 55 canonical traits have numerical eligible hooks; unrelated contexts and unowned traits have none
+PASS trait effects produce concrete state changes and environmental eligibility respects actual location
+PASS normalized local hazards preserve round baselines for different course lengths and geometry
+PASS an actual refusal is rolled once; first adds four faults and represents the same fence, second eliminates
+PASS technical mistakes can clear; time, RPG state and legal scoring follow resolved records
+PASS actual choices, rider abilities, timing, energy and readiness influence relevant execution checks
+PASS dressage uses actual movement marks; hunter judges style without showjumping time penalties
+PASS saved in-progress outcomes retain ledgers, refusal representations, five RPG values and readiness
+PASS all 58 exact narratives are gated after outcomes; missing facts never create an event
+PASS NPCs complete actual stable rounds, scores freeze, first rounds freeze and jump-off carries all current values
+PASS Quick Compete remains immediate and posts stable official results without interactive ledger resolutions
+PASS all existing training buttons retain their IDs, labels and ordering
+PASS severe pole avoidance owns one whole-line decision, ordinary polework does not use the jump refusal table
+PASS real foaling inherits resilience within a bounded parental range without rewriting other genetics
+PASS all eventing phases resolve in order with cumulative scoring and unchanged protected horse data
+PASS planned interactive scene titles do not assert an incident before it resolves; existing choices remain identical
