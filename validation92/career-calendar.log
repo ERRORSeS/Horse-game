@@ -1,0 +1,25 @@
+PASS career calendar uses explicit classifications, supported levels and four-year Games cycles
+PASS rider birthdays and overlapping age divisions survive profile switching and old saves
+PASS ponies use measured height, young horse classes use birth year and Welsh limits preserve genetics
+PASS ranking math respects performance, elimination, placing cutoff and rolling expiration
+PASS background meets record recurring combinations and process each date once
+PASS classified live results apply one capped premium and use the booked rider ID
+PASS team scoring honors starter and counting-score rules
+PASS career training is bounded and sponsor stipends are idempotent
+evalmachine.<anonymous>:11
+  if (careerEligibility(youth,rider,null,{history:previous})) throw Error('qualified youth blocked');
+                                                              ^
+
+Error: qualified youth blocked
+    at evalmachine.<anonymous>:11:69
+    at Script.runInContext (node:vm:149:12)
+    at Object.runInContext (node:vm:301:6)
+    at check (evalmachine.<anonymous>:12:30)
+    at Object.<anonymous> (/workspace/work/ranking-points92/tests/career-expansion.test.cjs:157:1)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+
+Node.js v24.22.1

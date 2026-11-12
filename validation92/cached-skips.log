@@ -1,0 +1,17 @@
+{"index":0,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":false}
+{"index":1,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":2,"unit":"month","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":3,"unit":"day","ok":true,"equal":true,"diffs":[],"reused":true}
+{"index":4,"unit":"day","ok":true,"equal":false,"diffs":[{"path":".npcSales.2.medicalMoodObservation","a":"","b":"The horse's mood is beginning to return to its usual pattern."}],"reused":false}
+AssertionError [ERR_ASSERTION]: cached transport changed simulation
+
+false !== true
+
+    at /workspace/work/ranking-points92/tests/cached-skips91-browser.cjs:2:2768 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

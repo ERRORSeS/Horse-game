@@ -1,0 +1,4 @@
+PASS annual majors use competition classifications and respect championship cycles
+PASS sandbox classes persist without rank or career money and annual IDs remain stable
+PASS federation applications are gated, idempotent and selected on scheduled milestones
+PASS career-sanctioned custom shows need no approval qualifications or upfront funding

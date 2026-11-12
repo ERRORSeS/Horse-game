@@ -21,7 +21,7 @@ const CAREER_REGIONAL_NAMES = {
 
 function careerState() {
   return app.career ||= {
-    version: 1, recordVersion:84, settings: { progression: false, background: true, games: true, sponsors: true },
+    version: 1, recordVersion:84, rankingPointsVersion92:1, settings: { progression: false, background: true, games: true, sponsors: true },
     origin: pastureCalendarHour(), cursor: pastureCalendarHour(), npcs: null, meets: {},
     allocations: {}, contracts: [], practice: {}, rankings: {}, rankHistory: {}
   };
@@ -381,6 +381,9 @@ function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
 }
 
 function careerPoints(event, row, starters, fieldFactor = 1) {
+  // Already-booked custom snapshots may predate the corrected high-tier base.
+  if (event.official && event.customShowId && event.tier>=5 && event.base==null)
+    event={...event,base:CAREER_TIERS[event.tier]?.national ?? 45};
   if (!event.official || !event.base || !Number.isFinite(row.score) || starters < event.minField || row.eliminated ||
       !Number.isInteger(row.placing) || row.placing < 1 || row.placing > Math.min(event.cutoff, Math.ceil(starters * .75))) return 0;
   const place = [0,1,.8,.65,.55,.45][row.placing] ?? (row.placing <= 10 ? .3 : .12);
@@ -504,7 +507,7 @@ function careerParticipationStatus(row) {
     ? 'Eliminated' : row.rank ? 'Completed' : 'Did Not Start';
 }
 
-function careerRecordMeet(event, standings, player = null, { recovery = false, ranked = careerActive() || (event.customShowId && event.official) } = {}) {
+function careerRecordMeet(event, standings, player = null, { recovery = false, ranked = careerActive() || (player && event.official) || (event.customShowId && event.official) } = {}) {
   const world = careerState();
   if (world.meets[event.id]) return world.meets[event.id];
   const mean = standings.reduce((sum,row) => sum + (row.skills?.discipline ?? 60), 0) / Math.max(1, standings.length);

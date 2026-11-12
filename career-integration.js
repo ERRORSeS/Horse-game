@@ -40,7 +40,7 @@ function careerComputeBoards(hour) {
     rows.get(id).scores.push(points);
   }
   for (const meet of Object.values(careerState().meets)) {
-    if (meet.sandbox || (typeof rank91Real==='function'&&!rank91Real(meet)) || meet.hour >= hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
+    if (meet.sandbox || (typeof rank91Real==='function'&&!rank91Real(meet)) || meet.hour > hour || meet.hour < hour - CAREER_HOURS_PER_YEAR) continue;
     const seasonal = pastureDate(meet.hour).year === year;
     for (const row of meet.results.filter(row=>!specialties.has(row.riderId)||specialties.get(row.riderId)===meet.discipline)) for (const credit of careerPointCredits(meet,row)) {
       if (!credit.seasonal || seasonal){const country=nationalities.get(row.riderId)||credit.country;add(meet.discipline,{...credit,country,filter:credit.type==='national'?country:credit.type==='youth-national'?String(credit.filter).split('|')[0]+'|'+country:credit.filter});}

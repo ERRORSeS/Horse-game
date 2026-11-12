@@ -689,7 +689,7 @@ careerRankingRows = function (
     type,
     d,
     String(filter),
-    careerComputeBoards(hour + 1)[key] || [],
+    careerComputeBoards(hour)[key] || [],
     hour,
     pool,
   );

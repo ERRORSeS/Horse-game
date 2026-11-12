@@ -124,7 +124,7 @@ check('classified live results apply one capped premium and use the booked rider
   if (meet.results.filter(row => row.player).length !== 1 || meet.results.find(row => row.player).riderId !== 'player') throw Error('live rider');
   showPersistResults(show);
   if (horse.showResults.filter(row => row.entryId === show.id).length !== 1 || careerHorseRecord(horse).wins !== 1) throw Error('result repeated');
-  if (meet.results.some(row => row.points)) throw Error('paused ranking awarded points');
+  if (!(meet.results.find(row => row.player)?.points > 0)) throw Error('eligible live ranking points blocked by optional progression settings');
   if (careerHorseRecord(horse).premium <= 0 || careerHorseRecord(horse).premium > .35) throw Error('market premium');
 }`);
 
