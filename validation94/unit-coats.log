@@ -1,0 +1,7 @@
+PASS every actual breed and every supported coat/pattern has a complete numeric profile
+PASS all primary recipes and shade palettes resolve without impossible dilution alleles
+PASS restricted founders and LP breeds respect their independent body coat profiles
+PASS red factor, cream/pearl, silver, LP/PATN1 and frame viability follow actual inherited genes
+PASS grey progresses with individual variation while Fjord grey dun stays genetically distinct
+PASS body phenotype extensions leave all original face/leg generation and inherited marking values unchanged
+PASS progressive modifiers retain their genetic base and true white is not renamed grey

@@ -1,0 +1,19 @@
+const assert=require('node:assert/strict'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{
+ const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(process.env.GAME_URL||'http://localhost:8101');await page.waitForFunction(()=>Save3.ready);
+ const setup=await page.evaluate(()=>{
+  resetGame();app.settings.horseStatEditor85=true;const old=app.horses[0];delete old.coatGenetics94;old.breed='Friesian';old.coat='Old Bay (medium)';old.faceMarking='Blaze + Snip';old.legMarkings={FR:'Sock',FL:'Stocking',BR:'None',BL:'Pastern'};old.socks=socksFromLegMarkings(old.legMarkings);old.marking='Old body pattern';old.marking2='None';old.coatGenetics94=coat94Legacy(old);
+  const names=[...BREEDS];let h;try{BREEDS.splice(0,BREEDS.length,'Dutch Warmblood');h=baseHorse('trained','player');}finally{BREEDS.splice(0,BREEDS.length,...names);}h.owner='Your Stable';app.horses.push(h);app.selectedHorseId=h.id;changeTab('horses');renderHorses();
+  const protectedValues=horse=>({face:horse.faceMarking,legs:horse.legMarkings,socks:horse.socks,legacyGenes:horse.genetics});
+  return {old:old.id,id:h.id,oldProtected:protectedValues(old),protected:protectedValues(h),oldCoat:old.coat,skills:JSON.stringify(h.stats),potential:JSON.stringify(h.potential)};
+ });
+ const root=page.locator('[data-ui-key="coat94:'+setup.id+'"]');await root.locator('summary').first().click();const editor=root.locator('details').filter({has:page.locator('[data-coat94-family]')});await editor.locator('summary').first().click();
+ await root.locator('[data-coat94-family]').selectOption('Buckskin');await root.locator('[data-coat94-primary]').selectOption('buckskin');await root.locator('[data-coat94-shade]').selectOption('2');await root.locator('[data-coat94-patterns]').selectOption(['tobiano','frame_overo']);await root.locator('[data-coat94-expression]').selectOption('1');await root.locator('[data-coat94-apply]').click();
+ const changed=await page.evaluate(id=>{const h=app.horses.find(h=>h.id===id);return {view:coat94Describe(h.coatGenetics94,coat94Age(h)),face:h.faceMarking,legs:h.legMarkings,socks:h.socks,legacyGenes:h.genetics,skills:JSON.stringify(h.stats),potential:JSON.stringify(h.potential)};},setup.id);
+ assert(changed.view.name.includes('Dark Buckskin Tovero'));assert.equal(changed.view.genes.cream,'Cr/N');assert.equal(changed.view.genes.tobiano,'TO/N');assert.equal(changed.view.genes.frame,'O/N');assert.deepEqual({face:changed.face,legs:changed.legs,socks:changed.socks,legacyGenes:changed.legacyGenes},setup.protected);assert.equal(changed.skills,setup.skills);assert.equal(changed.potential,setup.potential);
+ await page.evaluate(async()=>{saveGame(false);await Save3.flush();});await page.reload();await page.waitForFunction(()=>Save3.ready);
+ const loaded=await page.evaluate(({id,old})=>{const h=app.horses.find(h=>h.id===id),legacy=app.horses.find(h=>h.id===old);changeTab('horses');renderHorses();return {newCoat:coat94Describe(h.coatGenetics94,coat94Age(h)).name,oldCoat:legacy.coat,oldProtected:{face:legacy.faceMarking,legs:legacy.legMarkings,socks:legacy.socks,legacyGenes:legacy.genetics}};},setup);
+ assert.equal(loaded.newCoat,changed.view.name);assert.equal(loaded.oldCoat,setup.oldCoat);assert.deepEqual(loaded.oldProtected,setup.oldProtected);
+ await page.evaluate(()=>{changeTab('sales');renderSales();});for(const name of ['Zangersheide','Miniature Horse','Finnhorse'])assert.equal(await page.locator('[data-breed94-filter] option').filter({hasText:new RegExp('^'+name+'$')}).count(),1);assert.deepEqual(errors,[]);
+ console.log('PASS text coat selector, genotype-compatible Tovero edit, unchanged markings/skills/potential, legacy load preservation, verified reload and new breed market options');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});

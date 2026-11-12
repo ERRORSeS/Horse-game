@@ -1,0 +1,771 @@
+[
+  {
+    "name": "Zangersheide",
+    "id": "zangersheide",
+    "code": "ZANG",
+    "category": "Sport Warmblood",
+    "height": [
+      "16.0",
+      "17.3"
+    ],
+    "reference": {
+      "jumping": 94,
+      "dressage": 83,
+      "eventing": 82,
+      "hunter": 86
+    },
+    "jumpScope": [
+      1.4,
+      1.6,
+      1.7
+    ],
+    "specialties": [
+      "Showjumping",
+      "Sport Horse"
+    ]
+  },
+  {
+    "name": "Irish Sport Horse",
+    "id": "irish_sport_horse",
+    "code": "ISH",
+    "category": "Sport Horse",
+    "height": [
+      "15.2",
+      "17.2"
+    ],
+    "reference": {
+      "jumping": 89,
+      "dressage": 80,
+      "eventing": 94,
+      "hunter": 85
+    },
+    "jumpScope": [
+      1.25,
+      1.5,
+      1.6
+    ],
+    "specialties": [
+      "Eventing",
+      "Showjumping"
+    ]
+  },
+  {
+    "name": "Quarter Horse",
+    "id": "quarter_horse",
+    "code": "QH",
+    "category": "Stock Horse",
+    "height": [
+      "14.2",
+      "16.1"
+    ],
+    "reference": {
+      "jumping": 66,
+      "dressage": 73,
+      "eventing": 68,
+      "hunter": 77
+    },
+    "jumpScope": [
+      0.75,
+      1.05,
+      1.2
+    ],
+    "specialties": [
+      "Stock Riding",
+      "Hunters",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "American Paint Horse",
+    "id": "american_paint_horse",
+    "code": "APH",
+    "category": "Stock Horse",
+    "height": [
+      "14.2",
+      "16.2"
+    ],
+    "reference": {
+      "jumping": 68,
+      "dressage": 72,
+      "eventing": 68,
+      "hunter": 77
+    },
+    "jumpScope": [
+      0.8,
+      1.1,
+      1.25
+    ],
+    "specialties": [
+      "Stock Riding",
+      "Hunters",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Appaloosa",
+    "id": "appaloosa",
+    "code": "APP",
+    "category": "Stock Horse",
+    "height": [
+      "14.2",
+      "16.1"
+    ],
+    "reference": {
+      "jumping": 72,
+      "dressage": 72,
+      "eventing": 76,
+      "hunter": 79
+    },
+    "jumpScope": [
+      0.85,
+      1.15,
+      1.3
+    ],
+    "specialties": [
+      "Hunters",
+      "Eventing",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Knabstrupper",
+    "id": "knabstrupper",
+    "code": "KN",
+    "category": "Spotted Sport Horse",
+    "height": [
+      "15.2",
+      "17.1"
+    ],
+    "reference": {
+      "jumping": 83,
+      "dressage": 91,
+      "eventing": 77,
+      "hunter": 82
+    },
+    "jumpScope": [
+      1.15,
+      1.4,
+      1.55
+    ],
+    "specialties": [
+      "Dressage",
+      "Showjumping",
+      "Hunters"
+    ]
+  },
+  {
+    "name": "Connemara Pony",
+    "id": "connemara_pony",
+    "code": "CON",
+    "category": "Sport Pony",
+    "height": [
+      "12.2",
+      "14.2"
+    ],
+    "reference": {
+      "jumping": 90,
+      "dressage": 79,
+      "eventing": 90,
+      "hunter": 93
+    },
+    "jumpScope": [
+      1.05,
+      1.3,
+      1.4
+    ],
+    "specialties": [
+      "Pony Jumping",
+      "Eventing",
+      "Hunters"
+    ]
+  },
+  {
+    "name": "Shetland Pony",
+    "id": "shetland_pony",
+    "code": "SHET",
+    "category": "Small Pony",
+    "height": [
+      "7.0",
+      "10.2"
+    ],
+    "reference": {
+      "jumping": 43,
+      "dressage": 57,
+      "eventing": 46,
+      "hunter": 60
+    },
+    "jumpScope": [
+      0.3,
+      0.6,
+      0.75
+    ],
+    "specialties": [
+      "Pony Management",
+      "In-hand/Driving where supported"
+    ]
+  },
+  {
+    "name": "Icelandic Horse",
+    "id": "icelandic_horse",
+    "code": "ICE",
+    "category": "Gaited/Northern Horse",
+    "height": [
+      "12.3",
+      "14.2"
+    ],
+    "reference": {
+      "jumping": 60,
+      "dressage": 74,
+      "eventing": 68,
+      "hunter": 66
+    },
+    "jumpScope": [
+      0.5,
+      0.9,
+      1.1
+    ],
+    "specialties": [
+      "Gaited Riding",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Haflinger",
+    "id": "haflinger",
+    "code": "HAF",
+    "category": "Light Draft/Riding Horse",
+    "height": [
+      "13.2",
+      "15.1"
+    ],
+    "reference": {
+      "jumping": 71,
+      "dressage": 79,
+      "eventing": 74,
+      "hunter": 80
+    },
+    "jumpScope": [
+      0.8,
+      1.1,
+      1.25
+    ],
+    "specialties": [
+      "General Riding",
+      "Dressage",
+      "Driving"
+    ]
+  },
+  {
+    "name": "Cleveland Bay",
+    "id": "cleveland_bay",
+    "code": "CB",
+    "category": "Carriage/Sport Horse",
+    "height": [
+      "16.0",
+      "16.3"
+    ],
+    "reference": {
+      "jumping": 76,
+      "dressage": 80,
+      "eventing": 76,
+      "hunter": 78
+    },
+    "jumpScope": [
+      1.05,
+      1.3,
+      1.45
+    ],
+    "specialties": [
+      "Driving",
+      "Dressage",
+      "Hunters"
+    ]
+  },
+  {
+    "name": "Norwegian Fjord",
+    "id": "norwegian_fjord",
+    "code": "NF",
+    "category": "Northern Riding/Driving Horse",
+    "height": [
+      "13.1",
+      "14.3"
+    ],
+    "reference": {
+      "jumping": 65,
+      "dressage": 72,
+      "eventing": 71,
+      "hunter": 74
+    },
+    "jumpScope": [
+      0.65,
+      1.0,
+      1.15
+    ],
+    "specialties": [
+      "General Riding",
+      "Driving",
+      "Dressage"
+    ]
+  },
+  {
+    "name": "Andalusian / PRE",
+    "id": "andalusian_pre",
+    "code": "PRE",
+    "category": "Iberian/Baroque Horse",
+    "height": [
+      "15.0",
+      "16.3"
+    ],
+    "reference": {
+      "jumping": 72,
+      "dressage": 95,
+      "eventing": 70,
+      "hunter": 74
+    },
+    "jumpScope": [
+      0.85,
+      1.15,
+      1.35
+    ],
+    "specialties": [
+      "Dressage",
+      "Classical Riding"
+    ]
+  },
+  {
+    "name": "Lusitano",
+    "id": "lusitano",
+    "code": "LUS",
+    "category": "Iberian/Baroque Horse",
+    "height": [
+      "15.0",
+      "16.3"
+    ],
+    "reference": {
+      "jumping": 79,
+      "dressage": 95,
+      "eventing": 80,
+      "hunter": 77
+    },
+    "jumpScope": [
+      1.0,
+      1.3,
+      1.45
+    ],
+    "specialties": [
+      "Dressage",
+      "Classical Riding",
+      "Versatile Sport"
+    ]
+  },
+  {
+    "name": "Akhal-Teke",
+    "id": "akhal_teke",
+    "code": "AT",
+    "category": "Light Athletic Horse",
+    "height": [
+      "15.0",
+      "16.2"
+    ],
+    "reference": {
+      "jumping": 85,
+      "dressage": 82,
+      "eventing": 89,
+      "hunter": 76
+    },
+    "jumpScope": [
+      1.15,
+      1.4,
+      1.55
+    ],
+    "specialties": [
+      "Eventing",
+      "Showjumping",
+      "Endurance"
+    ]
+  },
+  {
+    "name": "Morgan",
+    "id": "morgan",
+    "code": "MOR",
+    "category": "Versatile Riding Horse",
+    "height": [
+      "14.1",
+      "16.1"
+    ],
+    "reference": {
+      "jumping": 77,
+      "dressage": 83,
+      "eventing": 79,
+      "hunter": 83
+    },
+    "jumpScope": [
+      1.0,
+      1.25,
+      1.4
+    ],
+    "specialties": [
+      "Dressage",
+      "Hunters",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Tennessee Walking Horse",
+    "id": "tennessee_walking_horse",
+    "code": "TWH",
+    "category": "Gaited Horse",
+    "height": [
+      "14.2",
+      "17.0"
+    ],
+    "reference": {
+      "jumping": 61,
+      "dressage": 65,
+      "eventing": 63,
+      "hunter": 70
+    },
+    "jumpScope": [
+      0.65,
+      0.95,
+      1.1
+    ],
+    "specialties": [
+      "Gaited Riding",
+      "Trail Riding"
+    ]
+  },
+  {
+    "name": "Gypsy Cob",
+    "id": "gypsy_cob",
+    "code": "GCOB",
+    "category": "Cob/Driving Horse",
+    "height": [
+      "13.0",
+      "16.1"
+    ],
+    "reference": {
+      "jumping": 66,
+      "dressage": 71,
+      "eventing": 68,
+      "hunter": 79
+    },
+    "jumpScope": [
+      0.65,
+      1.05,
+      1.2
+    ],
+    "specialties": [
+      "General Riding",
+      "Driving",
+      "Hunters"
+    ]
+  },
+  {
+    "name": "Clydesdale",
+    "id": "clydesdale",
+    "code": "CLY",
+    "category": "Heavy Draft",
+    "height": [
+      "16.0",
+      "18.0"
+    ],
+    "reference": {
+      "jumping": 49,
+      "dressage": 59,
+      "eventing": 48,
+      "hunter": 63
+    },
+    "jumpScope": [
+      0.45,
+      0.8,
+      1.0
+    ],
+    "specialties": [
+      "Draft Work",
+      "Driving"
+    ]
+  },
+  {
+    "name": "Shire",
+    "id": "shire",
+    "code": "SHI",
+    "category": "Heavy Draft",
+    "height": [
+      "16.2",
+      "19.0"
+    ],
+    "reference": {
+      "jumping": 41,
+      "dressage": 55,
+      "eventing": 42,
+      "hunter": 60
+    },
+    "jumpScope": [
+      0.35,
+      0.75,
+      0.9
+    ],
+    "specialties": [
+      "Draft Work",
+      "Driving"
+    ]
+  },
+  {
+    "name": "Percheron",
+    "id": "percheron",
+    "code": "PER",
+    "category": "Heavy Draft",
+    "height": [
+      "15.2",
+      "18.0"
+    ],
+    "reference": {
+      "jumping": 53,
+      "dressage": 63,
+      "eventing": 54,
+      "hunter": 67
+    },
+    "jumpScope": [
+      0.5,
+      0.9,
+      1.05
+    ],
+    "specialties": [
+      "Driving",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Belgian Draft",
+    "id": "belgian_draft",
+    "code": "BDR",
+    "category": "Heavy Draft",
+    "height": [
+      "16.0",
+      "18.0"
+    ],
+    "reference": {
+      "jumping": 44,
+      "dressage": 57,
+      "eventing": 45,
+      "hunter": 63
+    },
+    "jumpScope": [
+      0.4,
+      0.75,
+      0.95
+    ],
+    "specialties": [
+      "Draft Work",
+      "Driving"
+    ]
+  },
+  {
+    "name": "Standardbred",
+    "id": "standardbred",
+    "code": "STB",
+    "category": "Racing/Driving Horse",
+    "height": [
+      "14.2",
+      "17.0"
+    ],
+    "reference": {
+      "jumping": 67,
+      "dressage": 68,
+      "eventing": 78,
+      "hunter": 69
+    },
+    "jumpScope": [
+      0.75,
+      1.05,
+      1.25
+    ],
+    "specialties": [
+      "Harness Racing",
+      "Driving",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Mustang",
+    "id": "mustang",
+    "code": "MUS",
+    "category": "Versatile Range Horse",
+    "height": [
+      "13.0",
+      "15.3"
+    ],
+    "reference": {
+      "jumping": 73,
+      "dressage": 71,
+      "eventing": 81,
+      "hunter": 79
+    },
+    "jumpScope": [
+      0.85,
+      1.15,
+      1.35
+    ],
+    "specialties": [
+      "Eventing",
+      "Hunters",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Miniature Horse",
+    "id": "miniature_horse",
+    "code": "MINI",
+    "category": "Miniature Horse",
+    "height": [
+      "7.0",
+      "9.2"
+    ],
+    "reference": {
+      "jumping": 36,
+      "dressage": 50,
+      "eventing": 31,
+      "hunter": 48
+    },
+    "jumpScope": [
+      0.2,
+      0.45,
+      0.6
+    ],
+    "specialties": [
+      "In-hand",
+      "Driving",
+      "Management"
+    ]
+  },
+  {
+    "name": "Pony of the Americas",
+    "id": "pony_of_the_americas",
+    "code": "POA",
+    "category": "Sport/Stock Pony",
+    "height": [
+      "11.2",
+      "14.0"
+    ],
+    "reference": {
+      "jumping": 79,
+      "dressage": 74,
+      "eventing": 82,
+      "hunter": 84
+    },
+    "jumpScope": [
+      0.9,
+      1.15,
+      1.3
+    ],
+    "specialties": [
+      "Pony Hunters",
+      "Pony Jumping",
+      "Eventing"
+    ]
+  },
+  {
+    "name": "Australian Stock Horse",
+    "id": "australian_stock_horse",
+    "code": "ASH",
+    "category": "Stock/Sport Horse",
+    "height": [
+      "14.0",
+      "16.2"
+    ],
+    "reference": {
+      "jumping": 83,
+      "dressage": 79,
+      "eventing": 91,
+      "hunter": 84
+    },
+    "jumpScope": [
+      1.05,
+      1.3,
+      1.45
+    ],
+    "specialties": [
+      "Eventing",
+      "Jumping",
+      "Stock Riding"
+    ]
+  },
+  {
+    "name": "Lipizzaner",
+    "id": "lipizzaner",
+    "code": "LIP",
+    "category": "Classical Dressage Horse",
+    "height": [
+      "14.2",
+      "16.2"
+    ],
+    "reference": {
+      "jumping": 65,
+      "dressage": 96,
+      "eventing": 67,
+      "hunter": 71
+    },
+    "jumpScope": [
+      0.7,
+      1.0,
+      1.2
+    ],
+    "specialties": [
+      "Dressage",
+      "Classical Riding"
+    ]
+  },
+  {
+    "name": "Noriker",
+    "id": "noriker",
+    "code": "NOR",
+    "category": "Heavy Draft",
+    "height": [
+      "15.0",
+      "17.1"
+    ],
+    "reference": {
+      "jumping": 56,
+      "dressage": 70,
+      "eventing": 59,
+      "hunter": 70
+    },
+    "jumpScope": [
+      0.55,
+      0.9,
+      1.1
+    ],
+    "specialties": [
+      "Driving",
+      "General Riding"
+    ]
+  },
+  {
+    "name": "Finnhorse",
+    "id": "finnhorse",
+    "code": "FIN",
+    "category": "Versatile Northern Horse",
+    "height": [
+      "14.3",
+      "16.1"
+    ],
+    "reference": {
+      "jumping": 79,
+      "dressage": 82,
+      "eventing": 85,
+      "hunter": 85
+    },
+    "jumpScope": [
+      1.0,
+      1.25,
+      1.4
+    ],
+    "specialties": [
+      "Dressage",
+      "Eventing",
+      "Jumping",
+      "Driving"
+    ]
+  }
+]
