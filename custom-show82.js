@@ -48,7 +48,7 @@ function customShowEvents(from,to) {
         tier:show.sanctioned ? show.tier : 0, prestige:show.prestige,country:show.country,
         course:row.course,horseAge:row.horseAge || null,ponyCm:row.pony || row.division==='pony' ? 148 : null,
         ranking:show.sanctioned ? (row.division==='senior' ? 'national' : 'division') : 'none',official:show.sanctioned,
-        base:show.sanctioned ? CAREER_TIERS[show.tier].national : 0,minField:8,cutoff:10
+        base:show.sanctioned ? (CAREER_TIERS[show.tier].national ?? 45) : 0,minField:8,cutoff:10
       },date.year);
       event.id='career:'+year+':'+show.id+'-'+(index+1);
       event.customShowId=show.id;
@@ -116,4 +116,51 @@ careerEnter = function(event,horse) {
     return {ok:false,message:'This class already has a saved entry.'};
   }
   return CUSTOM_SHOW_ENTER(event,horse);
+};
+
+// Repair known ranking result data without replaying any show side effects.
+function repairRankingPoints92() {
+  const world=app.career;
+  if (!world || world.rankingPointsVersion92===1) return false;
+  let repaired=false;
+  const recorded=new Map(),catalogue=new Map(CAREER_SERIES.map(event=>[event.id,event]));
+  for (const show of [...(app.showHistory || []),app.activeShow].filter(Boolean)) {
+    if (!show.finalStandings?.some(row=>row.player)) continue;
+    const event=careerShowClass(show);
+    if (event.official && !event.sandbox && event.base>0) recorded.set(event.id,event);
+  }
+  for (const meet of Object.values(world.meets || {})) {
+    if (!meet.official || meet.sandbox ||
+        (typeof rank91Real==='function' && !rank91Real(meet))) continue;
+    if (!(meet.results || []).some(row=>row.player && row.started!==false && !(row.points>0))) continue;
+    const definition=catalogue.get(meet.classId);
+    const scheduled=definition?.official && definition.base>0 && definition.discipline===meet.discipline &&
+      definition.tier===meet.tier && definition.ranking===meet.ranking ?
+        careerEvent(definition,pastureDate(meet.at ?? meet.hour).year) : null;
+    const legacy=recorded.get(meet.id) || scheduled;
+    const custom=meet.customId && Number.isInteger(meet.tier) && meet.tier>=5 && meet.tier<=11 &&
+      ['national','division'].includes(meet.ranking);
+    if (!legacy && !custom) continue;
+    const event=legacy || {...meet,customShowId:meet.customId,base:CAREER_TIERS[meet.tier]?.national ?? 45,
+      minField:8,cutoff:10};
+    if (legacy && (meet.ranking!==legacy.ranking || meet.division!==legacy.division)) {
+      Object.assign(meet,{ranking:legacy.ranking,division:legacy.division});repaired=true;
+    }
+    const starters=meet.starters ?? (meet.results || []).filter(row=>row.started!==false).length;
+    const field=clamp(.85+(meet.fieldStrength ?? 60)*.003,.85,1.15);
+    for (const row of meet.results || []) {
+      if (!row.player || row.started===false || row.points>0) continue;
+      const points=careerPoints(event,row,starters,field);
+      if (points>0) { row.points=points;repaired=true; }
+    }
+  }
+  world.rankingPointsVersion92=1;
+  if (repaired && Number.isFinite(world.rankingHour)) careerPublish(world.rankingHour,{repair:true});
+  return repaired;
+}
+const CUSTOM_POINTS92_LOAD=hydrateFromSave;
+hydrateFromSave=function(...args) {
+  const result=CUSTOM_POINTS92_LOAD(...args);
+  repairRankingPoints92();
+  return result;
 };

@@ -421,7 +421,7 @@ function careerRiderRankingMarkup(rider,discipline) {
       board.rankedId=credit.id;
       board.earned=true;
       const year=pastureDate(now).year;
-      if (meet.hour>=(world.rankingHour ?? now-CAREER_HOURS_PER_YEAR) &&
+      if (meet.hour>(world.rankingHour ?? now-CAREER_HOURS_PER_YEAR) &&
           (!credit.seasonal || pastureDate(meet.hour).year>=year)) board.pending+=credit.points;
     }
   }
