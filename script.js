@@ -4962,8 +4962,9 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
   foal.height = heightFromBreed(foal.breed);
   foal.genetics = foalGeneticsFromParents(mare, sire || {});
   const lethalOveroRisk = mareHasVisibleOveroMarking(mare) && mareHasVisibleOveroMarking(sire || {});
-  if (lethalOveroRisk && countAllele(foal.genetics.overo, 'O') === 2) {
-    pushReport(`${mare.name} lost a foal due to lethal frame overo (OO).`);
+  const coatViability94=foal.genetics.coat94?.viability;
+  if (coatViability94 ? !coatViability94.valid : lethalOveroRisk && countAllele(foal.genetics.overo, 'O') === 2) {
+    pushReport(coatViability94 ? `${mare.name} lost a foal due to an incompatible inherited coat genotype.` : `${mare.name} lost a foal due to lethal frame overo (OO).`);
     delete mare.pregnantBy;
     delete mare.pregnantEmbryo;
     mare.pregnancyDays = 0;

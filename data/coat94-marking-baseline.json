@@ -1,0 +1,54 @@
+{
+  "baseCommit": "2673e13c562b132768a16767b70277af6799cb3c",
+  "protectedRegions": [
+    {
+      "file": "script.js",
+      "start": "const SOCKS =",
+      "end": "\n",
+      "sha256": "09aea40d6f6c1dad9e59877111ef4ff3fbe1e5d5d5d1ddabef812c0738e49896"
+    },
+    {
+      "file": "script.js",
+      "start": "const FACE_MARKINGS =",
+      "end": "\n",
+      "sha256": "0968a8835725b82060af26a3a0b78a3afc92540e5b35f728fdfa04848051116f"
+    },
+    {
+      "file": "script.js",
+      "start": "const GENE_KEYS =",
+      "end": "\n",
+      "sha256": "187739324880a791a990412225edc7b15800b6e85648187f05095c866dffba9c"
+    },
+    {
+      "file": "script.js",
+      "start": "function randomGenetics(",
+      "end": "function splitGenePair(",
+      "sha256": "9a29349f9dea25af9bde002d8f6dfbec4d5ae709d775b2f672a49ed1de040fea"
+    },
+    {
+      "file": "script.js",
+      "start": "function randomLegMarkings(",
+      "end": "function resolveWhitePattern(",
+      "sha256": "b5f5fa44d6d9617dc2a0e9dc35cf531d070b4045e7d1e9f2c8d52b0706c65dd2"
+    },
+    {
+      "file": "script.js",
+      "start": "function resolvePhenotypeFromGenetics(",
+      "end": "function inheritGenePair(",
+      "sha256": "3ec24603a55a3ff26139cb6acf759a083a93ecb3895b1e6ceb2b21f6637c7c09"
+    },
+    {
+      "file": "script.js",
+      "start": "function foalGeneticsFromParents(",
+      "end": "function randomMarking(",
+      "sha256": "e2a6f8844cf77c6386ef925db27264871a9d8a048ed33e2c71ee94bd1e56358b"
+    },
+    {
+      "file": "career-breeds.js",
+      "start": "function careerWelshMarkings(",
+      "end": "function careerWelshRegistry(",
+      "sha256": "061797c1e81cef9484e83cef2eb610dc222028c0fa93a712cc2c0f091d40eb22"
+    }
+  ],
+  "assetFiles": []
+}

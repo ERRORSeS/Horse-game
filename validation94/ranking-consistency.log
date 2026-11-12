@@ -1,0 +1,4 @@
+PASS NPC debut wins earn the same full points as a player in every discipline
+PASS best ranks survive recomputation, falling standings and reload while zero entrants have no invented best
+PASS saved discounted NPC results repair once without changing player, private, local or pre-debut results
+PASS board result breakdowns use published credited points rather than unrelated wins

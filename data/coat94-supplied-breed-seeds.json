@@ -1,0 +1,303 @@
+{
+  "Thoroughbred": {
+    "Bay": 55.0,
+    "Chestnut": 35.0,
+    "Black": 10.0
+  },
+  "Arabian": {
+    "Bay": 45.0,
+    "Chestnut": 45.0,
+    "Black": 10.0
+  },
+  "Dutch Warmblood": {
+    "Bay": 50.0,
+    "Chestnut": 25.0,
+    "Black": 20.0,
+    "Buckskin": 3.0,
+    "Palomino": 2.0
+  },
+  "Belgian Warmblood": {
+    "Bay": 50.0,
+    "Chestnut": 30.0,
+    "Black": 20.0
+  },
+  "Hanoverian": {
+    "Bay": 55.0,
+    "Chestnut": 25.0,
+    "Black": 20.0
+  },
+  "Holsteiner": {
+    "Bay": 60.0,
+    "Chestnut": 20.0,
+    "Black": 20.0
+  },
+  "Oldenburg": {
+    "Bay": 45.0,
+    "Chestnut": 30.0,
+    "Black": 20.0,
+    "Buckskin": 3.0,
+    "Palomino": 2.0
+  },
+  "Trakehner": {
+    "Bay": 45.0,
+    "Chestnut": 25.0,
+    "Black": 30.0
+  },
+  "Selle Fran\u00e7ais": {
+    "Bay": 55.0,
+    "Chestnut": 35.0,
+    "Black": 10.0
+  },
+  "Zangersheide": {
+    "Bay": 50.0,
+    "Chestnut": 30.0,
+    "Black": 15.0,
+    "Buckskin": 3.0,
+    "Palomino": 2.0
+  },
+  "Swedish Warmblood": {
+    "Bay": 50.0,
+    "Chestnut": 30.0,
+    "Black": 20.0
+  },
+  "Canadian Warmblood": {
+    "Bay": 50.0,
+    "Chestnut": 30.0,
+    "Black": 20.0
+  },
+  "Irish Sport Horse": {
+    "Bay": 45.0,
+    "Chestnut": 35.0,
+    "Black": 20.0
+  },
+  "Quarter Horse": {
+    "Bay": 35.0,
+    "Chestnut": 30.0,
+    "Black": 10.0,
+    "Buckskin": 9.0,
+    "Palomino": 8.0,
+    "Red Dun": 4.0,
+    "Grullo": 2.0,
+    "Smoky Black": 2.0
+  },
+  "American Paint Horse": {
+    "Bay": 37.0,
+    "Chestnut": 33.0,
+    "Black": 10.0,
+    "Buckskin": 8.0,
+    "Palomino": 7.0,
+    "Red Dun": 3.0,
+    "Grullo": 2.0
+  },
+  "Appaloosa": {
+    "Bay": 36.0,
+    "Chestnut": 32.0,
+    "Black": 12.0,
+    "Buckskin": 8.0,
+    "Palomino": 7.0,
+    "Grullo": 3.0,
+    "Red Dun": 2.0
+  },
+  "Knabstrupper": {
+    "Bay": 35.0,
+    "Chestnut": 35.0,
+    "Black": 30.0
+  },
+  "Connemara Pony": {
+    "Bay": 40.0,
+    "Chestnut": 12.0,
+    "Black": 12.0,
+    "Buckskin": 20.0,
+    "Palomino": 10.0,
+    "Smoky Black": 6.0
+  },
+  "Welsh Mountain Pony A": {
+    "Bay": 35.0,
+    "Chestnut": 40.0,
+    "Black": 10.0,
+    "Palomino": 8.0,
+    "Buckskin": 5.0,
+    "Dun": 2.0
+  },
+  "Welsh Pony B": {
+    "Bay": 40.0,
+    "Chestnut": 35.0,
+    "Black": 12.0,
+    "Palomino": 6.0,
+    "Buckskin": 5.0,
+    "Dun": 2.0
+  },
+  "Welsh Pony of Cob Type C": {
+    "Bay": 40.0,
+    "Chestnut": 38.0,
+    "Black": 15.0,
+    "Palomino": 4.0,
+    "Buckskin": 3.0
+  },
+  "Welsh Cob D": {
+    "Bay": 42.0,
+    "Chestnut": 40.0,
+    "Black": 13.0,
+    "Palomino": 3.0,
+    "Buckskin": 2.0
+  },
+  "Shetland Pony": {
+    "Bay": 28.0,
+    "Chestnut": 35.0,
+    "Black": 25.0,
+    "Palomino": 6.0,
+    "Silver Black": 4.0,
+    "Buckskin": 2.0
+  },
+  "Icelandic Horse": {
+    "Bay": 25.0,
+    "Chestnut": 30.0,
+    "Black": 22.0,
+    "Silver Black": 10.0,
+    "Silver Bay": 5.0,
+    "Buckskin": 3.0,
+    "Palomino": 3.0,
+    "Dun": 2.0
+  },
+  "Friesian": {
+    "Black": 100.0
+  },
+  "Haflinger": {
+    "Chestnut": 100.0
+  },
+  "Cleveland Bay": {
+    "Bay": 100.0
+  },
+  "Norwegian Fjord": {
+    "Brown Dun": 90.0,
+    "Red Dun": 5.0,
+    "White Dun": 2.0,
+    "Grey Dun": 2.0,
+    "Yellow Dun": 1.0
+  },
+  "Andalusian / PRE": {
+    "Bay": 55.0,
+    "Chestnut": 35.0,
+    "Black": 10.0
+  },
+  "Lusitano": {
+    "Bay": 55.0,
+    "Chestnut": 30.0,
+    "Black": 15.0
+  },
+  "Akhal-Teke": {
+    "Bay": 40.0,
+    "Chestnut": 30.0,
+    "Black": 15.0,
+    "Buckskin": 8.0,
+    "Palomino": 5.0,
+    "Cremello": 2.0
+  },
+  "Morgan": {
+    "Bay": 33.0,
+    "Chestnut": 40.0,
+    "Black": 20.0,
+    "Palomino": 4.0,
+    "Buckskin": 3.0
+  },
+  "Tennessee Walking Horse": {
+    "Bay": 32.0,
+    "Chestnut": 30.0,
+    "Black": 18.0,
+    "Palomino": 8.0,
+    "Buckskin": 7.0,
+    "Silver Black": 3.0,
+    "Gold Champagne": 2.0
+  },
+  "Gypsy Cob": {
+    "Bay": 37.0,
+    "Chestnut": 33.0,
+    "Black": 20.0,
+    "Buckskin": 5.0,
+    "Palomino": 5.0
+  },
+  "Clydesdale": {
+    "Bay": 60.0,
+    "Chestnut": 17.0,
+    "Black": 15.0,
+    "Brown": 8.0
+  },
+  "Shire": {
+    "Black": 55.0,
+    "Bay": 30.0,
+    "Chestnut": 10.0,
+    "Brown": 5.0
+  },
+  "Percheron": {
+    "Black": 75.0,
+    "Bay": 20.0,
+    "Chestnut": 5.0
+  },
+  "Belgian Draft": {
+    "Chestnut": 75.0,
+    "Bay": 15.0,
+    "Black": 10.0
+  },
+  "Standardbred": {
+    "Bay": 45.0,
+    "Chestnut": 25.0,
+    "Black": 25.0,
+    "Brown": 5.0
+  },
+  "Mustang": {
+    "Bay": 30.0,
+    "Chestnut": 30.0,
+    "Black": 15.0,
+    "Buckskin": 8.0,
+    "Palomino": 7.0,
+    "Bay Dun": 5.0,
+    "Red Dun": 3.0,
+    "Grullo": 2.0
+  },
+  "Miniature Horse": {
+    "Bay": 22.0,
+    "Chestnut": 25.0,
+    "Black": 15.0,
+    "Buckskin": 10.0,
+    "Palomino": 10.0,
+    "Silver Black": 6.0,
+    "Cremello": 4.0,
+    "Perlino": 3.0,
+    "Smoky Cream": 2.0,
+    "Dun": 3.0
+  },
+  "Pony of the Americas": {
+    "Bay": 35.0,
+    "Chestnut": 35.0,
+    "Black": 15.0,
+    "Buckskin": 10.0,
+    "Palomino": 5.0
+  },
+  "Australian Stock Horse": {
+    "Bay": 40.0,
+    "Chestnut": 30.0,
+    "Black": 15.0,
+    "Buckskin": 8.0,
+    "Palomino": 4.0,
+    "Dun": 3.0
+  },
+  "Lipizzaner": {
+    "Bay": 60.0,
+    "Chestnut": 20.0,
+    "Black": 20.0
+  },
+  "Noriker": {
+    "Bay": 30.0,
+    "Chestnut": 30.0,
+    "Black": 25.0,
+    "Silver Black": 10.0,
+    "Buckskin": 5.0
+  },
+  "Finnhorse": {
+    "Bay": 30.0,
+    "Chestnut": 45.0,
+    "Black": 18.0,
+    "Silver Black": 4.0,
+    "Palomino": 3.0
+  }
+}
