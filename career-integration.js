@@ -479,7 +479,9 @@ function careerEnter(event, horse) {
     const horseSkill = event.allocated ? 78 : effectiveDisciplineSkill(horse,event.discipline);
     const score = athleteSkill * .35 + horseSkill * .35 + Math.min(30, performance * 8);
     if (event.team && team.length + 1 < event.team) return { ok: false, message: 'Your federation cannot field a complete qualified squad for this class.' };
-    if (team.length >= max && score < team[max - 1].selection) return { ok: false, message: 'The federation has filled its quota with stronger qualified combinations. You are on the reserve list.' };
+    const nomination = typeof federationEnabled==='function'&&federationEnabled()&&typeof federationNomination==='function'?federationNomination(event,rider,horse):null;
+    const selected = nomination && (typeof federationMayRepresent==='function'?federationMayRepresent(event,nomination):['Selected — National Squad','Selected — Championship Team'].includes(nomination.status));
+    if (!selected && team.length >= max && score < team[max - 1].selection) return { ok: false, message: 'The federation has filled its quota with stronger qualified combinations. You are on the reserve list.' };
   }
   if (app.money < event.entryFee) return { ok: false, message: 'Insufficient funds for entry.' };
   const allocated = event.allocated ? careerAllocatedHorse(event,rider,horse) : null;
