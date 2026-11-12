@@ -1,6 +1,6 @@
 /* Local, portable save identities. IndexedDB is device storage, not cloud storage. */
 const Save3=(()=>{
- let database=null,opening=null,pending=null,timer=null,lastError=null,ready=false,dirty=false;
+ let database=null,opening=null,pending=null,timer=null,lastError=null,ready=false,dirty=false,starting=null,blockedSaveId=null,deletingId=null;
  const supported=typeof indexedDB!=='undefined';
  function id(){const bytes=new Uint32Array(3);if(typeof crypto!=='undefined'&&crypto.getRandomValues)crypto.getRandomValues(bytes);else for(let i=0;i<3;i++)bytes[i]=Math.floor(Math.random()*4294967296);return 'OXER-'+Array.from(bytes,n=>n.toString(36).toUpperCase().padStart(7,'0')).join('-');}
  function identity(){return app.saveIdentity ||= {id:id(),name:'My Stable',stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}
@@ -65,6 +65,35 @@ const Save3=(()=>{
   const verified=await getStored(record.id);
   if(!await sameStored(verified,stored))throw Error('Save readback verification failed.');
  }
+ async function summaries(){
+  const d=await db();
+  if(!d){const rows=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('horse_game_save3_')&&!key.endsWith('__active__'))try{const r=JSON.parse(localStorage.getItem(key));rows.push({id:r.id,name:r.name,updatedAt:r.updatedAt});}catch(error){rows.push({id:key.slice('horse_game_save3_'.length),name:'Unreadable save'});}}return rows;}
+  return storageOperation('Listing save summaries',(resolve,reject,setAbort)=>{
+   const transaction=d.transaction('saves','readonly'),request=transaction.objectStore('saves').openCursor(),rows=[];
+   setAbort(()=>transaction.abort());request.onerror=()=>reject(request.error);transaction.onabort=()=>reject(transaction.error);
+   request.onsuccess=()=>{const cursor=request.result;if(!cursor){resolve(rows);return;}const r=cursor.value;if(r.id!=='__active__')rows.push({id:r.id,name:r.name||'Unnamed save',updatedAt:r.updatedAt,createdAt:r.createdAt});cursor.continue();};
+  });
+ }
+ async function activate(saveId){
+  const active=await getStored('__active__');if(active?.saveId===saveId)return;
+  const d=await db();if(!d){localStorage.setItem('horse_game_save3___active__',JSON.stringify({id:'__active__',saveId}));return;}
+  await storageOperation('Selecting active save',(resolve,reject,setAbort)=>{const transaction=d.transaction('saves','readwrite');setAbort(()=>transaction.abort());transaction.oncomplete=()=>resolve();transaction.onerror=()=>reject(transaction.error);transaction.onabort=()=>reject(transaction.error);transaction.objectStore('saves').put({id:'__active__',saveId});});
+ }
+ async function remove(saveId){
+  if(deletingId)throw Error('Another save deletion is in progress.');
+  const key=String(saveId||'').trim().toUpperCase();if(!/^OXER-[A-Z0-9-]+$/.test(key))throw Error('Choose a valid local save ID to delete.');
+  deletingId=key;const current=app.saveIdentity?.id===key,blocked=blockedSaveId===key,wasDirty=dirty;
+  try{
+   if(current){if(timer!==null){if(typeof timer==='function')timer();else clearTimeout(timer);timer=null;}dirty=false;}
+   if(pending)await pending.catch(()=>{});
+   const d=await db();if(!d){localStorage.removeItem('horse_game_save3_'+key);const active=await getStored('__active__');if(active?.saveId===key)localStorage.removeItem('horse_game_save3___active__');}
+   else await storageOperation('Deleting local save',(resolve,reject,setAbort)=>{
+    const transaction=d.transaction('saves','readwrite'),store=transaction.objectStore('saves');setAbort(()=>transaction.abort());transaction.oncomplete=()=>resolve();transaction.onerror=()=>reject(transaction.error);transaction.onabort=()=>reject(transaction.error);
+    store.delete(key);const request=store.get('__active__');request.onsuccess=()=>{if(request.result?.saveId===key)store.delete('__active__');};
+   });
+   if(current){app.saveIdentity=null;dirty=false;ready=false;}if(blocked){blockedSaveId=null;lastError=null;}return {current,blocked};
+  }catch(error){if(current)dirty=dirty||wasDirty;throw error;}finally{deletingId=null;}
+ }
  async function list(){
   const d=await db();
   if(!d){const rows=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('horse_game_save3_')&&!key.endsWith('__active__'))try{rows.push(JSON.parse(localStorage.getItem(key)));}catch(error){}}return rows;}
@@ -109,6 +138,7 @@ const Save3=(()=>{
   const encoded=await payload;return {...header,...(typeof encoded==='string'?{payload:encoded}:encoded)};
  }
  function enqueue(){
+  if(deletingId&&app.saveIdentity?.id===deletingId)return false;
   identity();dirty=true;saveFeedback('Saving on this device…');
   if(timer!==null){if(typeof timer==='function')timer();else clearTimeout(timer);}
   const run=()=>{timer=null;flush().catch(()=>{});};timer=typeof scheduleAutomaticSave==='function'?scheduleAutomaticSave(run):setTimeout(run,600);return true;
@@ -120,6 +150,7 @@ const Save3=(()=>{
   // One write at a time. Changes during a write become one fresh follow-up snapshot.
   const operation=Promise.resolve().then(async()=>{
    while(dirty){
+    if(deletingId&&app.saveIdentity?.id===deletingId){dirty=false;break;}
     const saveId=identity().id;
     try{
      validate(app);dirty=false;const current=await record();
@@ -136,14 +167,14 @@ const Save3=(()=>{
   }).finally(()=>{if(pending===operation)pending=null;});
   pending=operation;return operation;
  }
- async function load(saveId,{preserve=true}={}){if((dirty||pending)&&preserve)await flush();const stored=await getStored(String(saveId).trim().toUpperCase()),r=await unpackRecord(stored);if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await put(stored);dirty=false;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;await flush();}render();saveFeedback('Loaded '+r.name+' · '+r.id);return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
- async function create(name='My Stable'){if(dirty||pending)await flush();let meta;do{meta={id:id(),name,stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}while(await get(meta.id));app.saveIdentity=meta;dirty=true;await flush();return meta;}
+ async function load(saveId,{preserve=true}={}){if((dirty||pending)&&preserve)await flush();const stored=await getStored(String(saveId).trim().toUpperCase()),r=await unpackRecord(stored);if(!r?.payload)throw Error('No accessible save matches this ID on this device or connected storage. Import a save file or choose a local save.');const data=validate(JSON.parse(r.payload)),before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity={id:r.id,name:r.name,stableName:r.stableName,createdAt:r.createdAt,updatedAt:r.updatedAt,schemaVersion:3,storage:r.storage};await activate(r.id);dirty=false;let migrationError=null;if(!data.ridingEducationRepairVersion||data.auctions3&&data.auctions3.bidFundingVersion!==2){dirty=true;try{await flush();}catch(error){migrationError=error;}}ready=true;lastError=migrationError;blockedSaveId=null;render();saveFeedback(migrationError?'Loaded '+r.name+'. Saving needs attention: '+migrationError.message:'Loaded '+r.name+' · '+r.id,Boolean(migrationError));return true;}catch(error){hydrateFromSave(JSON.parse(before));throw error;}}
+ async function create(name='My Stable'){if(dirty||pending)await flush();let meta;do{meta={id:id(),name,stableName:app.currentBarn?.name||'Your Stable',createdAt:new Date().toISOString(),updatedAt:null,schemaVersion:3,storage:supported?'IndexedDB on this device':'Local browser storage'};}while(await get(meta.id));app.saveIdentity=meta;dirty=true;await flush();ready=true;lastError=null;blockedSaveId=null;return meta;}
  function exportFile(){cleanTransferFields();identity();return JSON.stringify({format:'oxer-to-oxer',version:3,exportedAt:new Date().toISOString(),state:JSON.parse(serializeAppState())});}
- async function importFile(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer'||file.version&&![1,3].includes(file.version))throw Error('Unsupported save file.');const data=validate(file.state||file);if(dirty||pending)await flush();const before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity=data.saveIdentity||null;identity();dirty=true;await flush();render();return app.saveIdentity.id;}catch(error){hydrateFromSave(JSON.parse(before));dirty=false;throw error;}}
+ async function importFile(text){const file=JSON.parse(text);if(file.format&&file.format!=='oxer-to-oxer'||file.version&&![1,3].includes(file.version))throw Error('Unsupported save file.');const data=validate(file.state||file);if(dirty||pending)await flush();const before=serializeAppState();try{hydrateFromSave(data);app.saveIdentity=data.saveIdentity||null;identity();dirty=true;await flush();ready=true;lastError=null;blockedSaveId=null;render();return app.saveIdentity.id;}catch(error){hydrateFromSave(JSON.parse(before));dirty=false;throw error;}}
  async function portableCode(){const text=exportFile(),raw=new TextEncoder().encode(text);let data=raw,mode='RAW';if(typeof CompressionStream!=='undefined'){data=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());mode='GZ';}const chunks=[];for(let i=0;i<data.length;i+=8192)chunks.push(String.fromCharCode(...data.subarray(i,i+8192)));return 'OXER3.'+mode+'.'+HorseHealth.hash(text).toString(16)+'.'+btoa(chunks.join('')).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');}
  async function importCode(code){const parts=String(code).trim().split('.');if(parts.length!==4||parts[0]!=='OXER3'||!['RAW','GZ'].includes(parts[1]))throw Error('Paste the full Portable Save Code, not the short local Save ID.');if(parts[3].length>100000000)throw Error('Portable code is too large. Use Import Save File instead.');let encoded=parts[3].replaceAll('-','+').replaceAll('_','/');encoded+='='.repeat((4-encoded.length%4)%4);let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(parts[1]==='GZ'){if(typeof DecompressionStream==='undefined')throw Error('This browser cannot decompress the code. Use an exported JSON save file instead.');bytes=new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());}const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(HorseHealth.hash(text).toString(16)!==parts[2])throw Error('Portable Save Code is incomplete or damaged. Copy the complete code again.');return importFile(text);}
- async function start(){try{const active=await get('__active__');if(active?.saveId)await load(active.saveId,{preserve:false});else{SAVE3_LEGACY_LOAD(false);if(typeof singleSaveLoadBlocked!=='undefined'&&singleSaveLoadBlocked)throw Error('The existing legacy save could not be restored. Export/recover it before starting a new stable.');identity();dirty=true;await flush();}ready=true;}catch(error){lastError=error;saveFeedback('Local save database unavailable: '+error.message+'. Existing saves have not been deleted.',true);}finally{document.querySelector('[data-save3-loading]')?.remove();}}
- return {supported,identity,get,list,load,create,flush,enqueue,exportFile,importFile,portableCode,importCode,validate,start,get dirty(){return dirty||Boolean(pending);},get ready(){return ready;},get error(){return lastError;}};
+ function start(){if(starting)return starting;starting=(async()=>{try{const active=await getStored('__active__');if(active?.saveId){blockedSaveId=active.saveId;await load(active.saveId,{preserve:false});}else{SAVE3_LEGACY_LOAD(false);if(typeof singleSaveLoadBlocked!=='undefined'&&singleSaveLoadBlocked)throw Error('The existing legacy save could not be restored. Export/recover it before starting a new stable.');identity();dirty=true;await flush();}ready=true;blockedSaveId=null;}catch(error){lastError=error;saveFeedback('Local save database unavailable: '+error.message+'. Existing saves have not been deleted.',true);}finally{document.querySelector('[data-save3-loading]')?.remove();}})().finally(()=>{starting=null;});return starting;}
+ return {supported,identity,get,list,summaries,remove,load,create,flush,enqueue,exportFile,importFile,portableCode,importCode,validate,start,get dirty(){return dirty||Boolean(pending);},get ready(){return ready;},get error(){return lastError;},get blockedSaveId(){return blockedSaveId;},get loading(){return Boolean(starting);}};
 })();
 const SAVE3_HYDRATE=hydrateFromSave;
 hydrateFromSave=function(data){const r=SAVE3_HYDRATE(data);app.saveIdentity=data.saveIdentity?HorseHealth.copy(data.saveIdentity):null;return r;};
@@ -152,7 +183,7 @@ resetGame=function(...args){const r=SAVE3_RESET(...args);app.saveIdentity=null;a
 const SAVE3_LEGACY_LOAD=loadGame;
 loadGame=function(manual=true,...args){if(Save3.supported&&!manual)return false;return SAVE3_LEGACY_LOAD(manual,...args);};
 const SAVE3_SAVE=saveGame;
-saveGame=function(manual=true){if(!Save3.supported){Save3.identity();return SAVE3_SAVE(manual);}if(!Save3.ready){saveFeedback('Save storage is still loading or requires recovery.',true);return false;}Save3.enqueue();if(manual)Save3.flush().catch(()=>{});return true;};
+saveGame=function(manual=true){if(!Save3.supported){Save3.identity();return SAVE3_SAVE(manual);}if(!Save3.ready){saveFeedback(Save3.loading?'Save storage is loading. Please wait a moment.':('Saving is unavailable: '+(Save3.error?.message||'Load or create a local stable first.')+' Open Settings → Your Save to retry, recover or delete a local save.'),true);return false;}Save3.enqueue();if(manual)Save3.flush().catch(()=>{});return true;};
 const SAVE3_SETTINGS=renderSettings;
 renderSettings=function(){SAVE3_SETTINGS();const panel=document.getElementById('settings');if(!panel)return;panel.querySelector('[data-save3-panel]')?.remove();const node=document.createElement('section'),meta=Save3.identity();node.className='box';node.dataset.save3Panel='';node.innerHTML=`<details data-save3-disclosure><summary>Your Save</summary><p>${csEscape(meta.name)} · ${csEscape(meta.stableName)}</p><p>Save ID: <strong>${csEscape(meta.id)}</strong></p><p>Last saved: ${csEscape(meta.updatedAt||'Not yet saved')} · ${csEscape(meta.storage)}</p><p>IDs load saves available on this device. No cloud backend is configured. Use a Portable Save Code or export a file to move progress to another device.</p><button data-save3='copy'>Copy Local Save ID</button><details><summary>Move or Recover a Save on Any Device</summary><p>A short ID locates a save on this device. A Portable Save Code contains the full snapshot. Generate a fresh code after playing, then paste it into this same section on another device. No cloud account is needed.</p><button data-save3='portable'>Generate Portable Save Code</button><label>Portable Save Code<textarea data-save3-code data-authoritative-selection='true' rows='5' spellcheck='false' placeholder='Paste the complete OXER3 portable code here'></textarea></label><button data-save3='copy-portable'>Copy Portable Code</button><button data-save3='load-portable'>Load Portable Save Code</button></details><button data-save3='export'>Export Save</button><button data-save3='rename'>Rename Save</button><button data-save3='new'>Create Separate Stable Save</button><label>Enter Save ID<input data-save3-id></label><button data-save3='find'>Find Save</button><button data-save3='list'>Choose Local Save</button><label>Import Save File<input type='file' accept='.json,application/json' data-save3-file></label><div data-save3-found></div><p role='status' data-save3-status></p></details>`;panel.prepend(node);const status=node.querySelector('[data-save3-status]'),found=node.querySelector('[data-save3-found]');const action=fn=>async()=>{try{await fn();}catch(e){status.textContent=e.message;}};
  node.querySelector('[data-save3="portable"]').onclick=action(async()=>{node.querySelector('[data-save3-code]').value=await Save3.portableCode();status.textContent='Portable code generated. It contains this snapshot and works on another device.';});

@@ -38,6 +38,7 @@
     "test:ranking-consistency": "node tests/ranking-consistency93.test.cjs && node tests/year1-trials93.test.cjs && node tests/npc-ranking-month93.cjs",
     "test:ranking-consistency-browser": "node tests/ranking-consistency93-browser.cjs && node tests/year1-trials93-browser.cjs",
     "test:dressage-fairness": "node tests/dressage-fairness95.test.cjs",
-    "test:dressage-fairness-browser": "node tests/dressage-fairness95-browser.cjs"
+    "test:dressage-fairness-browser": "node tests/dressage-fairness95-browser.cjs",
+    "test:save-recovery-browser": "node tests/save-recovery96-browser.cjs"
   }
 }

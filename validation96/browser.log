@@ -1,0 +1,6 @@
+PASS transient startup failure retries successfully
+PASS corrupt active save does not hide other careers; loading valid career clears recovery lock
+PASS delete cancellation keeps data; confirmed delete removes only selected save
+PASS existing active career loads when full-save writes fail: no unnecessary rewrite
+PASS deleting during queued save cannot recreate removed career
+PASS current-save deletion creates verified fresh career
