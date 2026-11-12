@@ -1,0 +1,7 @@
+PASS all sanctioned custom tiers use a finite base and credit a qualifying result
+PASS the release boundary includes completed points once and excludes future results
+PASS loading repairs affected saved player results once without prizes or invalid points
+PASS every ranking calendar class across four years has a valid award and ranking destination
+PASS local calendar shows remain unranked and are excluded from save repairs
+PASS designated calendar ranking shows award and publish in every discipline with optional progression off
+PASS old designated calendar results repair from the catalogue without retained show snapshots

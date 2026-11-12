@@ -140,13 +140,13 @@ renderCalendar = function () {
   return result;
 };
 
-function careerRiderDetails(row, discipline) {
+function careerRiderDetails(row, discipline, rankingContext = null) {
   const state = careerState();
   const rider = state.npcs?.find(rider => rider.id === row.id) || rrSettings().profiles.find(profile => profile.id === row.id);
   if (!rider) return '';
   const identity = rider.career ? { ...rider.career, id: rider.id } : rider;
-  const history = careerResults({ riderId: row.id, discipline }).sort((a,b) => b.hour - a.hour);
-  const rankHistory = state.rankHistory[careerBoardKey('world',discipline)]?.[row.id];
+  const history = rankingContext ? ranking93History(row,rankingContext.type,discipline,rankingContext.filter) : careerResults({ riderId: row.id, discipline }).sort((a,b) => b.hour - a.hour);
+  const rankHistory = state.rankHistory[rankingContext ? careerBoardKey(rankingContext.type,discipline,String(rankingContext.filter ?? '')) : careerBoardKey('world',discipline)]?.[row.id];
   return `<p>Competition age ${careerAge(identity) ?? 'unrecorded'} · ${CAREER_STAGES[rider.stage] || rider.level || 'Player rider'}
     · Major wins ${history.filter(result => result.major && result.placing === 1).length}</p>
     <p>Eligible divisions · ${careerDivisions({ ...identity, professional: rider.professional || rider.level === 'Professional' })
@@ -155,7 +155,8 @@ function careerRiderDetails(row, discipline) {
     ${rider.horses ? '<p>Partnerships · ' + rider.horses.map(horse => csEscape(horse.name) + ' (' + csEscape(horse.breed) + ')').join(', ') + '</p>' : ''}
     ${rankHistory?.releases.length ? `<p>Recent releases · ${rankHistory.releases.slice(-6).map(record =>
       'Y' + pastureDate(record.hour).year + ' M' + pastureDate(record.hour).month + ' #' + record.rank).join(' · ')}</p>` : ''}
-    ${history.slice(0,5).map(result => `<p>${csEscape(result.event)} · ${csEscape(result.horseName)} · ${result.placing ? '#' + result.placing : 'Unclassified'}</p>`).join('')}`;
+    ${rankingContext ? '<p>Results counting toward this board · '+history.reduce((n,r)=>n+r.rankingPoints,0)+' points</p>' : ''}
+    ${history.slice(0,5).map(result => `<p>${csEscape(result.event)} · ${csEscape(result.horseName)} · ${result.placing ? '#' + result.placing : 'Unclassified'}${result.rankingPoints!=null ? ' · +'+result.rankingPoints+' points' : ''}</p>`).join('')}`;
 }
 function careerRivals(rider, discipline) {
   const rivals = new Map();
@@ -209,27 +210,26 @@ function careerSponsorMarkup(rider) {
 }
 function careerLeaderboardDetails(row, type, discipline, filter) {
   if (type === 'team') {
-    const meets = Object.values(careerState().meets).filter(meet => meet.series === filter && meet.discipline === discipline)
-      .sort((a,b) => b.hour-a.hour);
+    const scored=ranking93History(row,type,discipline,filter);
+    const meets=scored.map(result=>careerState().meets[result.eventId]);
     const squad = meets.map(meet => ({ meet, result: meet.teams.find(team => team.country === row.country) }))
       .find(entry => entry.result);
     if (!squad) return '<p class="shop-empty">No classified squad.</p>';
     const members = squad.meet.results.filter(result => result.country === row.country)
       .map(result => csEscape(result.riderName) + ' / ' + csEscape(result.horseName));
-    return `<p>Latest squad · ${csEscape(squad.meet.name)} · Team #${squad.result.placing}</p><p>${members.join(' · ')}</p>`;
+    return `<p>Results counting toward this board · ${scored.reduce((n,r)=>n+r.rankingPoints,0)} points</p><p>Latest squad · ${csEscape(squad.meet.name)} · Team #${squad.result.placing} · +${squad.result.points} points</p><p>${members.join(' · ')}</p>`;
   }
   if (['horse','young-horse','combination'].includes(type)) {
-    const horseId = type === 'combination' ? row.id.slice(row.id.indexOf('|') + 1) : row.id;
+    const horseId = type === 'combination' ? row.horseId || row.id.slice(row.id.indexOf('|') + 1) : row.id;
     const horse = app.horses.find(horse => horse.id === horseId) ||
       careerState().npcs?.flatMap(rider => rider.horses).find(horse => horse.id === horseId);
-    const history = careerResults({ horseId, discipline, riderId: type === 'combination' ? row.id.split('|')[0] : undefined })
-      .sort((a,b) => b.hour-a.hour);
-    return `<p>${horse ? csEscape(horse.breed) + ' · ' : ''}${history.length} starts ·
+    const history = ranking93History(row,type,discipline,filter);
+    return `<p>Results counting toward this board · ${history.reduce((n,r)=>n+r.rankingPoints,0)} points</p><p>${horse ? csEscape(horse.breed) + ' · ' : ''}${history.length} scoring starts ·
       ${history.filter(result => result.placing === 1).length} wins</p>
       ${history.slice(0,5).map(result => `<p>${csEscape(result.event)} · ${csEscape(result.riderName)} ·
-        ${result.placing ? '#' + result.placing : 'Unclassified'}</p>`).join('')}`;
+        ${result.placing ? '#' + result.placing : 'Unclassified'}${result.rankingPoints!=null ? ' · +'+result.rankingPoints+' points' : ''}</p>`).join('')}`;
   }
-  return careerRiderDetails(row,discipline) || '<p>' + csEscape(row.name) + '</p>';
+  return careerRiderDetails(row,discipline,{type,filter}) || '<p>' + csEscape(row.name) + '</p>';
 }
 
 function renderCareerRankings() {
@@ -283,7 +283,7 @@ function renderCareerRankings() {
         const change = row.previous == null ? 'New' : row.previous - row.rank;
         return `<details class="career-rank-row" data-career-rank-row="${index}">
           <summary><span class="career-rank">#${row.rank}</span><span class="career-rank-name"><strong>${csEscape(row.name)}</strong>
-            <small>${csEscape(row.country)} · Best #${row.best}</small></span><span class="career-rank-points">${row.points} pts</span>
+            <small>${csEscape(row.country)} · ${Number.isInteger(row.best)&&row.best>0 ? 'Best #'+row.best : 'Best —'}</small></span><span class="career-rank-points">${row.points} pts</span>
             <span class="career-movement ${change > 0 ? 'rising' : change < 0 ? 'falling' : ''}">${change > 0 ? '+' : ''}${change}</span></summary>
           <div class="career-rank-detail"></div>
         </details>`;
