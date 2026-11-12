@@ -65,3 +65,13 @@ check('batched result lookups invalidate for newly written official results and 
 check('accepted reserve substitutions survive the deadline and reload without becoming new offers',`{
  const f=fed90Fixture(5);fed90Trial(f,0);fed90Trial(f,1);federationReview(f.plan,f.plan.selection);const s=federationState().seasons[f.plan.id],player=s.members.find(m=>m.riderId===f.rider.id);player.role='reserve';player.status=FED90_ROLES.reserve;for(const m of s.members.filter(m=>m.riderId!==player.riderId)){m.role='main';m.status=FED90_ROLES.main;}const event={...federation90ProgramEvents(f.plan).find(e=>e.date.month===8),tier:4,ranking:'division'};s.members.filter(m=>m.role==='main').slice(0,2).forEach((m,i)=>m.horseId='missing-accepted-'+i);const nomination=federation90Nominate(event,'GBR',event.at-48),offered=nomination.members.find(m=>m.riderId===f.rider.id);if(!offered)throw Error('no eligible offer');offered.status='Accepted';offered.acceptedAt=event.at-48;hydrateFromSave(JSON.parse(serializeAppState()));const later=federation90Nominate(event,'GBR',event.at);if(later.members.find(m=>m.riderId===f.rider.id)?.status!=='Accepted')throw Error('accepted replacement expired at deadline');
 }`);
+
+check('confirmed main-squad nominations are not rejected by the legacy stronger-combinations quota',`{
+ const f=fed90Fixture(6);fed90Trial(f,0);fed90Trial(f,1);federationReview(f.plan,f.plan.selection);const event=federation90ProgramEvents(f.plan).find(e=>e.date.month===8),date=pastureDate(event.at-72);app.year=date.year;app.month=date.month;app.day=date.day;app.hour=date.hour||0;app.money=1000000;
+ if(!federationNomination(event,f.rider,f.horse)||careerEligibility(event,f.rider,f.horse))throw Error('fixture not eligible main squad');
+ const field=careerNpcField,equipment=validateCalendarEquipment;try{
+  careerNpcField=function(e,limit,player,pool){return pool?Array.from({length:6},(_,i)=>({rider:{id:'quota98:'+i,country:'GBR'},selection:200})):field(e,limit,player,pool);};validateCalendarEquipment=()=>({valid:true,messages:[]});
+  const result=careerEnter(event,f.horse);if(!result.ok||result.show.eventId!==event.id||result.show.federationSelection?.role!=='main')throw Error(result.message||'main entry failed');
+  app.activeShow=null;app.competitionRpg=null;const season=federationState().seasons[f.plan.id],member=season.members.find(m=>m.riderId===f.rider.id);member.role='reserve';member.status=FED90_ROLES.reserve;const rejected=careerEnter({...event,id:event.id+':reserve'},f.horse);if(rejected.ok||!/nomination/i.test(rejected.message))throw Error('non-nominated reserve entered main competition');
+ }finally{careerNpcField=field;validateCalendarEquipment=equipment;}
+}`);

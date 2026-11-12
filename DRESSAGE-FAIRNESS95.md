@@ -1,3 +1,5 @@
+> Updated: the original 95–100% scale below is superseded by [DRESSAGE-NATIONAL98.md](DRESSAGE-NATIONAL98.md), which restores realistic percentages while keeping judging fair.
+
 # Attainable, consistent dressage judging
 
 Manual movement marks used `5 + 0.035 × skill`, a preparation adjustment capped at 0.5, and a 0.2 clean-execution bonus. Even at skill 100 that capped a perfect movement at 9.2; at skill 80 the maximum was 8.5. Automatic judging used a separate scale and class penalty. Exact dressage ties were broken by starting order.
