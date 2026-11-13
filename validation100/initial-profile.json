@@ -1,0 +1,125 @@
+{
+  "ms": 1626.199999999255,
+  "rows": [
+    {
+      "name": "",
+      "file": "background-save.js?v=progression90-1",
+      "hits": 231
+    },
+    {
+      "name": "horseNameKey",
+      "file": "script.js?v=coat94-update86-1",
+      "hits": 182
+    },
+    {
+      "name": "rank91Pool",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 137
+    },
+    {
+      "name": "add",
+      "file": "npc-careers85.js?v=points93-1",
+      "hits": 41
+    },
+    {
+      "name": "careerDivisions",
+      "file": "career-world.js?v=points93-1",
+      "hits": 40
+    },
+    {
+      "name": "npc85Registry",
+      "file": "npc-careers85.js?v=points93-1",
+      "hits": 38
+    },
+    {
+      "name": "careerRosterIndex",
+      "file": "career-world.js?v=points93-1",
+      "hits": 31
+    },
+    {
+      "name": "hash",
+      "file": "health-engine.js?v=month87-1",
+      "hits": 26
+    },
+    {
+      "name": "careerDivisions",
+      "file": "career-world.js?v=points93-1",
+      "hits": 25
+    },
+    {
+      "name": "careerUniqueRiderName",
+      "file": "career-world.js?v=points93-1",
+      "hits": 23
+    },
+    {
+      "name": "(garbage collector)",
+      "file": "",
+      "hits": 20
+    },
+    {
+      "name": "careerRoll",
+      "file": "career-world.js?v=points93-1",
+      "hits": 18
+    },
+    {
+      "name": "careerComputeBoards",
+      "file": "career-integration.js?v=nomination98-points92-1",
+      "hits": 17
+    },
+    {
+      "name": "",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 16
+    },
+    {
+      "name": "candidate",
+      "file": "script.js?v=coat94-update86-1",
+      "hits": 16
+    },
+    {
+      "name": "ranking91EventRoster",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 14
+    },
+    {
+      "name": "careerRoll",
+      "file": "career-world.js?v=points93-1",
+      "hits": 13
+    },
+    {
+      "name": "rank91Real",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 11
+    },
+    {
+      "name": "rank91Eligible",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 11
+    },
+    {
+      "name": "rank91Eligible",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 9
+    },
+    {
+      "name": "careerPointCredits",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 9
+    },
+    {
+      "name": "",
+      "file": "career-integration.js?v=nomination98-points92-1",
+      "hits": 9
+    },
+    {
+      "name": "",
+      "file": "ranking-population91.js?v=points93-1",
+      "hits": 8
+    },
+    {
+      "name": "horseNameKey",
+      "file": "script.js?v=coat94-update86-1",
+      "hits": 8
+    }
+  ]
+}

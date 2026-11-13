@@ -1,0 +1,5 @@
+PASS full skill, accurate execution and full preparation produce realistic strong movement marks
+PASS identical automatic player and NPC performances use equal marks at every class difficulty
+PASS equal dressage totals share placing regardless of player flag or start order; better tests can win
+POPULATION97 {"tests":2000,"mean":85.13352499999982,"nineties":3,"tens":6,"movements":40000,"minimum":81.95,"maximum":93.65}
+PASS large fields stay realistic, exceptional marks remain attainable and accuracy can win
