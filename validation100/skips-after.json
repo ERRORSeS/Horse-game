@@ -1,0 +1,155 @@
+{
+  "url": "http://localhost:8106",
+  "rows": [
+    {
+      "unit": "day",
+      "elapsedMs": 182.30000000074506,
+      "result": {
+        "ok": true,
+        "simulationMs": 85.29999999888241,
+        "timings": {
+          "ledgerInputReused": false,
+          "engineMs": 84.59999999962747,
+          "outputDiffMs": 0.6999999992549419,
+          "diffMs": 3.900000000372529,
+          "inputMs": 25.200000001117587,
+          "prepareMs": 31.099951170384884,
+          "returnMs": 31.2001953125,
+          "applyMs": 2.900146484375
+        }
+      },
+      "date": [
+        1,
+        1,
+        2
+      ],
+      "meets": 446,
+      "npcs": 726
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 126.69999999925494,
+      "result": {
+        "ok": true,
+        "simulationMs": 37.100000001490116,
+        "timings": {
+          "ledgerInputReused": true,
+          "engineMs": 37,
+          "outputDiffMs": 0.10000000149011612,
+          "diffMs": 4.300000000745058,
+          "inputMs": 12.799999998882413,
+          "prepareMs": 31.59995117224753,
+          "returnMs": 38.199951171875,
+          "applyMs": 1.800048828125
+        }
+      },
+      "date": [
+        1,
+        1,
+        3
+      ],
+      "meets": 446,
+      "npcs": 726
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 121.69999999925494,
+      "result": {
+        "ok": true,
+        "simulationMs": 35.30000000074506,
+        "timings": {
+          "ledgerInputReused": true,
+          "engineMs": 35,
+          "outputDiffMs": 0.30000000074505806,
+          "diffMs": 4.199999999254942,
+          "inputMs": 12.900000000372529,
+          "prepareMs": 32.69980468787253,
+          "returnMs": 32,
+          "applyMs": 1.60009765625
+        }
+      },
+      "date": [
+        1,
+        1,
+        4
+      ],
+      "meets": 446,
+      "npcs": 726
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 6166.5999999996275,
+      "result": {
+        "ok": true,
+        "simulationMs": 5627.5999999996275,
+        "timings": {
+          "ledgerInputReused": true,
+          "engineMs": 5603.5,
+          "outputDiffMs": 24.09999999962747,
+          "diffMs": 4.300000000745058,
+          "inputMs": 12.5,
+          "prepareMs": 31.000048827379942,
+          "returnMs": 437.80029296875,
+          "applyMs": 52.599853515625
+        }
+      },
+      "date": [
+        1,
+        2,
+        1
+      ],
+      "meets": 1517,
+      "npcs": 7676
+    },
+    {
+      "unit": "day",
+      "elapsedMs": 650,
+      "result": {
+        "ok": true,
+        "simulationMs": 40.5,
+        "timings": {
+          "ledgerInputReused": true,
+          "engineMs": 40.30000000074506,
+          "outputDiffMs": 0.19999999925494194,
+          "diffMs": 28,
+          "inputMs": 127.40000000037253,
+          "prepareMs": 153.19985351525247,
+          "returnMs": 297.7001953125,
+          "applyMs": 1.900146484375
+        }
+      },
+      "date": [
+        1,
+        2,
+        2
+      ],
+      "meets": 1517,
+      "npcs": 7676
+    },
+    {
+      "unit": "month",
+      "elapsedMs": 2357.300000000745,
+      "result": {
+        "ok": true,
+        "simulationMs": 1653.5,
+        "timings": {
+          "ledgerInputReused": true,
+          "engineMs": 1639.9000000003725,
+          "outputDiffMs": 13.599999999627471,
+          "diffMs": 17.700000001117587,
+          "inputMs": 126,
+          "prepareMs": 131.3998535145074,
+          "returnMs": 368.2001953125,
+          "applyMs": 59.800048828125
+        }
+      },
+      "date": [
+        1,
+        3,
+        1
+      ],
+      "meets": 2083,
+      "npcs": 8465
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+PASS portable code restores on independent empty storage and detects damaged codes
+PASS save lookup persists the one-time current horse repair
+PASS independent IDs, lookup, unknown IDs, portable import and invalid-import rollback

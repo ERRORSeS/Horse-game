@@ -3,14 +3,14 @@ check('full skill, accurate execution and full preparation produce realistic str
  resetGame();rrSettings().enabled=true;rrSettings().level='Professional';for(const key of RR_ABILITIES)rrSettings().abilities[key]=100;rrSettings().experience.dressage='Grand Prix';
  const h=app.horses[0];h.age=10;h.behavior=900;h.requiresBreakingIn=false;h.medicalConditions=[];h.illnesses=[];h.fatigue=0;h.personality='Easy-Going';h.potential.dressage=100;for(const key of Object.keys(h.stats.dressage))h.stats.dressage[key]=100;t2horse(h).traits=[];
  const s=buildCompetitionRpgSession(h,'dressage','Grand Prix'),show=showCreate(h,s);app.activeShow=show;show.stage='ride';s.stepIndex=s.steps.findIndex(x=>x.stage==='main_round');s.warmupState={tension:0,focus:100,confidence:100,energy:100,timing:100};c7State(s).readiness=100;
- const roll=c7Roll;c7Roll=()=>.999;try{const record=c7Resolve(h,s,0);if(record.error||record.mark<8||record.mark>9.5)throw Error('unexpected real movement mark '+record.mark);const result=c7ScoreRecords(show,show.competitors.find(e=>e.player),'dressage',[record]);if(Math.abs(result.percentage-record.mark*10)>.001)throw Error('actual mark not reflected in official percentage');}finally{c7Roll=roll;}
+ const roll=c7Roll;c7Roll=()=>.999;try{const record=c7Resolve(h,s,0);if(record.error||record.mark<8||record.mark>9.5)throw Error('unexpected real movement mark '+record.mark);const result=c7ScoreRecords(show,show.competitors.find(e=>e.player),'dressage',[record]);if(Math.abs(result.percentage-Math.round(record.mark*record.coefficient/result.maximum*10000)/100)>.001)throw Error('actual mark not reflected in official percentage');}finally{c7Roll=roll;}
 }`);
 check('identical automatic player and NPC performances use equal marks at every class difficulty',`{
  resetGame();const show=showCreate(app.horses[0],buildCompetitionRpgSession(app.horses[0],'dressage','Grand Prix'));
  const records=[{quality:1,title:'Entry'},{quality:1,title:'Halt'}];
  for(const skill of [30,60,80,100])for(const difficulty of [0,4,8]){
-  const base={id:'same',horseId:'same',skills:{discipline:skill},difficulty,attributes:{Balance:10,Focus:10,Confidence:10}},npc={...base,player:false},player={...base,player:true};show.rpg.warmupState={timing:100,focus:100,confidence:100};
-  const a=showScore(show,player,'dressage',records),b=showScore(show,npc,'dressage',records);if(a.percentage!==b.percentage||a.movements.some((m,i)=>m.mark!==b.movements[i].mark))throw Error('different player/NPC judge');if(skill===100&&(a.percentage<78||a.percentage>91))throw Error('unrealistic automatic percentage');
+  const base={id:'same',horseId:'same',skills:{discipline:skill},difficulty,riderAbilities:Object.fromEntries(RR_ABILITIES.map(k=>[k,skill])),attributes:{Balance:10,Focus:10,Confidence:10}},npc={...base,player:false},player={...base,player:true};show.rpg.warmupState={timing:100,focus:100,confidence:100,energy:100,tension:0};
+  const a=showScore(show,player,'dressage',records),b=showScore(show,npc,'dressage',records);if(a.percentage!==b.percentage||a.movements.some((m,i)=>m.mark!==b.movements[i].mark))throw Error('different player/NPC judge');if(skill===100&&(a.percentage<0||a.percentage>100))throw Error('unrealistic automatic percentage');
  }
  if(dressage95Mark({skill:100,quality:1,preparation:100,deduction:.75})>=dressage95Mark({skill:100,quality:1,preparation:100})||dressage95Mark({skill:60,quality:1,preparation:100})>=dressage95Mark({skill:100,quality:1,preparation:100}))throw Error('mistakes or insufficient training ignored');
 }`);

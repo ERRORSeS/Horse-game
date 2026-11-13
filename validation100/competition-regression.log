@@ -1,0 +1,76 @@
+PASS trait fixture
+PASS trait Rushes Fences activates only in its eligible jump context
+PASS trait Cautious Jumper activates only in its eligible newExercise context
+PASS trait Bold Jumper activates only in its eligible jump context
+PASS trait Hesitates at Fillers activates only in its eligible hasFiller context
+PASS trait Water-Shy activates only in its eligible water context
+PASS trait Overjumps activates only in its eligible jump context
+PASS trait Careful Front End activates only in its eligible jump context
+PASS trait Trails Hind Legs activates only in its eligible jump context
+PASS trait Long Stride Tendency activates only in its eligible related context
+PASS trait Short Stride Tendency activates only in its eligible related context
+PASS trait Drifts Left to Fences activates only in its eligible jump context
+PASS trait Drifts Right to Fences activates only in its eligible jump context
+PASS trait Strong After Fences activates only in its eligible jump context
+PASS trait Careful but Slow activates only in its eligible jump context
+PASS trait Enjoys Jumping activates only in its eligible jump context
+PASS trait Strong on Left Rein activates only in its eligible left context
+PASS trait Strong on Right Rein activates only in its eligible right context
+PASS trait Weak Left Canter Lead activates only in its eligible leftCanter context
+PASS trait Weak Right Canter Lead activates only in its eligible rightCanter context
+PASS trait Anticipates Transitions activates only in its eligible transition context
+PASS trait Difficult Downward Transitions activates only in its eligible downward context
+PASS trait Naturally Straight activates only in its eligible flat context
+PASS trait Falls Inward on Circles activates only in its eligible circle context
+PASS trait Excellent Rhythm activates only in its eligible rhythmEligible context
+PASS trait Contact Sensitive activates only in its eligible inconsistentContact context
+PASS trait Quick Learner activates only in its eligible completed context
+PASS trait Slow Learner activates only in its eligible completed context
+PASS trait Dislikes Repetition activates only in its eligible fourth context
+PASS trait Patient Worker activates only in its eligible repeated context
+PASS trait Easily Distracted activates only in its eligible realDistraction context
+PASS trait Strong Work Ethic activates only in its eligible demanding context
+PASS trait Needs Encouragement activates only in its eligible encouraged context
+PASS trait Frustrates Easily activates only in its eligible failedAttempt context
+PASS trait Slow to Warm Up activates only in its eligible cold context
+PASS trait Quick to Settle activates only in its eligible disturbed context
+PASS trait Nervous in New Arenas activates only in its eligible newArrival context
+PASS trait Comfortable in New Arenas activates only in its eligible newArrival context
+PASS trait Distracted by Other Horses activates only in its eligible horses context
+PASS trait Enjoys Working Around Horses activates only in its eligible horses context
+PASS trait Wind Sensitive activates only in its eligible wind context
+PASS trait Traffic Nervous activates only in its eligible traffic context
+PASS trait Likes Open Spaces activates only in its eligible outdoor context
+PASS trait Prefers Enclosed Spaces activates only in its eligible indoor context
+PASS trait Nervous Around Arena Gates activates only in its eligible gate context
+PASS trait Enjoys Trail Work activates only in its eligible trail context
+PASS trait Difficult to Mount activates only in its eligible mount context
+PASS trait Stands Quietly activates only in its eligible standing context
+PASS trait Sensitive to Grooming activates only in its eligible groom context
+PASS trait Hoof-Handling Difficulties activates only in its eligible hoof context
+PASS trait Calm with Farrier activates only in its eligible farrier context
+PASS trait Nervous with Farrier activates only in its eligible farrier context
+PASS trait Sensitive to Clipping activates only in its eligible clip context
+PASS trait Equipment Cautious activates only in its eligible newEquipment context
+PASS trait Mouths Equipment activates only in its eligible equipment context
+PASS trait Very People-Oriented activates only in its eligible familiarHandler context
+EXAM 20 401/1000
+EXAM 50 689/1000
+EXAM 90 901/1000
+EXAM 0 0/1000
+PASS symptom sensitivity independently samples actual general examination findings
+PASS medical mood quantiles match conditional severity and clear after recovery
+PASS exactly five hours needs no night; longer trips require one
+PASS reservations, failed bookings and fixed international dates preserve funds
+PASS complete distant journey, per-night care and reload retain itinerary and venue familiarity
+PASS profiles vary independently and loading outcomes reflect individuality
+PASS all supplied narrative lines are preserved and substitutions resolve
+PASS zero-fence rounds cannot generate nonexistent rails
+PASS sensitivity amplifies actual tack discomfort within the three-point budget
+PASS veterinary trait handling is visible, timed and not replayed by repeated examination
+PASS illustrative Silver Storm Eclipse Nova Ruby ranking preserves original nonqualifiers
+PASS ranking never uses the player flag as an advantage
+PASS trip experience changes coping slowly and is applied only once
+PASS leave before warm-up releases a home entry and routes an arrived horse home without awards
+PASS ridability ignores age and expired estimates but respects young age and lifelong kissing spines
+PASS a refused fence can cause a rolled fall with a recorded incident cause

@@ -1,0 +1,958 @@
+{
+  "quickEventing": {
+    "ok": true,
+    "stage": "final",
+    "total": 19.47,
+    "scores": {
+      "dressage": {
+        "version100": 1,
+        "phase": "dressage",
+        "testName": "Oxer Preliminary Eventing Dressage Test",
+        "testLevel": "Level Three",
+        "percentage": 80.53,
+        "technicalPercentage": 80.53,
+        "penalties": 19.47,
+        "movements": [
+          {
+            "movement": "Entry, centreline and halt",
+            "gait": "Trot",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.124800727478538,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Working trot left",
+            "gait": "Trot",
+            "kind": "general",
+            "coefficient": 1,
+            "rawMark": 8.289975157656395,
+            "mark": 8.5,
+            "deduction": 0,
+            "comment": "Correct movement; regular execution.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.2,
+              0.35,
+              0.25,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8.5
+            ]
+          },
+          {
+            "movement": "Left trot circle",
+            "gait": "Trot",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.176234340853368,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Walk–trot transitions",
+            "gait": "Trot",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.149668955541525,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Free walk",
+            "gait": "Walk",
+            "kind": "expressive",
+            "coefficient": 2,
+            "rawMark": 8.155843775258088,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Expressive walk with correct execution.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.35,
+              0.25,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Left canter transition",
+            "gait": "Canter",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.249044454264764,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Right canter circle",
+            "gait": "Canter",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.313189990575735,
+            "mark": 8.5,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8.5
+            ]
+          },
+          {
+            "movement": "Downward transition",
+            "gait": "Walk",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 7.686981175137684,
+            "mark": 7.5,
+            "deduction": 0.3,
+            "comment": "Observed aid error; 0.30 mark deduction.",
+            "quality": 0.6,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              7.5
+            ]
+          },
+          {
+            "movement": "Lengthened trot",
+            "gait": "Trot",
+            "kind": "expressive",
+            "coefficient": 1,
+            "rawMark": 8.08638529921385,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Expressive trot with correct execution.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.35,
+              0.25,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Change of direction and straightness",
+            "gait": "Trot",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.223584281559413,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Shoulder-in left",
+            "gait": "Trot",
+            "kind": "technical",
+            "coefficient": 1,
+            "rawMark": 8.142809294302637,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Well-trained collection and balance.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.2,
+              0.4,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Counter-canter right",
+            "gait": "Canter",
+            "kind": "technical",
+            "coefficient": 1,
+            "rawMark": 8.169696025130028,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Well-trained collection and balance.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.2,
+              0.4,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Collected trot",
+            "gait": "Trot",
+            "kind": "technical",
+            "coefficient": 1,
+            "rawMark": 8.33495171732145,
+            "mark": 8.5,
+            "deduction": 0,
+            "comment": "Well-trained collection and balance.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.2,
+              0.4,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8.5
+            ]
+          },
+          {
+            "movement": "Medium canter",
+            "gait": "Canter",
+            "kind": "expressive",
+            "coefficient": 1,
+            "rawMark": 7.981691146758074,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Expressive canter with correct execution.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.35,
+              0.25,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Half-pass right",
+            "gait": "Trot",
+            "kind": "technical",
+            "coefficient": 1,
+            "rawMark": 8.234656353731328,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Well-trained collection and balance.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.2,
+              0.4,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Extended walk",
+            "gait": "Walk",
+            "kind": "expressive",
+            "coefficient": 2,
+            "rawMark": 8.178604692336792,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Expressive walk with correct execution.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.35,
+              0.25,
+              0.2,
+              0.1,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          },
+          {
+            "movement": "Final halt and salute",
+            "gait": "Walk",
+            "kind": "precision",
+            "coefficient": 1,
+            "rawMark": 8.182641935962563,
+            "mark": 8,
+            "deduction": 0,
+            "comment": "Accurate figures and rider timing.",
+            "quality": 1,
+            "components": {
+              "natural": 85,
+              "training": 96.25,
+              "rider": 95,
+              "harmony": 73.33333333333333,
+              "condition": 83.33333333333333
+            },
+            "weights": [
+              0.1,
+              0.4,
+              0.25,
+              0.15,
+              0.1
+            ],
+            "judges": [
+              8
+            ]
+          }
+        ],
+        "earned": 153,
+        "maximum": 190,
+        "judges": 1,
+        "judgeNames": null,
+        "artistic": null,
+        "testErrors": 0,
+        "errorPoints": 0,
+        "errorUnit": "points",
+        "deductionPercent": 0,
+        "comments": [
+          "Accurate figures and rider timing.",
+          "Correct movement; regular execution.",
+          "Accurate figures and rider timing.",
+          "Accurate figures and rider timing.",
+          "Expressive walk with correct execution.",
+          "Accurate figures and rider timing.",
+          "Accurate figures and rider timing.",
+          "Observed aid error; 0.30 mark deduction.",
+          "Expressive trot with correct execution.",
+          "Accurate figures and rider timing.",
+          "Well-trained collection and balance.",
+          "Well-trained collection and balance.",
+          "Well-trained collection and balance.",
+          "Expressive canter with correct execution.",
+          "Well-trained collection and balance.",
+          "Expressive walk with correct execution.",
+          "Accurate figures and rider timing."
+        ],
+        "eliminated": false
+      },
+      "cross-country": {
+        "version100": 1,
+        "phase": "cross-country",
+        "faults": 0,
+        "obstaclePenalties": 0,
+        "time": 381.92,
+        "optimumTime": 382.97872340425533,
+        "timeLimit": 765.9574468085107,
+        "timePenalties": 0,
+        "penalties": 0,
+        "obstacles": [
+          {
+            "number": 1,
+            "type": "Log",
+            "terrain": "Uphill",
+            "height": 1.05,
+            "difficulty": 6,
+            "completed": true,
+            "faults": 0,
+            "time": 21.68,
+            "outcome": "Clear log",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 9.28392675705254
+            }
+          },
+          {
+            "number": 2,
+            "type": "Brush fence",
+            "terrain": "Downhill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.17,
+            "outcome": "Clear brush fence",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 52.33962847851217
+            }
+          },
+          {
+            "number": 3,
+            "type": "Bank",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 20.87,
+            "outcome": "Clear bank",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 51.851089182309806
+            }
+          },
+          {
+            "number": 4,
+            "type": "Water complex",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 20.88,
+            "outcome": "Clear water complex",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 17.20158418174833
+            }
+          },
+          {
+            "number": 5,
+            "type": "Ditch",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 6,
+            "completed": true,
+            "faults": 0,
+            "time": 20.9,
+            "outcome": "Clear ditch",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 51.2475167401135
+            }
+          },
+          {
+            "number": 6,
+            "type": "Corner",
+            "terrain": "Uphill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.75,
+            "outcome": "Clear corner",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 92.10642508696765
+            }
+          },
+          {
+            "number": 7,
+            "type": "Combination",
+            "terrain": "Downhill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.24,
+            "outcome": "Clear combination",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 29.189308010973036
+            }
+          },
+          {
+            "number": 8,
+            "type": "Terrain change",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 20.94,
+            "outcome": "Clear terrain change",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 68.9188742544502
+            }
+          },
+          {
+            "number": 9,
+            "type": "Narrow fence",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 6,
+            "completed": true,
+            "faults": 0,
+            "time": 20.95,
+            "outcome": "Clear narrow fence",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 97.31498176697642
+            }
+          },
+          {
+            "number": 10,
+            "type": "Log",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 20.97,
+            "outcome": "Clear log",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 11.813784134574234
+            }
+          },
+          {
+            "number": 11,
+            "type": "Brush fence",
+            "terrain": "Uphill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.82,
+            "outcome": "Clear brush fence",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 31.239609350450337
+            }
+          },
+          {
+            "number": 12,
+            "type": "Bank",
+            "terrain": "Downhill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.31,
+            "outcome": "Clear bank",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 17.791011044755578
+            }
+          },
+          {
+            "number": 13,
+            "type": "Water complex",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 6,
+            "completed": true,
+            "faults": 0,
+            "time": 21.01,
+            "outcome": "Clear water complex",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 94.28783829789609
+            }
+          },
+          {
+            "number": 14,
+            "type": "Ditch",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.03,
+            "outcome": "Clear ditch",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 30.15657071955502
+            }
+          },
+          {
+            "number": 15,
+            "type": "Corner",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.04,
+            "outcome": "Clear corner",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 98.67623900063336
+            }
+          },
+          {
+            "number": 16,
+            "type": "Combination",
+            "terrain": "Uphill",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.9,
+            "outcome": "Clear combination",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 57.51093358267099
+            }
+          },
+          {
+            "number": 17,
+            "type": "Terrain change",
+            "terrain": "Downhill",
+            "height": 1.05,
+            "difficulty": 6,
+            "completed": true,
+            "faults": 0,
+            "time": 21.38,
+            "outcome": "Clear terrain change",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 27.15876705478877
+            }
+          },
+          {
+            "number": 18,
+            "type": "Narrow fence",
+            "terrain": "Rolling",
+            "height": 1.05,
+            "difficulty": 5,
+            "completed": true,
+            "faults": 0,
+            "time": 21.08,
+            "outcome": "Clear narrow fence",
+            "refusal": {
+              "refused": false,
+              "chance": 1,
+              "roll": 17.20017020124942
+            }
+          }
+        ],
+        "energyUse": 10.2102,
+        "eliminated": false
+      },
+      "showjumping": {
+        "version100": 1,
+        "phase": "showjumping",
+        "faults": 0,
+        "rails": 0,
+        "fences": [
+          {
+            "number": 1,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 2,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 3,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 4,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 5,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 6,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 7,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 8,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 9,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 10,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 11,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 12,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 13,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 14,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          },
+          {
+            "number": 15,
+            "height": 1.1,
+            "rail": false,
+            "refusal": false,
+            "penalties": 0
+          }
+        ],
+        "time": 110.73,
+        "timeAllowed": 110.76923076923076,
+        "timePenalties": 0,
+        "penalties": 0,
+        "energyUse": 3,
+        "eliminated": false
+      }
+    },
+    "phaseCount": 3
+  },
+  "manualGrandPrix": {
+    "percentage": 86.52,
+    "movements": 24
+  },
+  "calendarEvent": {
+    "event": "career:1:realism100-calendar",
+    "score": 28.31,
+    "points": 32,
+    "phases": "{\"dressage\":[20.31,79.69,0],\"cross-country\":[1.2,322.45,0,1.2,0,320],\"showjumping\":[6.8,109.97,4,2.8,0]}"
+  }
+}

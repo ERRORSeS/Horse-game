@@ -524,7 +524,7 @@ function careerRecordMeet(event, standings, player = null, { recovery = false, r
       riderId: row.player ? identity?.id : row.riderId, riderName: row.player ? identity?.name : row.riderName,
       horseId: row.horseId, horseName: row.horseName || row.name, player: Boolean(row.player), country: identity?.country,
       ...(row.entryId ? {entryId:row.entryId} : {}), status, started, placing,
-      score: Number.isFinite(row.total) ? row.total : null, eliminated: status === 'Eliminated' || status === 'Retired',
+      score: Number.isFinite(row.total) ? row.total : null, ...(['dressage','eventing'].includes(event.discipline)&&typeof performance100PhasesSummary==='function'?{phases100:performance100PhasesSummary(row.scores)}:{}), eliminated: status === 'Eliminated' || status === 'Retired',
       clear: Boolean(placing && event.discipline === 'jumping' && row.scores?.showjumping?.faults === 0),
       ...(row.player ? {showPoints:!event.sandbox && placing ? Math.max(0,30-placing) : 0} : {})
     };
@@ -583,14 +583,15 @@ function careerResolveNpcMeet(event) {
   const field = careerNpcField(event, event.npcCount);
   if (!field.length) return careerRecordMeet(event, []);
   const competitors = field.map((pair,index) => careerNpcEntry(event,pair,index));
-  const show = { id: event.id, discipline: event.discipline, level: event.level, round: 0, competitors };
+  const show = { id: event.id, discipline: event.discipline, level: event.level, eventSnapshot:event, round: 0, competitors };
+  const phases100=event.discipline==='eventing'&&typeof eventing100Order==='function'?eventing100Order(show):CAREER_PHASES[event.discipline];
   for (const entry of competitors) {
-    for (const phase of CAREER_PHASES[event.discipline]) {
+    for (const phase of phases100) {
       const rider = field[entry.startOrder - 1].rider;
-      const eliminated = careerRoll(entry.id, 'incident:' + phase) < clamp(.14 - rider.skill / 850, .025, .12);
+      const eliminated = !['dressage','eventing'].includes(event.discipline) && careerRoll(entry.id, 'incident:' + phase) < clamp(.14 - rider.skill / 850, .025, .12);
       entry.scores[phase] = showScore(show, entry, phase, undefined, { eliminated });
       if (eliminated) {
-        for (const rest of CAREER_PHASES[event.discipline]) entry.scores[rest] ||= { eliminated: true, penalties: 0, time: 0 };
+        for (const rest of phases100) entry.scores[rest] ||= { eliminated: true, penalties: 0, time: 0 };
         break;
       }
     }
