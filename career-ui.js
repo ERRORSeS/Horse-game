@@ -245,13 +245,14 @@ function renderCareerRankings() {
     : type === 'youth-national' ? Object.entries(CAREER_AGE_DIVISIONS).filter(([key]) => key !== 'senior')
       .flatMap(([key,row]) => Object.entries(CAREER_COUNTRIES).map(([code,country])=>[key+'|'+code,row.label+' · '+country[0]]))
     : type === 'young-horse' ? [4,5,6,7,8].map(age => [age,age + '-year-olds'])
-    : ['team','tour'].includes(type) ? series : type === 'horse' ? [['','World horses'],['pony','Pony horses']] : [];
+    : type === 'team' ? [...Object.entries(CAREER_AGE_DIVISIONS).map(([id,row])=>['national-teams|'+id,row.label+' · National team rankings']),...series] : type === 'tour' ? series : type === 'horse' ? [['','World horses'],['pony','Pony horses']] : [];
+  if(type==='team'&&!selected.nationalTeamsVersion99){selected['boardFilter:team']='national-teams|'+(careerDivisions(rider,pastureCalendarHour()).find(d=>d!=='pony')||'senior');selected.nationalTeamsVersion99=1;}
   const choice = selected['boardFilter:' + type];
   const filter = options.some(([value]) => String(value) === String(choice)) ? choice
-    : type === 'national' ? rider.country : options[0]?.[0] ?? '';
+    : type === 'national' ? rider.country : type === 'team' ? 'national-teams|'+(careerDivisions(rider,pastureCalendarHour()).find(d=>d!=='pony')||'senior') : options[0]?.[0] ?? '';
   const rows = careerRankingRows(type,discipline,filter);
   const top = rows.slice(0,100);
-  const own = rows.find(row => row.id === rider.id);
+  const own = rows.find(row => row.id === (type === 'team' ? rider.country : rider.id));
   if (own && !top.includes(own)) top.push(own);
   panel.innerHTML = `<section class="tack-shop horse-sales-shop career-shell">
     ${careerHero('Show office · Official results','Competition rankings','Weekly circuits and official show results keep every age group and national board competitive.')}
@@ -283,7 +284,7 @@ function renderCareerRankings() {
         const change = row.previous == null ? 'New' : row.previous - row.rank;
         return `<details class="career-rank-row" data-career-rank-row="${index}">
           <summary><span class="career-rank">#${row.rank}</span><span class="career-rank-name"><strong>${csEscape(row.name)}</strong>
-            <small>${csEscape(row.country)} · ${Number.isInteger(row.best)&&row.best>0 ? 'Best #'+row.best : 'Best —'}</small></span><span class="career-rank-points">${row.points} pts</span>
+            <small>${csEscape(row.country)}${type==='team'&&row.country===rider.country?' · Your national team':''}${type==='team'&&!row.starts?' · No team results yet':''} · ${Number.isInteger(row.best)&&row.best>0 ? 'Best #'+row.best : 'Best —'}</small></span><span class="career-rank-points">${row.points} pts</span>
             <span class="career-movement ${change > 0 ? 'rising' : change < 0 ? 'falling' : ''}">${change > 0 ? '+' : ''}${change}</span></summary>
           <div class="career-rank-detail"></div>
         </details>`;
