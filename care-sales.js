@@ -227,7 +227,7 @@ const CS_PREEXISTING_LIST=HorseSales.list;
 HorseSales.list=function(app,h,...args){csPreexisting(h);return CS_PREEXISTING_LIST(app,h,...args);};
 
 const CS_COLLAPSIBLE_AD=csSaleMarkup;
-csSaleMarkup=function(l){const h=l.horse,summary=`${csEscape(h.breed)} · ${h.age} years · ${csEscape(h.gender)}`;return CS_COLLAPSIBLE_AD(l).replace('<article class="box">',`<article class="box"><details class="sales-ad" data-ui-key="sale-ad-${csEscape(l.id)}"><summary>${summary}</summary><div class="sales-ad-body">`).replace('</article>','</div></details></article>');};
+csSaleMarkup=function(l){const h=l.horse,summary=`${csEscape(h.name)} · ${csEscape(h.breed)} · ${h.age} years · ${csEscape(h.gender)}`;return CS_COLLAPSIBLE_AD(l).replace('<article class="box">',`<article class="box"><details class="sales-ad" data-ui-key="sale-ad-${csEscape(l.id)}"><summary>${summary}</summary><div class="sales-ad-body">`).replace('</article>','</div></details></article>');};
 
 for(const t of MG_CATALOG.filter(t=>['crop','spurs'].includes(t.slot)))eqRule(t.id,'','');
 // Follow-through on source-specific plans; correction changes care, never genetic potential.

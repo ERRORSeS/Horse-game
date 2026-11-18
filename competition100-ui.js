@@ -4,7 +4,10 @@ createHorseCard=function(h,...args){const node=MOVE100_CARD(h,...args),box=docum
 const MOVE100_LOAD=hydrateFromSave;
 hydrateFromSave=function(...args){const out=MOVE100_LOAD(...args);for(const h of app.horses||[])movement100(h);return out;};
 const MOVE100_SALE=csSaleMarkup;
-csSaleMarkup=function(l,...args){return MOVE100_SALE(l,...args)+'<details><summary>Movement suitability</summary><p>'+csEscape(movement100Summary(l.horse))+'</p></details>';};
+function movement100ProfileMarkup(h,title='Movement quality'){return '<details data-movement100-horse="'+csEscape(h.id)+'"><summary>'+title+' — '+csEscape(h.name)+'</summary><p>'+csEscape(movement100Summary(h))+'</p></details>';}
+csSaleMarkup=function(l,...args){return MOVE100_SALE(l,...args).replace('</div></details></article>',movement100ProfileMarkup(l.horse,'Movement suitability')+'</div></details></article>');};
+const MOVE100_AUCTION=auctionLotMarkup;
+auctionLotMarkup=function(l,detail=false){const html=MOVE100_AUCTION(l,detail);return detail?html.replace('</article>',movement100ProfileMarkup(l.horse)+'</article>'):html;};
 const MOVE100_TRANSACTION=csTransactionMarkup;
 csTransactionMarkup=function(tx,...args){return MOVE100_TRANSACTION(tx,...args).replace('id="cs-sale-topic">','id="cs-sale-topic"><option value="movement100">Ask for a movement evaluation</option>');};
 const MOVE100_SAY=HorseSales.say;
