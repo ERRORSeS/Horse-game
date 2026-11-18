@@ -5135,7 +5135,8 @@ function processPregnancy(mare, newborns, dayAdvance = 30) {
 
 
 function seed() {
-  app.horses = [baseHorse('trained'), baseHorse('untrained'), baseHorse('fully')];
+  // New careers begin empty; horses are acquired through sales, auctions, rescue or leases.
+  app.horses = [];
   app.saleBarn = [baseHorse('fully', 'npc'), baseHorse('trained', 'npc')].map((h) => {
     applySalesAgeSkillBand(h);
     seedShowHistory(h, rnd(1, 3), highestAllowedLevelIndex(h, 'jumping'));
@@ -5445,7 +5446,8 @@ function renderDashboard() {
     </details>
   `).join('') || '<p class="small">No competition reports yet.</p>';
   document.getElementById('dashboard').innerHTML = `
-    ${reminders.length ? `<div class='box' style='border:2px solid #c40000;background:#ffe7e7'><h3 style='color:#c40000'>Reminders</h3>${reminders.map((r) => `<p><strong>${r.type}:</strong> ${r.note || 'No note'} <button data-rem-close='${r.id}'>Close</button></p>`).join('')}</div>` : ''}
+    ${!app.horses.length ? `<section class="stable-welcome"><p class="stable-eyebrow">A new beginning</p><h2>Start your stable</h2><p>Your stable is empty. Find your first horse through sales, auctions or rescue, or ride lesson horses at a boarding barn.</p><div class="inline"><button type="button" data-stable-start="sales">Explore horse sales</button><button type="button" data-stable-start="market">Browse the market</button><button type="button" data-stable-start="barn">Find a boarding barn</button></div></section>` : ''}
+    ${reminders.length ? `<div class='box stable-reminders'><h3>Reminders</h3>${reminders.map((r) => `<p><strong>${r.type}:</strong> ${r.note || 'No note'} <button data-rem-close='${r.id}'>Close</button></p>`).join('')}</div>` : ''}
     ${pastureDashboardMarkup()}
     <div class="grid two">
       <div class="box">

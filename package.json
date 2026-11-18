@@ -48,6 +48,7 @@
     "test:national-teams-life": "node tests/national-teams99-life-browser.cjs",
     "test:realism": "node tests/realism100.test.cjs",
     "test:realism-browser": "node tests/realism100-browser.cjs",
-    "test:realism-population": "node tests/realism100-population.cjs"
+    "test:realism-population": "node tests/realism100-population.cjs",
+    "test:appearance-browser": "node tests/appearance101-browser.cjs"
   }
 }
