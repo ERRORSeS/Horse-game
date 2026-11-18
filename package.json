@@ -50,6 +50,7 @@
     "test:realism-browser": "node tests/realism100-browser.cjs",
     "test:realism-population": "node tests/realism100-population.cjs",
     "test:appearance-browser": "node tests/appearance101-browser.cjs",
-    "test:dressage-movements": "node tests/dressage102.test.cjs"
+    "test:dressage-movements": "node tests/dressage102.test.cjs",
+    "test:sales-profiles-browser": "node tests/sales103-browser.cjs"
   }
 }
