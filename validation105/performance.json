@@ -1,0 +1,30 @@
+{
+  "baseline": [
+    {
+      "kind": "day",
+      "ms": 427
+    },
+    {
+      "kind": "month",
+      "ms": 567
+    },
+    {
+      "kind": "month",
+      "ms": 459
+    }
+  ],
+  "updated": [
+    {
+      "kind": "day",
+      "ms": 286
+    },
+    {
+      "kind": "month",
+      "ms": 569
+    },
+    {
+      "kind": "month",
+      "ms": 487
+    }
+  ]
+}
