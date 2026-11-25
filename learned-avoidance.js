@@ -69,7 +69,7 @@ function tbRecord(h,s,kind,discipline,positive=false){
  const attempt=s.attempts??s.stepIndex??0,index=s.rbResultIndex??s.lastResult;
  // Communication and welfare are separate real events, never inferred from the prose.
  if(kind==='communication')return null;
- const event=tbEvent(h,s,kind==='welfare'?'welfare:'+attempt:'attempt:'+attempt,kind==='welfare'?'welfare':'attempt',{resultIndex:index,clean:positive&&(index==null||index<=1),failed:!positive,jumping:tbJump(s),mounted:tbMounted(s),riderError:!!s.rrCurrentError,event:kind});
+ const event=tbEvent(h,s,kind==='welfare'?'welfare:'+attempt+':'+(s.rrWelfareSequence||0):'attempt:'+attempt,kind==='welfare'?'welfare':'attempt',{resultIndex:index,clean:positive&&(index==null||index<=1),failed:!positive,jumping:tbJump(s),mounted:tbMounted(s),riderError:!!s.rrCurrentError,event:kind});
  if(!event)return null;
  const state=tbSession(h,s),b=rrHorse(h),collection=/collect|shoulder|half-pass|piaffe|passage/.test(s.exerciseId||'');
  if(event.type==='attempt'){state.completedAttemptIds.push(event.key);state.completedAttemptIds=state.completedAttemptIds.slice(-200);if(event.riderError)state.errors++;}
