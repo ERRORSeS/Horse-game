@@ -114,3 +114,10 @@ button,input,select,textarea,summary { scroll-margin-top:calc(var(--topbar-heigh
 @media(max-width:700px) { button,input,select,textarea,summary { scroll-margin-top:16px; } }
 .stable-welcome { padding:clamp(24px,4vw,44px); margin-bottom:24px; border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:9px; background:var(--surface); }
 .stable-welcome h2 { margin:12px 0 16px; }.stable-welcome>p:not(.stable-eyebrow) { color:var(--muted); max-width:620px; margin-bottom:24px; }.stable-welcome button:first-child { background:var(--accent-soft); }
+
+/* Rider action panel closes back to the untouched training screen. */
+.rider105-dialog { width:min(760px,calc(100% - 28px)); max-height:85vh; overflow:auto; padding:24px; background:var(--surface); color:var(--text); border:1px solid var(--line); border-radius:10px; box-shadow:0 16px 60px #0003; }
+.rider105-dialog::backdrop { background:#15221cb3; }
+.rider105-dialog-heading { justify-content:space-between; margin-bottom:18px; }.rider105-dialog-heading h3 { margin:0; }
+.rider105-dialog .box { box-shadow:none; }
+@media(max-width:700px){.rider105-dialog{padding:16px;max-height:90vh;}.rider105-dialog .grid.two{grid-template-columns:1fr;}}
