@@ -147,7 +147,7 @@ function showScore(show,entry,phase,records,stats={}){
 function showPhase(show){return show.discipline==='eventing'?['dressage','cross-country','showjumping'][show.round]:show.round===1?'jump-off':show.discipline==='jumping'?'showjumping':show.discipline;}
 function showPlayerResult(show,session){
   const entry=show.competitors.find(e=>e.player),phase=showPhase(show);if(entry.scores[phase])return;
-  const records=(session.choiceRecords||[]).filter(x=>show.discipline!=='eventing'||x.phase===phase),fall=session.incidents?.findLast(i=>i.fell),result=showScore(show,entry,phase,records,{...session.roundStats,...(fall?.fallSeverity?{fallSeverity:fall.fallSeverity}:{})});
+  const records=(session.choiceRecords||[]).filter(x=>show.discipline==='jumping'?(!x.phase||x.phase===phase)&&(!Number.isInteger(x.step)||session.steps[x.step]?.stage==='main_round'):show.discipline!=='eventing'||x.phase===phase),fall=session.incidents?.findLast(i=>i.fell),result=showScore(show,entry,phase,records,{...session.roundStats,...(fall?.fallSeverity?{fallSeverity:fall.fallSeverity}:{})});
   entry.scores[phase]=result;entry.state='Performance Complete';show.phaseScores[phase]=result;
   for(const npc of show.competitors.filter(e=>!e.player&&e.startOrder<entry.startOrder&&(phase!=='jump-off'||show.qualifiers?.includes(e.id)))){if(!npc.scores[phase])npc.scores[phase]=showScore(show,npc,phase);npc.state='Performance Complete';}
   show.stage='results';showNote(show,'The provisional score appears on the board. The leaderboard updates immediately.');
