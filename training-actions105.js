@@ -39,11 +39,9 @@ function rider105Equipment(h,s,category){
 }
 function rider105Restriction(h,s){
  if(s.finished)return 'This session has finished.';
- if(h.deceased||h.retiredForever||h.retiredToBreeding||!canRideUnderSaddle(h))return 'Ridden actions are unavailable for this horse.';
+ if(h.deceased)return 'This horse is deceased; its history is preserved.';
  if(!tbMounted(s))return 'These rider actions are unavailable during groundwork or lunging.';
- if(s.mountedStopped||s.riderFell||s.horseFell||s.recoveryRequired||s.controlLost||s.safetyStop)return 'The exercise is interrupted. Use the existing assessment, recovery or remount controls.';
- if(h.trainingIncidentAssessment?.status==='pending'||tbMedical(h))return 'A recorded health or safety concern needs assessment before ridden actions can continue.';
- if((s.tension||0)>=90)return 'The horse is seriously unsettled. Regroup or change activity before continuing.';
+ // Action availability does not clear or bypass restrictions on actual ridden training.
  return '';
 }
 function rider105Profile(h,s,severity){
@@ -54,7 +52,7 @@ function rider105Profile(h,s,severity){
 }
 function rider105Reaction(h,s,severity,key){
  const score=rider105Profile(h,s,severity),e=t2exercise(s.exerciseId),collection=/collect|shoulder|half-pass|piaffe|passage/.test(s.exerciseId||'');
- const rows=RIDER105_REACTIONS.filter(r=>(!r.gait||s.gait===r.gait)&&(!r.collection||collection)&&!(r.id==='contact'&&!mgType(eqSetup(h).bit)));
+ const rows=RIDER105_REACTIONS.filter(r=>(!r.incident||!(s.mountedStopped||s.riderFell||s.horseFell))&&(!r.gait||s.gait===r.gait)&&(!r.collection||collection)&&!(r.id==='contact'&&!mgType(eqSetup(h).bit)));
  const weights=rows.map(r=>r.weight);
  // Personality shifts the odds within a shared pool; every eligible reaction remains possible.
  for(let i=0;i<rows.length;i++)weights[i]*=rows[i].incident?(.5+score/30):['unchanged','quick','ears'].includes(rows[i].id)?(1.5-score/120):(.7+score/100);
