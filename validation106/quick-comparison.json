@@ -1,0 +1,25 @@
+{
+  "baseline": {
+    "n": 40,
+    "clear": 22,
+    "eliminated": 0,
+    "jumpOffs": 0,
+    "meanTime": 52.99474999999999,
+    "elapsedMs": 2733
+  },
+  "updated": {
+    "n": 40,
+    "clear": 26,
+    "eliminated": 0,
+    "jumpOffs": 40,
+    "meanTime": 54.803250000000006,
+    "elapsedMs": 3203
+  },
+  "calendarEntry": {
+    "stage": "final",
+    "penalties": 4,
+    "time": 27.17,
+    "points": 11,
+    "placing": 7
+  }
+}

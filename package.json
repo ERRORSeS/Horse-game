@@ -52,6 +52,7 @@
     "test:appearance-browser": "node tests/appearance101-browser.cjs",
     "test:dressage-movements": "node tests/dressage102.test.cjs",
     "test:sales-profiles-browser": "node tests/sales103-browser.cjs",
-    "test:rider-actions-browser": "node tests/rider-actions105-browser.cjs"
+    "test:rider-actions-browser": "node tests/rider-actions105-browser.cjs",
+    "test:calendar-jumping-browser": "node tests/calendar-jumping106-browser.cjs"
   }
 }

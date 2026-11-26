@@ -288,7 +288,7 @@ function careerEvent(definition, year) {
       showjumping: pastureCalendarHour(year,date.month,date.day + (definition.course === 'Long' ? 2 : 0),18)
     } } : {}),
     rules: { ...CAREER_RULE_CACHE.get(ruleKey),
-      jumpOff: definition.discipline === 'jumping' && definition.tier >= 3 && !definition.team },
+      jumpOff: definition.discipline === 'jumping' && (definition.jumpOff ?? definition.tier >= 1) && !definition.team },
     entries: []
   };
 }
