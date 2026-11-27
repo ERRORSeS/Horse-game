@@ -56,6 +56,7 @@
     "test:calendar-jumping-browser": "node tests/calendar-jumping106-browser.cjs",
     "test:competition-difficulty-browser": "node tests/competition-difficulty108-browser.cjs",
     "test:training-report-browser": "node tests/training-report108-browser.cjs",
-    "test:auto-training-policy-browser": "node tests/auto-training109-browser.cjs"
+    "test:auto-training-policy-browser": "node tests/auto-training109-browser.cjs",
+    "test:competition-pace-browser": "node tests/competition-pace110-browser.cjs"
   }
 }

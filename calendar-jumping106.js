@@ -3,7 +3,8 @@ function jumping106Option(h,s){
  const step=s.steps[s.stepIndex],options=competitionPromptForStep(s)?.options||[],plan=c7Plan(s,step),choices=options.map((option,index)=>({option,index})).filter(({option})=>!/circle|re.?approach|represent|abort|skip/i.test(option.label));
  if(!choices.length)throw Error('No playable course choice is configured.');
  // Select by known preparation and riding difficulty, never by a future random draw.
- choices.sort((a,b)=>c7Execution(h,s,plan,a.option).chance-c7Execution(h,s,plan,b.option).chance||a.index-b.index);
+ if(showRidingStyle(s)==='Aggressive'&&step.stage==='main_round')choices.sort((a,b)=>showEffortTiming(h,s,plan.phase,a.option,1,plan.distance).movingTime-showEffortTiming(h,s,plan.phase,b.option,1,plan.distance).movingTime||c7Execution(h,s,plan,a.option).chance-c7Execution(h,s,plan,b.option).chance||a.index-b.index);
+ else choices.sort((a,b)=>c7Execution(h,s,plan,a.option).chance-c7Execution(h,s,plan,b.option).chance||a.index-b.index);
  return choices[0].index;
 }
 const JUMP106_QUICK=quickCompete;

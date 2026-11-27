@@ -63,7 +63,7 @@ function dressage100Sheet(show,entry,records,stats={},context=null){
 }
 function dressage100Simulate(show,entry,prior=[]){
  const h=performance100Horse(entry),c=dressage100Context(show,entry,h),test=dressage100Test(show),rider=c.rider,condition=c.condition,records=test.movements.map((m,i)=>{
-  if(prior[i])return prior[i];const training=c.training(m),ability=performance100Average(Object.values(rider).filter(Number.isFinite),50),learned=h.riderBehavior?.learned||{},chance=clamp((100-training.value)*.0015+(100-ability)*.0012+Math.max(0,condition.tension-50)*.001+(learned['Training Anticipation']??5)*.0002,.005,.35)*(typeof competitionFaultFactor108==='function'?competitionFaultFactor108():1),roll=HorseHealth.roll(c.seed,'dressage100:execution:'+i),error=roll<chance;
+  if(prior[i])return prior[i];const training=c.training(m),ability=performance100Average(Object.values(rider).filter(Number.isFinite),50),learned=h.riderBehavior?.learned||{},chance=competitionFaultChance108(clamp((100-training.value)*.0015+(100-ability)*.0012+Math.max(0,condition.tension-50)*.001+(learned['Training Anticipation']??5)*.0002,.005,.35),1),roll=HorseHealth.roll(c.seed,'dressage100:execution:'+i),error=roll<chance;
   return {quality:error?roll<chance*.25?.3:.6:1,completed:true,error:error?m.kind==='technical'?'balance':m.kind==='precision'?'aid':'rhythm':null};
  });return dressage100Sheet(show,entry,records,{},c);
 }
