@@ -60,6 +60,7 @@
     "test:competition-pace-browser": "node tests/competition-pace110-browser.cjs",
     "test:interactive-lessons-browser": "node tests/interactive-lessons111-browser.cjs",
     "test:ranking-background-browser": "node tests/ranking-background112-browser.cjs",
-    "test:ranking-lag-browser": "node tests/ranking-lag113-browser.cjs"
+    "test:ranking-lag-browser": "node tests/ranking-lag113-browser.cjs",
+    "test:horse-potential-browser": "node tests/horse-potential114-browser.cjs"
   }
 }
