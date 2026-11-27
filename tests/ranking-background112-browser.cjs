@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),{chromium}=require('playwright');
 (async()=>{const b=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{const p=await b.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(process.env.GAME_URL||'http://localhost:8124');await p.waitForFunction(()=>Save3.ready);
- const result=await p.evaluate(async()=>{resetGame();careerSetProfile(rrStoreCurrentProfile(),22,'GBR');const world=careerState(),start=pastureCalendarHour();world.settings.progression=false;world.settings.background=true;
+ const result=await p.evaluate(async()=>{resetGame();careerSetProfile(rrStoreCurrentProfile(),17,'GBR');const world=careerState(),start=pastureCalendarHour();world.settings.progression=false;world.settings.background=true;
  const specs=[...DISCIPLINES.map(d=>['world',d,'']),['national','jumping','GBR'],['division','jumping','junior'],['youth-national','jumping','junior|GBR']];
  for(const args of specs)careerRankingRows(...args);const opening=specs.map(args=>careerRankingRows(...args).reduce((n,r)=>n+r.points,0));
  const end=pastureCalendarHour(1,5,1,0),clock=performance.now();careerAdvance(end);Object.assign(app,pastureDate(end));const elapsed=performance.now()-clock,release=world.rankingHour;

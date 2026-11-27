@@ -345,7 +345,7 @@ renderSettings = function () {
       ${[['progression','Rider Career Progression & Rankings'],['background','Background NPC Career Simulation'],
         ['games','International Championship Calendar'],['sponsors','Sponsor Offers'],['federations','National Team Applications']].map(([key,label]) =>
         `<label><input type="checkbox" data-career-setting="${key}"${(key==='federations' ? world.settings.federations!==false : world.settings[key]) ? ' checked' : ''}> ${label}</label>`).join('')}
-      <p>Career progression and background simulation require Rider Realism. Games scheduling is independent.</p>
+      <p>NPC ranking competitions run independently of optional career progression. Use Reduce Lag in Settings to pause categories your riders do not qualify for. Games scheduling is independent.</p>
       <label>Welsh registry profile<select data-career-welsh>${careerOptions(Object.keys(CAREER_WELSH_STANDARDS).map(key => [key,key]),app.settings.welshStandard || 'UK-inspired')}</select></label>
     </details>`;
   manager.append(section);
