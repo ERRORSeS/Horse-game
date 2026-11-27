@@ -1,7 +1,7 @@
 /* Best-case career reachability: scripted clean rides use real entry, scoring,
    classification, applications and team selection. No qualification flags are forced. */
 function simulateRiderLife(startAge=22,stopAtFirstTeam=false){
- resetGame();rrSettings().enabled=true;const world=careerState();world.settings.progression=true;world.settings.background=true;
+ resetGame();app.horses=[baseHorse('trained')];rrSettings().enabled=true;const world=careerState();world.settings.progression=true;world.settings.background=true;
  careerSetProfile(rrStoreCurrentProfile(),startAge,'GBR');rrSettings().experience.jumping='1.80';for(const k of RR_ABILITIES)rrSettings().abilities[k]=100;
  const horse=app.horses[0],horseId=horse.id;horse.breed='Dutch Warmblood';horse.careerLevelCaps={};horse.age=9;horse.birthYear=app.year-9;horse.behavior=900;horse.requiresBreakingIn=false;horse.medicalConditions=[];horse.illnesses=[];horse.legacyMedicalRecords=[];
  for(const group of Object.values(horse.stats))for(const k of Object.keys(group))group[k]=100;for(const k of Object.keys(horse.potential))horse.potential[k]=100;

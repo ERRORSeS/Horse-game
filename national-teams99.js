@@ -15,7 +15,7 @@ careerSchedule=function(from,to,...args){const events=NATIONAL99_SCHEDULE(from,t
 const NATIONAL99_SEASON=federation90EnsureSeason;
 let national99Selecting=false;
 federation90EnsureSeason=function(event,country){
- if(event.federationProgram&&event.team&&!national99Selecting&&!federationCountries().includes(country)){
+ if((event.federationProgram&&event.team||event.games)&&!national99Selecting&&!federationCountries().includes(country)){
   const plan=federationPlan(event.date.year,country,event.discipline,event.division),clock=Math.max(pastureCalendarHour(),careerState().cursor||0);let changed=false;
   if(plan&&clock>=plan.selection){national99Selecting=true;try{for(const trial of [...plan.trials].sort((a,b)=>a.at-b.at)){if(careerEventEnd(trial)>clock||careerEventEnd(trial)>=event.at)continue;const old=careerState().meets[trial.id];if(old?.results.length)continue;if(old)delete careerState().meets[trial.id];const meet=careerResolveNpcMeet(trial);if(meet?.results.length)changed=true;}
    if(changed&&federation90BoardBatch)federation90BoardBatch.trialMeets=null;
@@ -53,12 +53,12 @@ showResultMarkup=function(show,...args){let html=NATIONAL99_RESULT(show,...args)
 const NATIONAL99_TRIAL_ROSTER=ranking91EventRoster;
 ranking91EventRoster=function(event,roster){
  if(!event.federationTrial||federationCountries().includes(event.federation))return NATIONAL99_TRIAL_ROSTER(event,roster);
- const spec=rank91Spec('youth-national',event.discipline,event.division+'|'+event.federation),candidates=(careerRosterIndex(roster).byCountry.get(event.federation)||[]).filter(r=>rank91Eligible(r,spec,event.at)).sort((a,b)=>b.skill-a.skill||a.id.localeCompare(b.id)).slice(0,12);
+ const spec=rank91Spec('youth-national',event.discipline,event.division+'|'+event.federation),ready=r=>rank91Eligible(r,spec,event.at)&&(r.horses||[]).some(h=>!FEDERATION_ELIGIBILITY(event,r,h,{npc:true,selectionOnly:true})&&npc85HorseEligible(r,h,event)),candidates=(careerRosterIndex(roster).byCountry.get(event.federation)||[]).filter(ready).sort((a,b)=>b.skill-a.skill||a.id.localeCompare(b.id)).slice(0,12);
  if(candidates.length>=12)return candidates;
  const names=new Set(roster.map(r=>r.name)),horses=new Set(roster.flatMap(r=>(r.horses||[]).map(h=>horseNameKey(h.name)))),[lo,hi]=CAREER_AGE_DIVISIONS[event.division].ages;let sequence=0;
- while(candidates.length<12){const id='national99:'+event.federation+':'+event.discipline+':'+event.division+':'+event.date.year+':'+ ++sequence;if(roster.some(r=>r.id===id))continue;
-  const age=lo+Math.floor(careerRoll(id,'age')*(Math.min(hi,55)-lo+1)),skill=76+careerRoll(id,'skill')*22,r={id,name:careerUniqueRiderName(id,event.federation,names),country:event.federation,specialty:event.discipline,birth:{year:event.date.year-age,month:1,day:1},professional:event.division==='professional'||event.division!=='amateur'&&age>=18,stage:skill>=92?4:3,skill,potential:100,travelWillingness:careerRoll(id,'travel'),horses:[],retiredHorses:[],starts:0,training:[],rankingDebutHour86:Math.min(event.at,pastureCalendarHour())};
-  const h=careerNpcHorse(r,event.division==='pony'?'pony':'sport',event.date.year,horses,event.division==='pony'?'pony':'sport');r.horses.push(h);npc85Initialize(r,h);roster.push(r);candidates.push(r);
+ while(candidates.length<12&&sequence<200){const id='national99:'+event.federation+':'+event.discipline+':'+event.division+':'+event.date.year+':'+ ++sequence;if(roster.some(r=>r.id===id))continue;
+  const age=lo+Math.floor(careerRoll(id,'age')*(Math.min(hi,55)-lo+1)),skill=Math.min(100,Math.max(76,requiredSkillBand(event.discipline,event.level)[0]+6)+careerRoll(id,'skill')*16),r={id,name:careerUniqueRiderName(id,event.federation,names),country:event.federation,specialty:event.discipline,birth:{year:event.date.year-age,month:1,day:1},professional:event.division==='professional'||event.division!=='amateur'&&age>=18,stage:skill>=92?4:3,skill,potential:100,travelWillingness:careerRoll(id,'travel'),horses:[],retiredHorses:[],starts:0,training:[],rankingDebutHour86:Math.min(event.at,pastureCalendarHour())};
+  const h=careerNpcHorse(r,event.division==='pony'?'pony':'sport',event.date.year,horses,event.division==='pony'?'pony':'sport');r.horses.push(h);npc85Initialize(r,h);if(!ready(r))continue;roster.push(r);candidates.push(r);
  }
  npc85Registry(true);return candidates;
 };

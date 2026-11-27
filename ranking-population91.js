@@ -411,6 +411,7 @@ function rank91EventSpec(event) {
       event.discipline,
       event.series || event.classId || event.id,
     );
+  if(event.games||event.gamesTrial)return rank91Spec(event.division==='senior'?'world':'division',event.discipline,event.division==='senior'?'':event.division);
   if (event.horseAge)
     return rank91Spec("young-horse", event.discipline, event.horseAge);
   if (event.ranking === "division" || event.federationTrial) {
@@ -440,8 +441,8 @@ function ranking91EventRoster(event, roster) {
       .filter((r) => !r.id.includes(":seller:"))
       .slice(0, 50);
   const spec = rank91EventSpec(event),
-    pool = rank91Pool(spec.type, spec.discipline, spec.filter, event.at),
-    byId = careerRosterIndex().byId;
+    pool = rank91Pool(spec.type, spec.discipline, spec.filter, event.at);
+  let byId = careerRosterIndex().byId;
   if (pool.key.startsWith("world|") && !event.team) {
     const week = Math.floor(event.at / RANK91_WEEK);
     if (pool.admissionWeek !== week) {
@@ -507,7 +508,7 @@ function ranking91EventRoster(event, roster) {
     }
   }
 
-  if (event.team) {
+  if (event.team || event.games) {
     const countries =
         event.programCountries ||
         [
@@ -519,6 +520,7 @@ function ranking91EventRoster(event, roster) {
       nominated = [];
     for (const country of countries) {
       const season = federation90EnsureSeason(event, country);
+      byId=careerRosterIndex().byId;
       for (const member of season?.members || [])
         if (federationMayRepresent(event, member) && byId.has(member.riderId))
           nominated.push(member.riderId);
@@ -539,6 +541,7 @@ function ranking91EventRoster(event, roster) {
       ].slice(0, pool.limit);
     }
   }
+  byId=careerRosterIndex().byId;
   return pool.members.map((m) => byId.get(m.id)).filter(Boolean);
 }
 // Existing canonical calendar events replace hidden per-board weekly meets.

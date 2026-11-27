@@ -64,6 +64,9 @@
     "test:horse-potential-browser": "node tests/horse-potential114-browser.cjs",
     "test:team-health-browser": "node tests/team-health115-browser.cjs",
     "test:background-save-browser": "node tests/background-save115-browser.cjs",
-    "test:regional-fields-browser": "node tests/regional-fields115-browser.cjs"
+    "test:regional-fields-browser": "node tests/regional-fields115-browser.cjs",
+    "test:games-browser": "node tests/games116-browser.cjs && node tests/senior-games116-browser.cjs",
+    "test:open-team-repair-browser": "node tests/team-open116-browser.cjs",
+    "test:senior-squads-browser": "node tests/senior-squads116-browser.cjs"
   }
 }
