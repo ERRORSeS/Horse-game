@@ -58,6 +58,7 @@
     "test:training-report-browser": "node tests/training-report108-browser.cjs",
     "test:auto-training-policy-browser": "node tests/auto-training109-browser.cjs",
     "test:competition-pace-browser": "node tests/competition-pace110-browser.cjs",
-    "test:interactive-lessons-browser": "node tests/interactive-lessons111-browser.cjs"
+    "test:interactive-lessons-browser": "node tests/interactive-lessons111-browser.cjs",
+    "test:ranking-background-browser": "node tests/ranking-background112-browser.cjs"
   }
 }

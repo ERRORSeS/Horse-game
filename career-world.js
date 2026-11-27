@@ -428,7 +428,7 @@ function careerNpcField(event, limit, player = null, selectionPool = false) {
     const sameCountry = rider.country === event.federation;
     const sameRegion = CAREER_COUNTRIES[rider.country][1] === event.hostRegion;
     const travel = event.tier <= 4 && !sameCountry ? (sameRegion ? .12 : .35) * (1 - (rider.travelWillingness ?? .5)) : 0;
-    matches.push({ rider, horse, score, selection, draw: careerRoll(event.id, rider.id) + travel + (event.tier<=4&&!sameCountry?1:0) });
+    matches.push({ rider, horse, score, selection, draw: careerRoll(event.id, rider.id) - (event.tier>=5 ? score*.006 : 0) + travel + (event.tier<=4&&!sameCountry?1:0) });
   }
   const quotas = {};
   if (player) quotas[player.country] = 1;
@@ -618,8 +618,8 @@ function careerAdvance(hour = pastureCalendarHour()) {
   careerSeedRankedHistory(world.cursor);
   const from = world.cursor + 1;
   const firstMonth = Math.floor(world.cursor / CAREER_HOURS_PER_MONTH);
-  const events = careerActive() && world.settings.background
-    ? careerSchedule(from - 72, hour, undefined, false).filter(event => careerEventEnd(event) >= from && careerEventEnd(event) <= hour)
+  const events = world.settings.background !== false
+    ? careerBackgroundSchedule112(from - 72, hour).filter(event => careerEventEnd(event) >= from && careerEventEnd(event) <= hour)
       .sort((a,b) => careerEventEnd(a)-careerEventEnd(b) || a.id.localeCompare(b.id))
     : [];
   let index=0, nextWeek=(Math.floor(world.cursor/CAREER_HOURS_PER_WEEK)+1)*CAREER_HOURS_PER_WEEK;
