@@ -105,7 +105,7 @@ const LESSON_MONTH=monthlyProgress;monthlyProgress=function(...args){
 };
 function lessonProfileDetails(h){
  const height=/hh/i.test(String(h.height))?String(h.height):h.height+' hh';
- const levels=Object.keys(SHOW_LEVELS).map(d=>'<li>'+mgEscape(d[0].toUpperCase()+d.slice(1))+': '+mgEscape(SHOW_LEVELS[d][highestAllowedLevelIndex(h,d)])+'</li>').join('');
+ const levels=Object.keys(SHOW_LEVELS).map(d=>'<li>'+mgEscape(d[0].toUpperCase()+d.slice(1))+': '+mgEscape(SHOW_LEVELS[d][highestAllowedLevelIndex(h,d)]||'Not suitable for this ridden discipline')+'</li>').join('');
  return '<section data-lesson-details><p>Personality: '+mgEscape(h.personality)+' · Coat: '+mgEscape(h.coat)+' · Height: '+mgEscape(height)+'</p><h4>Discipline levels</h4><ul>'+levels+'</ul><p>Barn-managed tack: '+Object.entries(h.tack||{}).filter(([slot])=>['bridle','bit','saddle','pad'].includes(slot)).map(([slot,type])=>mgEscape(slot)+': '+mgEscape(type)).join(' · ')+'</p><p>'+(h.lessonOverworked?'Overworked lesson horse at a facility rated below 2 stars for lessons. Tack may be unsuitable.':'Lesson workload managed by the barn. Tack selected for this horse’s personality.')+'</p></section>';
 }
 const LESSON_PROFILE=horseProfileMarkup;horseProfileMarkup=function(h,...args){return LESSON_PROFILE(h,...args)+(h.isLessonHorse||h.isLeased&&h.lessonLeaseTerms?lessonProfileDetails(h):'');};

@@ -199,7 +199,7 @@ function showBeginJumpOff(show,strategy='Balanced'){
   if(!show.qualifiers.includes(player.id)){show.stage='results';while(showNextCompetitor(show)){}return;}
   const carried=HorseHealth.copy(show.rpg.warmupState),h=showHorse(show),rpg=buildCompetitionRpgSession(h,'jumping',show.level);rpg.warmupState=carried;rpg.steps=rpg.steps.filter(s=>s.stage==='main_round').slice(0,4);rpg.liveShowId=show.id;rpg.jumpOff=true;rpg.strategy=strategy;rpg.ridingStyle=strategy;rpg.choiceRecords=[];show.rpg=rpg;app.competitionRpg=rpg;show.stage='ride';showNote(show,'Congratulations. '+h.name+' has qualified for the jump-off. You study the shortened course and locate the inside turn.');
 }
-const SHOW_RIDING_STYLES=Object.freeze({Conservative:{risk:.80,time:1.05},Balanced:{risk:1,time:1},Competitive:{risk:1.15,time:.94},Aggressive:{risk:1.35,time:.88}});
+const SHOW_RIDING_STYLES=Object.freeze({Conservative:{risk:.80,time:1.05},Balanced:{risk:1,time:1},Competitive:{risk:1.15,time:.94},Aggressive:{risk:1.35,time:.82}});
 function showRidingStyle(session){return session?.ridingStyle||session?.strategy||'Balanced';}
 function showEffortTiming(h,session,phase,choice,quality,baseDistance=null,timeFactor=1){
  const pace=SHOW_RIDING_STYLES[showRidingStyle(session)]?.time||1,intent=String(choice?.intent||choice?.label||''),route=/inside|tight|direct|cut/i.test(intent)?.94:/wide|conservative|steady|balance|extra/i.test(intent)?1.06:1,distance=(Number.isFinite(baseDistance)&&baseDistance>0?baseDistance:phase==='cross-country'?80:40)*route,speed=phase==='cross-country'?10:5+effectiveDisciplineSkill(h,session.discipline)/100;

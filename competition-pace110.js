@@ -31,8 +31,8 @@ hydrateFromSave=function(...args){const out=PACE110_LOAD(...args);repairRankingP
 /* Lesson scope is a saved selection from breed-appropriate ceilings, not current schooling. */
 function lessonScope110(h,barn){
  if(h.lessonScopeVersion110)return h;
- const p=Breed94.get(h.breed);if(!p?.ridden)return h;
- const athlete=breed94Potential(h,true),stars=clamp(Number(barn?.lessonsStars)||3,1,5),random=coat94Rng(h.id+':lesson-scope110'),roll=random();
+ const p=Breed94.get(h.breed)||{ridden:true,jumpScope:[.5,1.3,/Warmblood|Hanover|Holstein|Oldenburg|Trakehn|Selle Francais|Sport Cross|Westphalian/i.test(h.breed)?1.7:/Pony/i.test(h.breed)?1.3:/Draft/i.test(h.breed)?.9:/Friesian/i.test(h.breed)?1.1:1.5]};if(!p.ridden)return h;
+ const athlete=breed94Potential(h,true)||(h.athleticPotential94||={v:1,breed:h.breed,ridden:true,category:'Normal',potential:{...h.potential},subskills:{},jumpScope:p.jumpScope[1],source:'Lesson program selection'}),stars=clamp(Number(barn?.lessonsStars)||3,1,5),random=coat94Rng(h.id+':lesson-scope110'),roll=random();
  // Scope above 1.20m: 0%, 0%, 0.5%, 8%, 18%; above 1.40m: 0%, 0%, 0.05%, 1%, 3%.
  const high=stars>=5?.18:stars>=4?.08:stars>=3?.005:0,elite=stars>=5?.03:stars>=4?.01:stars>=3?.0005:0;
  const ceiling=roll<elite?1.6:roll<high?1.4:stars>=4?1.2:stars>=3?1.1:1;
