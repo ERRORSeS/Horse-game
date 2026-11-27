@@ -322,7 +322,7 @@ function careerResults({ riderId, horseId, discipline, from = -Infinity, until =
           tier: meet.tier, series: meet.series, division: meet.division, ranking: meet.ranking,
           horseAge: meet.horseAge, major: meet.major, custom: meet.custom })));
 }
-function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
+function careerEligibility(event, rider, horse, { npc = false, history, selectionOnly = false } = {}) {
   if (!rider) return 'Choose a rider.';
   const age = careerAge(rider, event.at, true);
   const division = CAREER_AGE_DIVISIONS[event.division];
@@ -344,8 +344,10 @@ function careerEligibility(event, rider, horse, { npc = false, history } = {}) {
       if (height > event.ponyCm || height <= (event.ponyMinCm || 0)) return 'The horse does not meet this pony class’s measured-height limits.';
     }
     const minimumSkill = event.minimumSkill ?? requiredSkillBand(event.discipline,event.level)[0];
+    const selectionHorse=selectionOnly?{...horse,illnesses:[],careerLevelCaps:undefined,potential:{...horse.potential}}:horse;
+    const unavailable=npc?false:selectionOnly ? horse.deceased||horse.retiredForever||horse.retiredToBreeding||(horse.requiresBreakingIn===true&&horse.manualRidabilityOverride!==true) : !canCompeteUnderSaddle(horse);
     if (npc ? horse.skills[event.discipline] < minimumSkill
-      : !canCompeteUnderSaddle(horse) || levelIndex(event.discipline, event.level) > highestAllowedLevelIndex(horse, event.discipline)) {
+      : unavailable || levelIndex(event.discipline, event.level) > highestAllowedLevelIndex(selectionHorse, event.discipline)) {
       return 'The horse does not meet the current schooling or medical requirements.';
     }
   } else if (!event.allocated) return 'Choose a horse.';

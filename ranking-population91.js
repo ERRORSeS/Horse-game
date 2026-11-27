@@ -404,6 +404,7 @@ function rank91Pool(type, d, filter = "", hour = pastureCalendarHour()) {
   return pool;
 }
 function rank91EventSpec(event) {
+  if(event.region&&!event.team&&!event.games&&event.series)return rank91Spec("tour",event.discipline,event.series);
   if (event.team)
     return rank91Spec(
       "team",

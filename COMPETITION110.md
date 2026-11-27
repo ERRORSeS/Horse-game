@@ -2,7 +2,7 @@ Competition settings now support a saved custom fault percentage from 0 to 100. 
 
 Aggressive uses 0.82 of Balanced moving time; Competitive uses 0.94. Aggressive automatic course choices prefer shorter lines without looking ahead at random outcomes. Refusals, rhythm and drift retain their actual recovery delays. Eventing pace now follows the same ordering.
 
-Default generated fields increase from 16 to 44 total combinations with prestige. Eligible real career entrants determine the actual field; fixed team, Games, specified starter counts and custom shows retain their rules. Unentered future events in saves adopt these defaults.
+Default generated fields increase from 17 to 50 total combinations with prestige. Eligible real career entrants determine the actual field; fixed team, Games, specified starter counts and custom shows retain their rules. Unentered future events in saves adopt these defaults.
 
 Official ranking results can score when optional career progression is disabled. Loading repairs known eligible zero-point results once using stored scoring rules or the real catalogue. It does not replay shows, pay prizes, invent starts or rank local schooling shows. Weekly ranking release timing remains unchanged; newly joined NPCs begin without points until they earn them.
 

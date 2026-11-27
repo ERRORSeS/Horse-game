@@ -4,7 +4,7 @@ function serializeAppStateInBackground({storage=false}={}){
  mgCleanupAssignments();mgState();
  return new Promise((resolve,reject)=>{
   let worker;
-  try{worker=new Worker(new URL('save-serialize-worker.js?v=2',document.baseURI));}catch(error){resolve(serializeAppState());return;}
+  try{worker=new Worker(new URL('save-serialize-worker.js?v=115',document.baseURI));}catch(error){resolve(serializeAppState());return;}
   const timeout=setTimeout(()=>{worker.terminate();reject(Error('Preparing the save timed out. Retry saving or export your progress.'));},30000);
   const finish=(error,payload)=>{clearTimeout(timeout);worker.terminate();if(error)reject(Error(error));else resolve(payload);};
   worker.onmessage=({data})=>finish(data.error,storage?data:data.payload);
