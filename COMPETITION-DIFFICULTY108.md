@@ -1,6 +1,6 @@
 # Competition fault difficulty and chronological training reports
 
-Settings → Competition difficulty adds Easy, Normal and Hard. Normal is the existing probability calculation; Easy multiplies relevant fault chances by 0.65, and Hard by 1.30, with probability bounds retained. These are relative changes in chance, not percentage-point changes or guaranteed incident counts. Faults remain possible on Easy.
+Settings → Competition difficulty adds Easy, Normal and Hard. Normal is the existing probability calculation; Easy multiplies relevant fault chances by 0.55, and Hard by 1.30, with probability bounds retained. These are relative changes in chance, not percentage-point changes or guaranteed incident counts. Faults remain possible on Easy.
 
 Interactive and quick competition execution errors, rails and refusals use the setting. The legacy whole-round rail/refusal model, eventing cross-country/arena jumping and simulated dressage execution errors also use it. Cross-country applies the multiplier once after contextual adjustments, including when profiles are cached. Player and NPC combinations use the same setting. Training probabilities, horse abilities, the value of a fault, movement-quality judging, medical rules and existing results are unchanged. Already generated/cached outcomes are retained. The preference saves per career and defaults to Normal for old or invalid settings.
 

@@ -507,7 +507,7 @@ function careerParticipationStatus(row) {
     ? 'Eliminated' : row.rank ? 'Completed' : 'Did Not Start';
 }
 
-function careerRecordMeet(event, standings, player = null, { recovery = false, ranked = careerActive() || (player && event.official) || (event.customShowId && event.official) } = {}) {
+function careerRecordMeet(event, standings, player = null, { recovery = false, ranked = careerActive() || event.official } = {}) {
   const world = careerState();
   if (world.meets[event.id]) return world.meets[event.id];
   const mean = standings.reduce((sum,row) => sum + (row.skills?.discipline ?? 60), 0) / Math.max(1, standings.length);
