@@ -7,7 +7,7 @@ self.onmessage=async({data})=>{
   const collections=[...(state.auctions3?.collections||[]),...(state.auctions3?.deferredCollections87||[])],current=new Set(collections.flatMap(c=>c.lots).map(l=>l.horseId));
   for(const rider of state.career?.npcs||[])if(rider.horses?.some(h=>current.has(h.id)))rider.horses=rider.horses.map(h=>current.has(h.id)?{id:h.id}:h);
   const payload=JSON.stringify(state);
-  if(storage&&payload.length>=32000000&&typeof CompressionStream!=='undefined'&&typeof DecompressionStream!=='undefined'){
+  if(storage&&payload.length>=4000000&&typeof CompressionStream!=='undefined'&&typeof DecompressionStream!=='undefined'){
    const payloadGzip=await new Response(new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
    self.postMessage({payload:null,payloadEncoding:'gzip',payloadGzip});
   }else self.postMessage({payload});

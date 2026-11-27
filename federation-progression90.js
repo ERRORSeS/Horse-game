@@ -59,17 +59,6 @@ function federation90Health(h) {
   if (!h) return "No eligible horse is registered.";
   if (h.deceased || h.retiredForever || h.retiredToBreeding)
     return "The registered horse is unavailable or retired.";
-  if (h.stats && !canCompeteUnderSaddle(h))
-    return "The registered horse is not medically or educationally eligible.";
-  if (
-    (h.medicalConditions || []).some(
-      (c) =>
-        !c.resolved &&
-        (c.severity === "major" || HorseHealth.definition(c).restriction),
-    ) ||
-    (h.illnesses || []).some((c) => c.active)
-  )
-    return "A current medical restriction prevents selection.";
   return "";
 }
 function federation90PartnerIssue(rider, horse) {
@@ -177,7 +166,7 @@ function federation90Score(plan, rider, horse, hour, context) {
     finished = records.filter((r) => r.placing && r.placing <= 10),
     consistency = records.length ? finished.length / records.length : 0,
     readiness = horse.stats
-      ? effectiveDisciplineSkill(horse, plan.discipline)
+      ? effectiveDisciplineSkill({...horse,illnesses:[],potential:{...horse.potential}}, plan.discipline)
       : Number(horse.skills?.[plan.discipline]) || 0,
     skill = rider.player
       ? Object.values(rider.abilities || {}).reduce((s, n) => s + n, 0) /
@@ -327,7 +316,7 @@ function federation90Issue(plan, rider, horse, hour, role = "main") {
       : plan.trial;
   event.minimumSkill = requiredSkillBand(event.discipline, event.level)[0];
   const issue = FEDERATION_ELIGIBILITY(event, rider, horse, {
-    npc: !rider.player,
+    npc: !rider.player, selectionOnly: true,
   });
   if (issue) return issue;
   if (
@@ -784,7 +773,7 @@ federationNomination = function (event, rider, horse) {
     return null;
   if (
     (event.games || event.major) &&
-    FEDERATION_ELIGIBILITY(event, rider, horse, { npc: !rider.player })
+    FEDERATION_ELIGIBILITY(event, rider, horse, { npc: !rider.player, selectionOnly: true })
   )
     return null;
   return member;
@@ -1010,7 +999,7 @@ function federation90Nominate(event, country, hour) {
         horse &&
         !federation90Health(horse) &&
         !federation90PartnerIssue(rider, horse) &&
-        !FEDERATION_ELIGIBILITY(event, rider, horse, { npc: !rider.player })
+        !FEDERATION_ELIGIBILITY(event, rider, horse, { npc: !rider.player, selectionOnly: true })
       );
     },
     withdrawn = old?.withdrawn || [],
@@ -1279,7 +1268,7 @@ federationMarkup82 = function (rider, horses) {
       })
       .join("");
   const end = html.lastIndexOf("</div></details>");
-  const section = `<section data-federation-evaluations>${cards}<p>Development and Reserve: six shared development/team preparation cups per year. Main: six Nations Preparation Cups. Ordinary shows remain available. Squad reviews occur after both trials and in months 9 and 12; medical vacancies are reviewed before relevant team events.</p></section>`;
+  const section = `<section data-federation-evaluations>${cards}<p>Development and Reserve: six shared development/team preparation cups per year. Main: six Nations Preparation Cups. Ordinary shows remain available. Squad reviews occur after both trials and in months 9 and 12; squad vacancies are reviewed before relevant team events; horse health does not affect selection.</p></section>`;
   return end < 0
     ? html + section
     : html.slice(0, end) + section + html.slice(end);

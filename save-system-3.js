@@ -28,7 +28,7 @@ const Save3=(()=>{
  }
  // Keep large career ledgers below browser single-value limits without dropping history.
  async function packRecord(record){
-  if(!record.payload||record.payload.length<32000000||(typeof CompressionStream==='undefined'||typeof DecompressionStream==='undefined'))return record;
+  if(!record.payload||record.payload.length<4000000||(typeof CompressionStream==='undefined'||typeof DecompressionStream==='undefined'))return record;
   const payloadGzip=await new Response(new Blob([record.payload]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
   return {...record,payload:null,payloadEncoding:'gzip',payloadGzip};
  }

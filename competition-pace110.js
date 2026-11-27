@@ -1,5 +1,5 @@
 /* Default field sizes follow prestige; fixed and player-defined formats retain their counts. */
-function competitionField110(prestige){return 16+Math.floor(clamp(Number(prestige)||0,0,100)*.28);}
+function competitionField110(prestige){return 16+Math.floor(clamp(Number(prestige)||0,0,100)*.34);}
 const PACE110_EVENT=careerEvent;
 careerEvent=function(definition,...args){const event=PACE110_EVENT(definition,...args);if(!definition.team&&!definition.games&&definition.starters==null){event.fieldSize=competitionField110(event.prestige??CAREER_TIERS[event.tier]?.prestige);event.npcCount=event.fieldSize-1;}return event;};
 const PACE110_FIELD=showConfigureField;
