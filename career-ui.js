@@ -37,7 +37,7 @@ function careerGuide() {
         `<p>${CAREER_DISCIPLINE_LABELS[discipline]} international winner bases, 1★ through World Championship · ${points.join(', ')}.</p>`).join('')}
       <p>Dressage uses the final percentage. Eventing uses total penalties across all phases. Hunter uses the judged score.</p></details>
     <details><summary>Ranking periods</summary>
-      <p>Ranking categories simulate up to 50 NPC contenders, or 100 when your rider is eligible. A newly active category adds five contenders per weekly release. NPC points come from real calendar competitions; private seller histories and legacy hidden circuits do not count.</p><p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release every seven game days. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
+      <p>Ranking categories simulate up to 50 NPC contenders, or 100 when your rider is eligible. A newly active category adds five contenders per weekly release. NPC points come from real calendar competitions, even with optional career progression off. The background competition setting controls simulation. New contenders start at zero and earn points at scheduled shows; boards publish those results every seven days. Private seller histories and legacy hidden circuits do not count.</p><p>World results roll off after 12 game months. World rider totals use the best 30 results. Rankings release every seven game days. Tour, team and national standings use the game year. Youth and young horse points stay in their own boards.</p></details>
     <details><summary>Age divisions and ponies</summary>
       <ul>${Object.values(CAREER_AGE_DIVISIONS).map(division => `<li>${division.label} · ${division.ages.join('–')}</li>`).join('')}</ul>
       <p>Age divisions use age in the competition year. Pony classes check measured height. The default 148 cm ceiling includes a 1 cm allowance for a shod measurement. Young horse divisions require the specified age and suitable schooling.</p></details>
@@ -345,7 +345,7 @@ renderSettings = function () {
       ${[['progression','Rider Career Progression & Rankings'],['background','Background NPC Career Simulation'],
         ['games','International Championship Calendar'],['sponsors','Sponsor Offers'],['federations','National Team Applications']].map(([key,label]) =>
         `<label><input type="checkbox" data-career-setting="${key}"${(key==='federations' ? world.settings.federations!==false : world.settings[key]) ? ' checked' : ''}> ${label}</label>`).join('')}
-      <p>Career progression and background simulation require Rider Realism. Games scheduling is independent.</p>
+      <p>NPC ranking competitions run independently of optional career progression. Use Reduce Lag in Settings to pause categories your riders do not qualify for. Games scheduling is independent.</p>
       <label>Welsh registry profile<select data-career-welsh>${careerOptions(Object.keys(CAREER_WELSH_STANDARDS).map(key => [key,key]),app.settings.welshStandard || 'UK-inspired')}</select></label>
     </details>`;
   manager.append(section);

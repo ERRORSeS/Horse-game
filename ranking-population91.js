@@ -353,10 +353,12 @@ function rank91Pool(type, d, filter = "", hour = pastureCalendarHour()) {
             careerRoll(id, "age") * (Math.min(ages[1], 60) - ages[0] + 1),
           ),
         stage =
-          age < 12
+          pool.key.startsWith("world|")
+            ? 3 + Math.floor(careerRoll(id, "stage") * 3)
+            : age < 12
             ? Math.floor(careerRoll(id, "stage") * 3)
             : Math.floor(careerRoll(id, "stage") * 5),
-        skill = [34, 49, 66, 81, 94][stage] + careerRoll(id, "skill") * 5;
+        skill = Math.min(100,[34,49,66,81,94,98][stage]+careerRoll(id,"skill")*5);
       const r = {
         id,
         name: careerUniqueRiderName(id, country, names),
@@ -436,8 +438,6 @@ function ranking91EventRoster(event, roster) {
     return (careerRosterIndex(roster).byDiscipline.get(event.discipline) || [])
       .filter((r) => !r.id.includes(":seller:"))
       .slice(0, 50);
-  if (!careerActive())
-    return careerRosterIndex(roster).byDiscipline.get(event.discipline) || [];
   const spec = rank91EventSpec(event),
     pool = rank91Pool(spec.type, spec.discipline, spec.filter, event.at),
     byId = careerRosterIndex().byId;
