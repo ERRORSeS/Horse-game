@@ -292,7 +292,7 @@ function careerEvent(definition, year) {
     entries: []
   };
 }
-function careerSchedule(from, to, includeGames = careerState().settings.games, includeForeground = true) {
+function careerSchedule(from, to, includeGames = careerState().settings.games !== false, includeForeground = true) {
   const events = [];
   for (let year = pastureDate(from).year; year <= pastureDate(to).year; year++) {
     for (const row of CAREER_SERIES) {

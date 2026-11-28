@@ -63,6 +63,7 @@ function show82Matches(event,filters) {
     event.prestige<Number(filters.min || 0) || event.prestige>Number(filters.max ?? 100)) return false;
   return ({
     pony:!!event.ponyCm, young:!!event.horseAge, team:!!event.team || !!event.federationTrial,
+    olympics:olympics117Event(event),
     championship:!!event.games || event.tier===4 || event.tier===11,
     ranking:!!event.base && event.official, custom:!!event.customShowId || !!event.custom, final:!!event.final
   })[filters.kind] ?? true;
@@ -133,7 +134,7 @@ function show82RenderCalendar() {
       ${show82Filter('Sort','sort',SHOW82_SORTS,filters.sort)}
       ${show82Filter('Tier','tier',choices(CAREER_TIERS.map((tier,i)=>[i,tier.label])),filters.tier)}
       ${show82Filter('Division','division',choices(Object.entries(CAREER_AGE_DIVISIONS).map(([key,row])=>[key,row.label])),filters.division)}
-      ${show82Filter('Class type','kind',choices([['pony','Pony'],['young','Young horse'],['team','Team or trial'],['championship','Championship'],['ranking','Ranking eligible'],['custom','Custom'],['final','Series final']]),filters.kind)}
+      ${show82Filter('Class type','kind',choices([['olympics','Olympics & Youth Olympics'],['pony','Pony'],['young','Young horse'],['team','Team or trial'],['championship','Championship'],['ranking','Ranking eligible'],['custom','Custom'],['final','Series final']]),filters.kind)}
       ${show82Filter('Entry status','status',choices([['eligible','Eligible for this combination'],['completed','Completed']]),filters.status)}
       ${show82Filter('Horse','horse',horses.map(h=>[h.id,h.name]),horse?.id)}
       <label>Minimum prestige<input type="number" min="0" max="100" data-show82-filter="min" value="${Number(filters.min || 0)}"></label>
