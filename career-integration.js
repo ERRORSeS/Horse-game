@@ -463,7 +463,7 @@ function careerAllocatedHorse(event, rider, sourceHorse) {
   horse.illnesses = [];
   for (const key of Object.keys(horse.stats.jumping)) horse.stats.jumping[key] = 78;
   horse.potential.jumping = 85;
-  horse.owner = 'World Youth Arena Games';
+  horse.owner = 'Youth Olympic Games';
   horse.isCareerAllocation = true;
   return horse;
 }
@@ -479,7 +479,7 @@ showFinish = function (show) {
 };
 function careerEnter(event, horse) {
   const world = careerState(), rider = careerRider();
-  if (!event || (event.games || event.gamesTrial) && !world.settings.games || event.at < pastureCalendarHour() + (typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):24) || event.at > pastureCalendarHour() + 90 * 24 ||
+  if (!event || (event.games || event.gamesTrial) && world.settings.games===false || event.at < pastureCalendarHour() + (typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):24) || event.at > pastureCalendarHour() + 90 * 24 ||
     world.meets[event.id] || event.registeredEntries?.length) return { ok: false, message: 'This class is closed.' };
   const earliest = typeof showBookingLeadHours86==='function'?showBookingLeadHours86(event):event.country===app.currentBarn?.country?24:60;
   if (event.at < pastureCalendarHour() + earliest) return { ok: false, message: 'There is too little time to reach this fixed-date class.' };

@@ -67,6 +67,7 @@
     "test:regional-fields-browser": "node tests/regional-fields115-browser.cjs",
     "test:games-browser": "node tests/games116-browser.cjs && node tests/senior-games116-browser.cjs",
     "test:open-team-repair-browser": "node tests/team-open116-browser.cjs",
-    "test:senior-squads-browser": "node tests/senior-squads116-browser.cjs"
+    "test:senior-squads-browser": "node tests/senior-squads116-browser.cjs",
+    "test:olympics-calendar-browser": "node tests/olympics-calendar117-browser.cjs"
   }
 }

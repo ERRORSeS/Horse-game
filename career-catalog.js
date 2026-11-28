@@ -169,7 +169,7 @@ for (const [name, cm] of [['Small', 127], ['Medium', 137], ['Large', 148]]) {
 for (const [discipline, level, continentalLevel, horseMinAge] of [
   ['jumping','1.60','1.40',9], ['dressage','Grand Prix','Intermediate',8], ['eventing','Four Star','Advanced',8]
 ]) {
-  careerClass('world-games-' + discipline, 'World Arena Games · ' + cap(discipline), discipline, 11, level, 8, {
+  careerClass('world-games-' + discipline, 'Olympic Games · ' + cap(discipline), discipline, 11, level, 8, {
     day: 13 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline), cycle: 4, edition: 0, games: true,
     country: 'FRA', horseMinAge, team: 3, count: 3, quota: 3, ranking: 'championship', base: 0
   });
@@ -179,7 +179,7 @@ for (const [discipline, level, continentalLevel, horseMinAge] of [
         cycle: 4, edition: 2, gamesTrial: true, country: 'KAZ', region: 'Asia', horseMinAge, ranking: 'none', base: 0, starters: 40 });
   }
   for (const month of [2,5,7]) {
-    careerClass('world-trials-' + discipline + '-' + month, 'World Arena Games Trial · ' + cap(discipline),
+    careerClass('world-trials-' + discipline + '-' + month, 'Olympic Games Trial · ' + cap(discipline),
       discipline, 8, level, month, { day: 20 + Object.keys(CAREER_WORLD_POINTS).indexOf(discipline),
         cycle: 4, edition: 0, gamesTrial: true, country: 'FRA', horseMinAge, ranking: 'none', base: 0, starters: 40 });
   }
@@ -189,12 +189,12 @@ for (const [discipline, level, continentalLevel, horseMinAge] of [
   });
 }
 for (const month of [2,5]) {
-  careerClass('youth-games-trial-' + month, 'World Youth Arena Games Trial', 'jumping', 4, '1.10', month, {
+  careerClass('youth-games-trial-' + month, 'Youth Olympic Games Trial', 'jumping', 4, '1.10', month, {
     cycle: 4, edition: 1, gamesTrial: true, division: 'junior', ages: [15,18], horseMinAge: 6,
     country: 'JPN', starters: 24, base: 45
   });
 }
-careerClass('youth-games', 'World Youth Arena Games · Individual Jumping', 'jumping', 11, '1.10', 7, {
+careerClass('youth-games', 'Youth Olympic Games · Individual Jumping', 'jumping', 11, '1.10', 7, {
   cycle: 4, edition: 1, games: true, country: 'JPN', ages: [15,18], division: 'junior', horseMinAge: 7,
   quota: 2, allocated: true, ranking: 'championship', base: 0
 });
